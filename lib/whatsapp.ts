@@ -5,6 +5,8 @@ const CLINIC_WHATSAPP_NUMBER = '923422078639'
 interface WhatsAppLinkOptions {
   treatmentName?: string
   customMessage?: string
+  /** Send TO this number instead of the clinic (e.g. reminding a patient) */
+  phoneOverride?: string
 }
 
 /**
@@ -12,15 +14,24 @@ interface WhatsAppLinkOptions {
  * - Pass `treatmentName` for service booking buttons
  *   (auto message: "...ke liye appointment book karwana chahta hoon")
  * - Pass `customMessage` to override completely (e.g. emergency popup)
+ * - Pass `phoneOverride` to message a patient instead of the clinic
  */
-export function buildWhatsAppLink({ treatmentName, customMessage }: WhatsAppLinkOptions = {}) {
+export function buildWhatsAppLink({
+  treatmentName,
+  customMessage,
+  phoneOverride,
+}: WhatsAppLinkOptions = {}) {
   const message =
     customMessage ??
     (treatmentName
       ? `Asalam-o-Alaikum Dr. Sahib, main ${treatmentName} ke liye appointment book karwana chahta hoon.`
       : `Asalam-o-Alaikum Dr. Sahib, mujhe appointment ke baare mein maloomat chahiye.`)
 
-  return `https://wa.me/${CLINIC_WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`
+  const number = phoneOverride
+    ? toInternationalPKNumber(phoneOverride)
+    : CLINIC_WHATSAPP_NUMBER
+
+  return `https://wa.me/${number}?text=${encodeURIComponent(message)}`
 }
 
 /** Converts a local PK number (0300-1234567 / 03001234567) to international format (923001234567) */

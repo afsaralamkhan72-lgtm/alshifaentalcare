@@ -141,3 +141,42 @@ Naya staff add karne ka tareeqa `admin-setup.sql` ke neeche likha hai.
 
 **Vercel par build fail**
 → Environment variables set nahi kiye. Step 5 ka point 3 dekhein.
+
+---
+
+# PHASE 2 — Treatment Plans & Invoices
+
+## Naya SQL (deploy ke baad chalayein)
+
+Supabase → SQL Editor → `phase2.sql` ka content paste kar ke **Run** karein.
+Ye 3 nayi tables banati hai: `treatment_plans`, `installments`, `visit_notes`.
+
+## Kya mila
+
+**Treatment Plans (Orthodontics ke liye)**
+- Patient profile kholein → "Treatment Plans" → **+ Treatment Plan**
+- Total cost, advance, duration (months) daalein
+- Monthly installment khud calculate hoti hai
+- Save karte hi **har month ki installment row automatically ban jati hai**
+
+**Har Month ka Record**
+- Har installment ke saamne **Mark Paid** button
+- Payment method (Cash/Bank/EasyPaisa/JazzCash) select karein
+- Paid / Overdue / Pending status khud lag jata hai
+- **Pichle sab payments ki history** table mein rehti hai — kab diya, kitna diya, kis tareeqe se
+- Paid karte hi wo entry **Billing reports mein bhi chali jati hai** (double entry nahi karni padti)
+
+**Balance Tracking**
+- Total, Paid, Remaining, aur Progress (jaise 7/24) upar cards mein
+- Overdue installments red banner mein alag se
+
+**WhatsApp Reminder**
+- Har plan par **Send Reminder** button
+- Patient ke number par seedha message — next installment ka number, amount aur due date
+
+**Invoice / PDF**
+- Patient profile → **Invoice** button
+- Poora statement: treatment plans, sab payments, total, paid, balance
+- **Save as PDF / Print** — PDF sirf aap ke device par banti hai
+- **Send Summary on WhatsApp** — text summary patient ko
+- Supabase par koi PDF save nahi hoti (storage bachti hai)

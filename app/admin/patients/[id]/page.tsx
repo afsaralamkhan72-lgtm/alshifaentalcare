@@ -1,7 +1,10 @@
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import DentalChart from '@/components/admin/DentalChart'
 import PatientEditModal from '@/components/admin/PatientEditModal'
+import TreatmentPlanForm from '@/components/admin/TreatmentPlanForm'
+import TreatmentPlanCard, { type Installment, type Plan } from '@/components/admin/TreatmentPlanCard'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -29,6 +32,28 @@ export default async function PatientDetailPage({ params }: Props) {
       .eq('patient_id', id)
       .order('treatment_date', { ascending: false })
     dentalRecords = data ?? []
+  }
+
+  // Treatment plans (orthodontics etc) + their monthly installments
+  const { data: plansData } = await supabase
+    .from('treatment_plans')
+    .select('id, title, total_cost, advance_paid, duration_months, monthly_amount, start_date, status')
+    .eq('patient_id', id)
+    .order('created_at', { ascending: false })
+
+  const plans = (plansData ?? []) as Plan[]
+
+  let installments: (Installment & { plan_id: string })[] = []
+  if (plans.length > 0) {
+    const { data } = await supabase
+      .from('installments')
+      .select('id, plan_id, installment_no, due_date, amount, paid_amount, paid_date, payment_method')
+      .in(
+        'plan_id',
+        plans.map((p) => p.id)
+      )
+      .order('installment_no', { ascending: true })
+    installments = (data ?? []) as (Installment & { plan_id: string })[]
   }
 
   return (
@@ -60,6 +85,12 @@ export default async function PatientDetailPage({ params }: Props) {
                 notes: patient.notes,
               }}
             />
+            <Link
+              href={`/admin/patients/${patient.id}/invoice`}
+              className="rounded-full border border-clinic-teal px-4 py-2 text-sm font-semibold text-clinic-teal"
+            >
+              Invoice
+            </Link>
           </div>
         </div>
 
@@ -83,8 +114,40 @@ export default async function PatientDetailPage({ params }: Props) {
         </div>
       </div>
 
+      {/* Treatment plans — orthodontics and any other multi-month course */}
+      <div className="mt-8">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-display text-lg font-semibold text-clinic-ink">Treatment Plans</h2>
+            <p className="text-sm text-clinic-ink/60">
+              Monthly installments, payment history aur balance.
+            </p>
+          </div>
+          <TreatmentPlanForm patientId={patient.id} />
+        </div>
+
+        <div className="mt-4 grid gap-4">
+          {plans.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-clinic-teal/20 bg-clinic-mint/40 p-6 text-center text-sm text-clinic-ink/60">
+              Koi treatment plan nahi hai. Braces jaise long treatment ke liye plan banayein —
+              har month ki installment khud ban jayegi.
+            </div>
+          ) : (
+            plans.map((plan) => (
+              <TreatmentPlanCard
+                key={plan.id}
+                plan={plan}
+                installments={installments.filter((i) => i.plan_id === plan.id)}
+                patientName={patient.full_name}
+                patientPhone={patient.phone}
+              />
+            ))
+          )}
+        </div>
+      </div>
+
       {patient.department === 'dental' ? (
-        <div id="dental-chart" className="mt-6 scroll-mt-6">
+        <div id="dental-chart" className="mt-8 scroll-mt-6">
           <h2 className="font-display text-lg font-semibold text-clinic-ink">Interactive Dental Chart</h2>
           <div className="mt-3">
             <DentalChart patientId={patient.id} initialRecords={dentalRecords} />
