@@ -40,6 +40,12 @@ export default function Navbar() {
         </nav>
 
         <div className="hidden items-center gap-3 lg:flex">
+          <Link
+            href="/login"
+            className="text-xs font-medium text-clinic-ink/50 transition-colors hover:text-clinic-teal"
+          >
+            Staff Login
+          </Link>
           <a
             href="tel:03422078639"
             className="text-sm font-semibold text-clinic-teal transition-colors hover:text-clinic-teal-light"
@@ -92,6 +98,12 @@ export default function Navbar() {
           >
             Book on WhatsApp
           </a>
+          <Link
+            href="/login"
+            className="mt-2 block rounded-full border border-clinic-teal px-4 py-2 text-center text-sm font-semibold text-clinic-teal"
+          >
+            Staff Login
+          </Link>
         </nav>
       )}
     </header>
