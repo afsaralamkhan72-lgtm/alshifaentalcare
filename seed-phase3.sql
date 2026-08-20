@@ -17,7 +17,11 @@ insert into public.services (department, title, short_description, sort_order) v
 ('dental', 'Scaling & Polishing', 'Professional cleaning to remove plaque and tartar buildup.', 1),
 ('dental', 'Root Canal Treatment (RCT)', 'Pain-free treatment to save an infected or damaged tooth.', 2),
 ('dental', 'Teeth Whitening', 'Safe, clinic-grade whitening for a brighter smile.', 3),
-('dental', 'Dental Implants', 'Permanent replacement for missing teeth.', 4);
+('dental', 'Dental Implants', 'Permanent replacement for missing teeth.', 4),
+('dental', 'Crowns & Bridges', 'Restore damaged teeth with durable crowns or bridges.', 5),
+('dental', 'Extractions', 'Safe and painless tooth extraction procedures.', 6),
+('dental', 'Orthodontics (Braces)', 'Straighten teeth and correct bite alignment.', 7),
+('dental', 'Dentures & Partial Plates', 'Complete or partial denture solutions for missing teeth.', 8);
 
 -- Sample Homeopathic services
 insert into public.services (department, title, short_description, sort_order) values
