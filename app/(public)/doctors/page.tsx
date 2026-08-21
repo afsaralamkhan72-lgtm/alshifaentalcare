@@ -1,6 +1,7 @@
 import PageHeader from '@/components/public/PageHeader'
 import DoctorCard from '@/components/public/DoctorCard'
 import { createClient } from '@/lib/supabase/server'
+import { CLINIC } from '@/clinic.config'
 
 async function getDoctors() {
   try {
@@ -13,6 +14,11 @@ async function getDoctors() {
   } catch {
     return []
   }
+}
+
+export const metadata = {
+  title: 'Our Doctors',
+  description: `Meet the doctors at ${CLINIC.name}, ${CLINIC.address.full}.`,
 }
 
 export default async function DoctorsPage() {

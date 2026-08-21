@@ -72,7 +72,7 @@ export default function EmergencyPopup() {
     <div
       role="dialog"
       aria-label={settings.title}
-      className="fixed bottom-6 left-1/2 z-50 w-[92%] max-w-sm -translate-x-1/2 animate-slide-up rounded-2xl border border-clinic-teal/10 bg-white p-4 shadow-2xl shadow-black/10 sm:left-auto sm:right-6 sm:translate-x-0"
+      className="fixed inset-x-3 bottom-24 z-50 animate-slide-up rounded-2xl border border-clinic-teal/10 bg-white p-4 shadow-2xl shadow-black/10 sm:inset-x-auto sm:bottom-6 sm:right-24 sm:w-[22rem]"
     >
       <button
         onClick={handleDismiss}

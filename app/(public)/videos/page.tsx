@@ -1,6 +1,7 @@
 import PageHeader from '@/components/public/PageHeader'
 import VideoEmbed from '@/components/public/VideoEmbed'
 import { createClient } from '@/lib/supabase/server'
+import { CLINIC } from '@/clinic.config'
 
 async function getVideos() {
   try {
@@ -13,6 +14,11 @@ async function getVideos() {
   } catch {
     return []
   }
+}
+
+export const metadata = {
+  title: 'Videos',
+  description: `Treatment videos and health tips from ${CLINIC.doctor.name}.`,
 }
 
 export default async function VideosPage() {

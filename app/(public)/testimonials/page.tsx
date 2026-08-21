@@ -1,6 +1,7 @@
 import PageHeader from '@/components/public/PageHeader'
 import TestimonialCard from '@/components/public/TestimonialCard'
 import { createClient } from '@/lib/supabase/server'
+import { CLINIC } from '@/clinic.config'
 
 async function getApprovedTestimonials() {
   try {
@@ -14,6 +15,11 @@ async function getApprovedTestimonials() {
   } catch {
     return []
   }
+}
+
+export const metadata = {
+  title: 'Patient Reviews',
+  description: `What patients say about ${CLINIC.name}, ${CLINIC.address.city}.`,
 }
 
 export default async function TestimonialsPage() {

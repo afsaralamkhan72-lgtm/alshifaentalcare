@@ -1,6 +1,3 @@
-'use client'
-
-import { useState } from 'react'
 import ClinicLogo from '@/components/ClinicLogo'
 import Link from 'next/link'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
@@ -20,8 +17,6 @@ const NAV_LINKS = [
 ]
 
 export default function Navbar({ logoUrl }: { logoUrl?: string | null }) {
-  const [open, setOpen] = useState(false)
-
   return (
     <header className="sticky top-0 z-30 border-b border-clinic-teal/10 bg-clinic-sand/95 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
@@ -31,6 +26,16 @@ export default function Navbar({ logoUrl }: { logoUrl?: string | null }) {
             {CLINIC.name}
           </span>
         </Link>
+
+        {/* Phone par booking foran nazar aana chahiye */}
+        <a
+          href={buildWhatsAppLink()}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="rounded-full bg-whatsapp px-4 py-2 text-xs font-semibold text-white lg:hidden"
+        >
+          Book
+        </a>
 
         <nav className="hidden items-center gap-6 lg:flex">
           {NAV_LINKS.map((link) => (
@@ -64,53 +69,28 @@ export default function Navbar({ logoUrl }: { logoUrl?: string | null }) {
             Book Appointment
           </Link>
         </div>
-
-        <button
-          onClick={() => setOpen(!open)}
-          aria-label="Toggle menu"
-          aria-expanded={open}
-          className="flex h-10 w-10 items-center justify-center rounded-full text-clinic-ink lg:hidden"
-        >
-          <span className="relative block h-4 w-5">
-            <span
-              className={`absolute left-0 top-0 h-0.5 w-5 bg-current transition-transform ${open ? 'translate-y-2 rotate-45' : ''}`}
-            />
-            <span className={`absolute left-0 top-1.5 h-0.5 w-5 bg-current transition-opacity ${open ? 'opacity-0' : ''}`} />
-            <span
-              className={`absolute left-0 top-3 h-0.5 w-5 bg-current transition-transform ${open ? '-translate-y-2 -rotate-45' : ''}`}
-            />
-          </span>
-        </button>
       </div>
 
-      {open && (
-        <nav className="flex flex-col gap-1 border-t border-clinic-teal/10 bg-clinic-sand px-4 pb-4 pt-2 lg:hidden">
+      {/* Mobile: saare sections aik hi nazar mein, scroll kar ke */}
+      <nav className="lg:hidden">
+        <div className="flex gap-1 overflow-x-auto px-3 pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {NAV_LINKS.map((link) => (
             <Link
               key={link.href}
               href={link.href}
-              onClick={() => setOpen(false)}
-              className="rounded-lg px-3 py-2 text-sm font-medium text-clinic-ink/80 hover:bg-clinic-mint"
+              className="shrink-0 rounded-full bg-white/70 px-3 py-1.5 text-sm font-medium text-clinic-ink/80 transition-colors active:bg-clinic-teal active:text-white"
             >
               {link.label}
             </Link>
           ))}
-          <a
-            href={buildWhatsAppLink()}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-2 rounded-full bg-whatsapp px-4 py-2 text-center text-sm font-semibold text-white"
-          >
-            Book on WhatsApp
-          </a>
           <Link
             href="/login"
-            className="mt-2 block rounded-full border border-clinic-teal px-4 py-2 text-center text-sm font-semibold text-clinic-teal"
+            className="shrink-0 rounded-full border border-clinic-teal/30 px-3 py-1.5 text-sm font-medium text-clinic-teal"
           >
             Staff Login
           </Link>
-        </nav>
-      )}
+        </div>
+      </nav>
     </header>
   )
 }

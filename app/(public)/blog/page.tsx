@@ -1,6 +1,7 @@
 import PageHeader from '@/components/public/PageHeader'
 import BlogCard from '@/components/public/BlogCard'
 import { createClient } from '@/lib/supabase/server'
+import { CLINIC } from '@/clinic.config'
 
 async function getPublishedPosts() {
   try {
@@ -14,6 +15,11 @@ async function getPublishedPosts() {
   } catch {
     return []
   }
+}
+
+export const metadata = {
+  title: 'Health Tips & Blog',
+  description: `Dental and homeopathic health tips from ${CLINIC.doctor.name}.`,
 }
 
 export default async function BlogPage() {

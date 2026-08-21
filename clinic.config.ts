@@ -95,6 +95,53 @@ export const CLINIC = {
   mrPrefix: env('MR_PREFIX', 'AS'),
 }
 
+/**
+ * Website ka apna address. SEO ke liye zaroori hai.
+ * Vercel par NEXT_PUBLIC_SITE_URL set kar dein, warna yahi use hoga.
+ */
+export const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL || 'https://alshifaentalcare.vercel.app'
+
+/**
+ * Google ko clinic ke baare mein batane wali maloomat (structured data).
+ * Is se Google search mein pata, timings aur phone number dikhata hai.
+ */
+export function clinicJsonLd(logoUrl?: string | null) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Dentist',
+    name: CLINIC.name,
+    description: `${CLINIC.tagline} in ${CLINIC.address.city}`,
+    url: SITE_URL,
+    telephone: CLINIC.phone.display,
+    ...(logoUrl ? { image: logoUrl, logo: logoUrl } : {}),
+    address: {
+      '@type': 'PostalAddress',
+      streetAddress: CLINIC.address.area,
+      addressLocality: CLINIC.address.city,
+      addressCountry: 'PK',
+    },
+    openingHoursSpecification: [
+      {
+        '@type': 'OpeningHoursSpecification',
+        dayOfWeek: [
+          'Monday',
+          'Tuesday',
+          'Wednesday',
+          'Thursday',
+          'Friday',
+          'Saturday',
+          'Sunday',
+        ],
+        opens: '10:00',
+        closes: '17:00',
+      },
+    ],
+    medicalSpecialty: ['Dentistry', 'Homeopathic'],
+    priceRange: 'PKR',
+  }
+}
+
 /** WhatsApp message ke aakhir mein lagne wali do lines */
 export const CLINIC_SIGNATURE = [
   CLINIC.doctor.name,

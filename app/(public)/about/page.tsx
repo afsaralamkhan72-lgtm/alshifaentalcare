@@ -36,6 +36,11 @@ async function getClinicHistory() {
   }
 }
 
+export const metadata = {
+  title: 'About Us',
+  description: `Learn about ${CLINIC.name}, ${CLINIC.doctor.name} and our approach to dental and homeopathic care in ${CLINIC.address.city}.`,
+}
+
 export default async function AboutPage() {
   const [doctor, history] = await Promise.all([getPrimaryDoctor(), getClinicHistory()])
 

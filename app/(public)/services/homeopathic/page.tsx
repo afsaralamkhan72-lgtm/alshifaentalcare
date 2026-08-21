@@ -1,6 +1,7 @@
 import PageHeader from '@/components/public/PageHeader'
 import ServiceCard from '@/components/public/ServiceCard'
 import { createClient } from '@/lib/supabase/server'
+import { CLINIC } from '@/clinic.config'
 
 async function getHomeopathicServices() {
   try {
@@ -15,6 +16,11 @@ async function getHomeopathicServices() {
   } catch {
     return []
   }
+}
+
+export const metadata = {
+  title: 'Homeopathic Treatments',
+  description: `Personalised homeopathic consultation and natural treatment for chronic conditions at ${CLINIC.name}, ${CLINIC.address.city}.`,
 }
 
 export default async function HomeopathicServicesPage() {

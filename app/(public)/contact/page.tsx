@@ -4,6 +4,11 @@ import { CLINIC } from '@/clinic.config'
 const MAP_EMBED_SRC =
   `https://www.google.com/maps?q=${encodeURIComponent(CLINIC.mapQuery)}&output=embed`
 
+export const metadata = {
+  title: 'Contact & Location',
+  description: `Visit ${CLINIC.name} at ${CLINIC.address.full}. ${CLINIC.timings.full}. Call ${CLINIC.phone.display}.`,
+}
+
 export default function ContactPage() {
   return (
     <>

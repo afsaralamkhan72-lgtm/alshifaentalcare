@@ -1,6 +1,7 @@
 import PageHeader from '@/components/public/PageHeader'
 import ServiceCard from '@/components/public/ServiceCard'
 import { createClient } from '@/lib/supabase/server'
+import { CLINIC } from '@/clinic.config'
 
 async function getDentalServices() {
   try {
@@ -15,6 +16,11 @@ async function getDentalServices() {
   } catch {
     return []
   }
+}
+
+export const metadata = {
+  title: 'Dental Treatments',
+  description: `Scaling, root canal, teeth whitening, braces, crowns and implants at ${CLINIC.name}, ${CLINIC.address.full}.`,
 }
 
 export default async function DentalServicesPage() {

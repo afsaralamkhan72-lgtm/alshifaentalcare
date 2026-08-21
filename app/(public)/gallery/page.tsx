@@ -1,6 +1,7 @@
 import PageHeader from '@/components/public/PageHeader'
 import GalleryItem from '@/components/public/GalleryItem'
 import { createClient } from '@/lib/supabase/server'
+import { CLINIC } from '@/clinic.config'
 
 async function getGallery() {
   try {
@@ -13,6 +14,11 @@ async function getGallery() {
   } catch {
     return []
   }
+}
+
+export const metadata = {
+  title: 'Before & After Gallery',
+  description: `Real patient results from ${CLINIC.name}, ${CLINIC.address.city}.`,
 }
 
 export default async function GalleryPage() {

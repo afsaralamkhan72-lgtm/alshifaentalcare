@@ -1,6 +1,7 @@
 import Image from 'next/image'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { CLINIC } from '@/clinic.config'
 
 interface Props {
   params: Promise<{ slug: string }>
@@ -18,6 +19,43 @@ async function getPost(slug: string) {
     return data
   } catch {
     return null
+  }
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = await params
+  try {
+    const supabase = await createClient()
+    const { data } = await supabase
+      .from('blog_posts')
+      .select('title, content, cover_image_url')
+      .eq('slug', slug)
+      .eq('is_published', true)
+      .maybeSingle()
+
+    if (!data) return { title: 'Article' }
+
+    const summary = (data.content ?? '')
+      .replace(/[#*_>`\-]/g, '')
+      .slice(0, 155)
+      .trim()
+
+    return {
+      title: data.title,
+      description: summary || `${CLINIC.name} health tips`,
+      openGraph: {
+        title: data.title,
+        description: summary,
+        type: 'article',
+        ...(data.cover_image_url ? { images: [data.cover_image_url] } : {}),
+      },
+    }
+  } catch {
+    return { title: 'Article' }
   }
 }
 
