@@ -34,18 +34,23 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
 
   const plans = plansRes.data ?? []
 
-  const [{ data: doctorRows }, { data: auth }] = await Promise.all([
-    supabase
-      .from('staff_profiles')
-      .select('id, full_name')
-      .in('role', ['doctor', 'admin'])
-      .eq('is_active', true)
-      .order('full_name'),
+  const [{ data: savedDoctors }, { data: auth }] = await Promise.all([
+    supabase.from('treating_doctors').select('name').eq('is_active', true).order('name'),
     supabase.auth.getUser(),
   ])
 
-  const doctors = doctorRows ?? []
-  const currentUserId = auth?.user?.id ?? null
+  const knownDoctors = (savedDoctors ?? []).map((d) => d.name)
+
+  // Agar login kiya hua staff khud doctor hai to uska naam pehle se bhar dein
+  let defaultDoctor: string | null = null
+  if (auth?.user?.id) {
+    const { data: me } = await supabase
+      .from('staff_profiles')
+      .select('full_name, role')
+      .eq('id', auth.user.id)
+      .maybeSingle()
+    if (me && (me.role === 'doctor' || me.role === 'admin')) defaultDoctor = me.full_name
+  }
   const transactions = txRes.data ?? []
   const clinic = (clinicRes.data?.value ?? {}) as Record<string, string>
 
@@ -87,10 +92,8 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         patientId={patient.id}
         total={grandTotal}
         paid={grandPaid}
-        doctors={doctors}
-        currentDoctorId={
-          doctors.some((d) => d.id === currentUserId) ? currentUserId : null
-        }
+        knownDoctors={knownDoctors}
+        defaultDoctor={defaultDoctor}
       />
 
       <InvoiceActions

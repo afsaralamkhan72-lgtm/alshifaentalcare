@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 interface FormState {
+  treating_doctor: string
   type: 'income' | 'expense'
   category: string
   amount: string
@@ -18,6 +19,7 @@ function todayStr() {
 }
 
 const INITIAL: FormState = {
+  treating_doctor: '',
   type: 'income',
   category: '',
   amount: '',
@@ -58,7 +60,7 @@ export default function TransactionForm() {
       description: form.description || null,
       transaction_date: form.transaction_date,
       recorded_by: user?.id ?? null,
-      doctor_id: form.type === 'income' ? (user?.id ?? null) : null,
+      treating_doctor: form.type === 'income' ? form.treating_doctor || null : null,
     })
 
     setSaving(false)
@@ -151,6 +153,15 @@ export default function TransactionForm() {
                 onChange={(e) => update('transaction_date', e.target.value)}
                 className={inputClass}
               />
+
+              {form.type === 'income' && (
+                <input
+                  placeholder="Treatment kis doctor ne kiya (optional)"
+                  value={form.treating_doctor}
+                  onChange={(e) => update('treating_doctor', e.target.value)}
+                  className={inputClass}
+                />
+              )}
 
               <textarea
                 placeholder="Description (optional)"

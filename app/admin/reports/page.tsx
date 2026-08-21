@@ -33,7 +33,7 @@ export default async function ReportsPage({
   const [txRes, patientsRes, apptRes, plansRes] = await Promise.all([
     supabase
       .from('transactions')
-      .select('type, category, amount, payment_method, doctor_id, patient_id')
+      .select('type, category, amount, payment_method, treating_doctor, patient_id')
       .gte('transaction_date', from)
       .lte('transaction_date', to),
     supabase
@@ -52,18 +52,11 @@ export default async function ReportsPage({
 
   const tx = txRes.data ?? []
 
-  // Doctor-wise earnings and case counts
-  const { data: staff } = await supabase
-    .from('staff_profiles')
-    .select('id, full_name, role')
-    .in('role', ['doctor', 'admin'])
-
-  const nameById = new Map((staff ?? []).map((s2) => [s2.id, s2.full_name]))
-
+  // Doctor-wise earnings, doctor ka naam entry ke waqt likha jata hai
   const doctorTotals = new Map<string, { total: number; patients: Set<string>; entries: number }>()
   for (const t of tx) {
     if (t.type !== 'income') continue
-    const key = t.doctor_id ?? 'unassigned'
+    const key = (t.treating_doctor as string | null)?.trim() || 'Doctor set nahi'
     const row = doctorTotals.get(key) ?? { total: 0, patients: new Set<string>(), entries: 0 }
     row.total += Number(t.amount)
     row.entries += 1
@@ -72,9 +65,9 @@ export default async function ReportsPage({
   }
 
   const doctorRows = [...doctorTotals.entries()]
-    .map(([id, v]) => ({
-      id,
-      name: id === 'unassigned' ? 'Doctor set nahi' : (nameById.get(id) ?? 'Unknown'),
+    .map(([name, v]) => ({
+      id: name,
+      name,
       total: v.total,
       cases: v.patients.size,
       entries: v.entries,

@@ -4,29 +4,25 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
-export interface DoctorOption {
-  id: string
-  full_name: string
-}
-
 interface Props {
   patientId: string
   total: number
   paid: number
-  doctors: DoctorOption[]
-  /** Logged-in staff, agar wo khud doctor hai to pehle se chun liya jaye */
-  currentDoctorId?: string | null
+  /** Pehle likhe hue doctor names, suggestion ke liye */
+  knownDoctors: string[]
+  /** Login kiye hue staff ka naam, pehle se bhar diya jata hai */
+  defaultDoctor?: string | null
 }
 
 export default function InvoiceBuilder({
   patientId,
   total,
   paid,
-  doctors,
-  currentDoctorId,
+  knownDoctors,
+  defaultDoctor,
 }: Props) {
   const router = useRouter()
-  const [doctorId, setDoctorId] = useState(currentDoctorId ?? doctors[0]?.id ?? '')
+  const [doctorName, setDoctorName] = useState(defaultDoctor ?? '')
   const [discountPct, setDiscountPct] = useState('')
   const [receiving, setReceiving] = useState('')
   const [method, setMethod] = useState('cash')
@@ -55,11 +51,20 @@ export default function InvoiceBuilder({
       category: 'treatment-payment',
       amount: receivingNum,
       payment_method: method,
-      doctor_id: doctorId || null,
+      treating_doctor: doctorName.trim() || null,
       description: pct > 0 ? `Payment received (${pct}% discount applied)` : 'Payment received',
       transaction_date: new Date().toISOString().slice(0, 10),
       recorded_by: user?.id ?? null,
     })
+
+    // Naya naam suggestion list mein mehfooz kar dein
+    if (doctorName.trim()) {
+      await supabase
+        .from('treating_doctors')
+        .insert({ name: doctorName.trim() })
+        .select()
+        .maybeSingle()
+    }
 
     setSaving(false)
     setDone(true)
@@ -76,19 +81,21 @@ export default function InvoiceBuilder({
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div>
-          <label className="text-sm font-medium text-clinic-ink">Treatment kis doctor ne kiya</label>
-          <select
-            value={doctorId}
-            onChange={(e) => setDoctorId(e.target.value)}
+          <label className="text-sm font-medium text-clinic-ink">
+            Treatment kis doctor ne kiya
+          </label>
+          <input
+            list="known-doctors"
+            placeholder="Doctor ka naam likhein"
+            value={doctorName}
+            onChange={(e) => setDoctorName(e.target.value)}
             className={inputClass}
-          >
-            <option value="">Select doctor</option>
-            {doctors.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.full_name}
-              </option>
+          />
+          <datalist id="known-doctors">
+            {knownDoctors.map((d) => (
+              <option key={d} value={d} />
             ))}
-          </select>
+          </datalist>
         </div>
         <div>
           <label className="text-sm font-medium text-clinic-ink">Discount (%)</label>
