@@ -1,5 +1,6 @@
 import { HISTORY_STEPS } from '@/lib/history-steps'
 import ClinicLogo from '@/components/ClinicLogo'
+import { toothLabel } from '@/lib/teeth'
 import { CLINIC } from '@/clinic.config'
 
 type SectionData = Record<string, unknown>
@@ -124,7 +125,7 @@ export default function PatientHistorySummary({
                 className="flex flex-wrap items-baseline gap-2 border-b border-clinic-teal/10 pb-2 text-sm last:border-0"
               >
                 <span className="rounded-md border border-clinic-teal px-2 py-0.5 font-display text-xs font-semibold text-clinic-teal">
-                  {r.tooth_number}
+                  {toothLabel(r.tooth_number)}
                 </span>
                 <span className="font-medium capitalize text-clinic-ink">
                   {r.condition.replace(/_/g, ' ')}

@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { CLINIC } from '@/clinic.config'
+import { CLINIC, timingsLine } from '@/clinic.config'
 import { createClient } from '@/lib/supabase/server'
 
 const STEPS = [
@@ -134,9 +134,7 @@ export default async function ProcessAndFaq() {
           {FAQS.map((f) => {
             const answer =
               f.q === 'What are the clinic timings?'
-                ? `The clinic is open ${CLINIC.timings.short} at ${CLINIC.address.full}.${
-                    closedDay ? ` ${closedDay} closed.` : ''
-                  }`
+                ? `${timingsLine(closedDay)} at ${CLINIC.address.full}.`
                 : f.a
             return (
             <details key={f.q} className="group px-6 py-4">

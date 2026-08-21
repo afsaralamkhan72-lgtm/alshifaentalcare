@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
@@ -10,7 +11,6 @@ interface FormState {
   department: 'dental' | 'homeopathic'
   age: string
   gender: string
-  date_of_birth: string
   primary_doctor: string
   address: string
 }
@@ -21,7 +21,6 @@ const INITIAL: FormState = {
   department: 'dental',
   age: '',
   gender: '',
-  date_of_birth: '',
   primary_doctor: '',
   address: '',
 }
@@ -35,6 +34,7 @@ export default function PatientsToolbar({
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState<FormState>(INITIAL)
   const [saving, setSaving] = useState(false)
+  const [created, setCreated] = useState<{ id: string; name: string } | null>(null)
   const [error, setError] = useState('')
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
@@ -55,7 +55,6 @@ export default function PatientsToolbar({
         department: form.department,
         age: form.age ? Number(form.age) : null,
         gender: form.gender || null,
-        date_of_birth: form.date_of_birth || null,
         primary_doctor: form.primary_doctor || null,
         address: form.address || null,
       })
@@ -73,11 +72,9 @@ export default function PatientsToolbar({
     }
 
     setForm(INITIAL)
-    setOpen(false)
-
-    // Registration flows straight into the history wizard, no hunting
-    // through the profile page to find it.
-    router.push(`/admin/patients/${created.id}/history`)
+    // Registration ke baad doctor khud faisla kare ke aage kya karna hai
+    setCreated({ id: created.id, name: form.full_name })
+    router.refresh()
   }
 
   return (
@@ -88,6 +85,53 @@ export default function PatientsToolbar({
       >
         + Add Patient
       </button>
+
+      {created && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center">
+            <p className="font-display text-lg font-semibold text-clinic-teal">
+              {created.name} register ho gaya
+            </p>
+            <p className="mt-1 text-sm text-clinic-ink/60">Ab kya karna hai?</p>
+
+            <div className="mt-5 grid gap-2">
+              <Link
+                href={`/admin/patients/${created.id}/invoice`}
+                className="rounded-full bg-clinic-teal px-5 py-2.5 text-sm font-semibold text-white"
+              >
+                Payment / Bill
+              </Link>
+              <Link
+                href={`/admin/patients/${created.id}`}
+                className="rounded-full border border-clinic-teal px-5 py-2.5 text-sm font-semibold text-clinic-teal"
+              >
+                Patient ka Profile
+              </Link>
+              <Link
+                href={`/admin/patients/${created.id}/history`}
+                className="rounded-full border border-clinic-teal/30 px-5 py-2.5 text-sm font-semibold text-clinic-ink/70"
+              >
+                Detail History Bharein
+              </Link>
+              <button
+                onClick={() => {
+                  setCreated(null)
+                  setOpen(true)
+                }}
+                className="mt-1 text-sm text-clinic-ink/60 hover:underline"
+              >
+                Agla patient register karein
+              </button>
+              <button
+                onClick={() => setCreated(null)}
+                className="text-sm text-clinic-ink/50 hover:underline"
+              >
+                Bas, band karein
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -141,6 +185,11 @@ export default function PatientsToolbar({
                   <option value="other">Other</option>
                 </select>
               </div>
+              <details className="rounded-xl bg-clinic-mint/40 p-3">
+                <summary className="cursor-pointer text-sm font-medium text-clinic-teal">
+                  Aur tafseel (optional)
+                </summary>
+                <div className="mt-3 grid gap-3">
               <div>
                 <label className="text-xs text-clinic-ink/50">Treating Doctor</label>
                 <input
@@ -156,16 +205,9 @@ export default function PatientsToolbar({
                   ))}
                 </datalist>
               </div>
+                </div>
+              </details>
 
-              <div>
-                <label className="text-xs text-clinic-ink/50">Date of Birth (optional)</label>
-                <input
-                  type="date"
-                  value={form.date_of_birth}
-                  onChange={(e) => update('date_of_birth', e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm outline-none focus:border-clinic-teal"
-                />
-              </div>
               <textarea
                 placeholder="Address (optional)"
                 value={form.address}
@@ -181,7 +223,7 @@ export default function PatientsToolbar({
                 disabled={saving}
                 className="mt-2 rounded-full bg-clinic-teal px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-clinic-teal-light disabled:opacity-60"
               >
-                {saving ? 'Saving...' : 'Save & Start History →'}
+                {saving ? 'Saving...' : 'Save Patient'}
               </button>
             </form>
           </div>

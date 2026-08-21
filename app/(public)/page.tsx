@@ -9,7 +9,7 @@ import HomeSections from '@/components/public/HomeSections'
 import ProcessAndFaq from '@/components/public/ProcessAndFaq'
 import ClinicShowcase from '@/components/public/ClinicShowcase'
 import Link from 'next/link'
-import { CLINIC } from '@/clinic.config'
+import { CLINIC, timingsLine } from '@/clinic.config'
 
 interface Service {
   id: string
@@ -23,7 +23,7 @@ const BASE_TICKER = [
   `📞 ${CLINIC.phone.display}`,
   '🦷 Dental & Homeopathic Care',
   `📍 ${CLINIC.address.full}`,
-  `🕐 ${CLINIC.timings.full}`,
+
 
   '💬 Book instantly on WhatsApp',
 ]
@@ -59,9 +59,7 @@ export default async function HomePage() {
     // koi chutti set nahi
   }
 
-  const tickerItems = closedDay
-    ? [...BASE_TICKER, `🚫 ${closedDay} closed`]
-    : BASE_TICKER
+  const tickerItems = [...BASE_TICKER, `🕐 ${timingsLine(closedDay)}`]
 
   return (
     <>

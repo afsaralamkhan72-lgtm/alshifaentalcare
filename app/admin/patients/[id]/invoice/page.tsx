@@ -5,7 +5,7 @@ import InvoiceActions from '@/components/admin/InvoiceActions'
 import ClinicLogo from '@/components/ClinicLogo'
 import InvoiceBuilder from '@/components/admin/InvoiceBuilder'
 import DeleteTransactionButton from '@/components/admin/DeleteTransactionButton'
-import { CLINIC } from '@/clinic.config'
+import { CLINIC, timingsLine } from '@/clinic.config'
 
 export default async function InvoicePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -22,7 +22,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   const [plansRes, txRes, clinicRes] = await Promise.all([
     supabase
       .from('treatment_plans')
-      .select('id, title, total_cost, advance_paid, monthly_amount, duration_months')
+      .select('id, title, total_cost, advance_paid, monthly_amount, duration_months, start_date')
       .eq('patient_id', id),
     supabase
       .from('transactions')
@@ -81,21 +81,83 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
     installments = data ?? []
   }
 
-  const planTotal = plans.reduce((s, p) => s + Number(p.total_cost), 0)
-  const planPaid =
-    plans.reduce((s, p) => s + Number(p.advance_paid), 0) +
-    installments.reduce((s, i) => s + Number(i.paid_amount), 0)
-  const walkInPaid = transactions
-    .filter((t) => t.category !== 'treatment-installment')
-    .reduce((s, t) => s + Number(t.amount), 0)
+  // ---- Hisaab kitab ----
+  // CHARGE  = jo kaam hua uski qeemat (rate se discount minus)
+  // PAYMENT = jo paise asal mein mile
+  // Har payment transactions mein record hoti hai, isliye wahi ginti hai.
+
+  const planCharges = plans.reduce((s, p) => s + Number(p.total_cost), 0)
+
+  const walkInCharges = transactions
+    .filter((t) => t.rate != null)
+    .reduce((s, t) => s + (Number(t.rate) - Number(t.discount_amount ?? 0)), 0)
 
   const totalDiscount = transactions.reduce(
     (sum, t) => sum + Number(t.discount_amount ?? 0),
     0
   )
 
-  const grandTotal = planTotal + walkInPaid
-  const grandPaid = planPaid + walkInPaid
+  // Chronological ledger: har charge aur har payment alag line par
+  type LedgerRow = {
+    date: string
+    label: string
+    doctor: string | null
+    charge: number
+    payment: number
+    method: string | null
+    id?: string
+  }
+
+  const ledger: LedgerRow[] = []
+
+  for (const p2 of plans) {
+    ledger.push({
+      date: p2.start_date ?? new Date().toISOString().slice(0, 10),
+      label: `${p2.title} (plan)`,
+      doctor: null,
+      charge: Number(p2.total_cost),
+      payment: 0,
+      method: null,
+    })
+  }
+
+  for (const t of transactions) {
+    const charge = t.rate != null ? Number(t.rate) - Number(t.discount_amount ?? 0) : 0
+    ledger.push({
+      id: t.id,
+      date: t.transaction_date,
+      label: t.treatment_name ?? t.description ?? 'Payment',
+      doctor: (t.treating_doctor as string | null) ?? null,
+      charge,
+      payment: Number(t.amount),
+      method: t.payment_method,
+    })
+  }
+
+  ledger.sort((a, b) => a.date.localeCompare(b.date))
+
+  let runningBalance = 0
+  const ledgerRows = ledger.map((row) => {
+    runningBalance += row.charge - row.payment
+    return { ...row, balance: runningBalance }
+  })
+
+  // Aaj ka hisaab alag, taake patient ko saaf nazar aaye
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const todayCharge = ledgerRows
+    .filter((r) => r.date === todayStr)
+    .reduce((sum, r) => sum + r.charge, 0)
+  const todayPaid = ledgerRows
+    .filter((r) => r.date === todayStr)
+    .reduce((sum, r) => sum + r.payment, 0)
+
+  // Aaj se pehle ka baqaya
+  const previousBalance = ledgerRows
+    .filter((r) => r.date < todayStr)
+    .reduce((sum, r) => sum + r.charge - r.payment, 0)
+
+  const grandTotal = planCharges + walkInCharges
+  const grandPaid = transactions.reduce((s, t) => s + Number(t.amount), 0)
   const balance = Math.max(0, grandTotal - grandPaid)
 
   return (
@@ -111,6 +173,9 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
 
       <InvoiceBuilder
         patientId={patient.id}
+        patientName={patient.full_name}
+        patientPhone={patient.phone}
+        portalCode={patient.portal_code ?? null}
         knownDoctors={knownDoctors}
         knownTreatments={knownTreatments}
         defaultDoctor={defaultDoctor}
@@ -121,6 +186,9 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         patientPhone={patient.phone}
         mrNumber={patient.mr_number ?? ''}
         portalCode={patient.portal_code ?? null}
+        previousBalance={previousBalance}
+        todayCharge={todayCharge}
+        todayPaid={todayPaid}
         total={grandTotal}
         paid={grandPaid}
         balance={balance}
@@ -195,51 +263,64 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           </>
         )}
 
-        {transactions.length > 0 && (
+        {/* Patient ke liye chaar saaf figures */}
+        <div className="mt-6 overflow-hidden rounded-xl border border-clinic-teal/30">
+          <div className="grid grid-cols-2 sm:grid-cols-4">
+            <Figure label="Purana Baqaya" value={previousBalance} />
+            <Figure label="Aaj Ka Kaam" value={todayCharge} />
+            <Figure label="Aaj Mile" value={todayPaid} tone="green" />
+            <Figure label="Ab Baqaya" value={balance} tone="teal" />
+          </div>
+        </div>
+
+        {ledgerRows.length > 0 && (
           <>
-            <p className="mt-6 text-sm font-semibold text-clinic-ink">Treatments &amp; Payments</p>
+            <p className="mt-6 text-sm font-semibold text-clinic-ink">Poora Hisaab Kitab</p>
             <div className="mt-2 overflow-x-auto">
-              <table className="w-full min-w-[560px] text-sm">
+              <table className="w-full min-w-[620px] text-sm">
                 <thead className="bg-clinic-mint text-left text-xs font-semibold text-clinic-ink/80">
                   <tr>
                     <th className="px-2 py-1.5">Date</th>
-                    <th className="px-2 py-1.5">Treatment</th>
+                    <th className="px-2 py-1.5">Tafseel</th>
                     <th className="px-2 py-1.5">Doctor</th>
-                    <th className="px-2 py-1.5 text-right">Rate</th>
-                    <th className="px-2 py-1.5 text-right">Discount</th>
-                    <th className="px-2 py-1.5">Method</th>
-                    <th className="px-2 py-1.5 text-right">Paid</th>
+                    <th className="px-2 py-1.5 text-right">Charge</th>
+                    <th className="px-2 py-1.5 text-right">Mila</th>
+                    <th className="px-2 py-1.5 text-right">Balance</th>
                     <th className="px-2 py-1.5 print:hidden"></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {transactions.map((t) => (
-                    <tr key={t.id} className="border-t border-clinic-teal/10">
+                  {ledgerRows.map((row, i) => (
+                    <tr key={row.id ?? `plan-${i}`} className="border-t border-clinic-teal/10">
                       <td className="px-2 py-2 whitespace-nowrap">
-                        {new Date(t.transaction_date).toLocaleDateString('en-GB')}
+                        {new Date(row.date).toLocaleDateString('en-GB')}
                       </td>
                       <td className="px-2 py-2 text-clinic-ink">
-                        {t.treatment_name ?? t.description ?? t.category ?? '—'}
+                        {row.label}
+                        {row.method && (
+                          <span className="ml-1 text-xs capitalize text-clinic-ink/50">
+                            ({row.method})
+                          </span>
+                        )}
                       </td>
-                      <td className="px-2 py-2 text-clinic-ink">{t.treating_doctor ?? '—'}</td>
-                      <td className="px-2 py-2 text-right">
-                        {t.rate ? `Rs. ${Number(t.rate).toLocaleString()}` : '—'}
+                      <td className="px-2 py-2 text-clinic-ink/70">{row.doctor ?? '—'}</td>
+                      <td className="px-2 py-2 text-right text-clinic-ink">
+                        {row.charge > 0 ? `Rs. ${row.charge.toLocaleString()}` : '—'}
                       </td>
-                      <td className="px-2 py-2 text-right text-clinic-teal">
-                        {Number(t.discount_amount) > 0
-                          ? `Rs. ${Number(t.discount_amount).toLocaleString()}`
-                          : '—'}
+                      <td className="px-2 py-2 text-right font-semibold text-emerald-700">
+                        {row.payment > 0 ? `Rs. ${row.payment.toLocaleString()}` : '—'}
                       </td>
-                      <td className="px-2 py-2 capitalize">{t.payment_method ?? '—'}</td>
                       <td className="px-2 py-2 text-right font-semibold text-clinic-ink">
-                        Rs. {Number(t.amount).toLocaleString()}
+                        Rs. {row.balance.toLocaleString()}
                       </td>
                       <td className="px-2 py-2 text-right print:hidden">
-                        <DeleteTransactionButton
-                          id={t.id}
-                          label={t.treatment_name ?? t.description ?? 'Entry'}
-                          amount={Number(t.amount)}
-                        />
+                        {row.id && (
+                          <DeleteTransactionButton
+                            id={row.id}
+                            label={row.label}
+                            amount={row.payment || row.charge}
+                          />
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -352,32 +433,58 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
 
         <div className="mt-6 border-t border-clinic-teal/20 pt-4">
           <div className="flex justify-between py-1 text-sm">
-            <span className="text-clinic-ink">Total Treatment Value</span>
+            <span className="text-clinic-ink">Kul Charges (treatment ki qeemat)</span>
             <span className="font-medium">Rs. {grandTotal.toLocaleString()}</span>
           </div>
           {totalDiscount > 0 && (
             <div className="flex justify-between py-1 text-sm">
-              <span className="text-clinic-ink">Total Discount</span>
+              <span className="text-clinic-ink">Discount</span>
               <span className="font-medium text-clinic-teal">
                 Rs. {totalDiscount.toLocaleString()}
               </span>
             </div>
           )}
           <div className="flex justify-between py-1 text-sm">
-            <span className="text-clinic-ink">Total Paid</span>
+            <span className="text-clinic-ink">Kul Payment Mili</span>
             <span className="font-medium text-emerald-700">Rs. {grandPaid.toLocaleString()}</span>
           </div>
           <div className="mt-2 flex justify-between rounded-xl bg-clinic-teal px-4 py-3 text-base text-white">
-            <span className="font-semibold">Balance Due</span>
+            <span className="font-semibold">Baqaya</span>
             <span className="font-display font-semibold">Rs. {balance.toLocaleString()}</span>
           </div>
         </div>
 
         <p className="mt-6 border-t border-clinic-teal/20 pt-4 text-center text-xs text-clinic-ink/70">
-          {clinic.timings ?? CLINIC.timings.full}
+          {clinic.timings || timingsLine(clinic.closed_day)}
         </p>
         </div>
       </div>
+    </div>
+  )
+}
+
+function Figure({
+  label,
+  value,
+  tone = 'plain',
+}: {
+  label: string
+  value: number
+  tone?: 'plain' | 'green' | 'teal'
+}) {
+  const box =
+    tone === 'teal'
+      ? 'bg-clinic-teal text-white'
+      : tone === 'green'
+        ? 'bg-emerald-50 text-emerald-800'
+        : 'bg-white text-clinic-ink'
+
+  return (
+    <div className={`border-r border-clinic-teal/15 p-4 text-center last:border-r-0 ${box}`}>
+      <p className={`text-xs font-medium ${tone === 'teal' ? 'text-white/80' : 'opacity-70'}`}>
+        {label}
+      </p>
+      <p className="mt-1 font-display text-lg font-semibold">Rs. {value.toLocaleString()}</p>
     </div>
   )
 }

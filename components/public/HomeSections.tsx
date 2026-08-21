@@ -2,7 +2,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/server'
 import WhatsAppButton from './WhatsAppButton'
-import { CLINIC } from '@/clinic.config'
+import { CLINIC, timingsLine } from '@/clinic.config'
 
 interface GalleryRow {
   id: string
@@ -59,6 +59,19 @@ async function getPreviews() {
 }
 
 export default async function HomeSections() {
+  let closedDay = ''
+  try {
+    const supabase = await createClient()
+    const { data } = await supabase
+      .from('site_settings')
+      .select('value')
+      .eq('key', 'clinic_info')
+      .maybeSingle()
+    closedDay = ((data?.value ?? {}) as Record<string, string>).closed_day || ''
+  } catch {
+    // koi chutti set nahi
+  }
+
   const { gallery, testimonials, blog } = await getPreviews()
 
   return (
@@ -207,7 +220,7 @@ export default async function HomeSections() {
             Toothache or a Long-Standing Problem?
           </h2>
           <p className="mx-auto mt-3 max-w-lg text-white/70">
-            Book your time today. {CLINIC.timings.full} at {CLINIC.address.area}.
+            Book your time today. {timingsLine(closedDay)} at {CLINIC.address.area}.
           </p>
           <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
             <WhatsAppButton label="Book on WhatsApp" />

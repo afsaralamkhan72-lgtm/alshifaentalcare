@@ -47,6 +47,11 @@ export default function TreatmentPlanCard({
   const [busyId, setBusyId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [entered, setEntered] = useState('')
+  const [justPaid, setJustPaid] = useState<{
+    month: string
+    paid: number
+    remaining: number
+  } | null>(null)
   const [method, setMethod] = useState('cash')
 
   const paidTotal =
@@ -90,7 +95,18 @@ export default function TreatmentPlanCard({
       recorded_by: user?.id ?? null,
     })
 
+    setJustPaid({
+      month: new Date(inst.due_date).toLocaleDateString('en-GB', {
+        month: 'long',
+        year: 'numeric',
+      }),
+      paid: got,
+      remaining: Math.max(0, Number(plan.total_cost) - (paidTotal + got)),
+    })
+
     setBusyId(null)
+    setEditingId(null)
+    setEntered('')
     router.refresh()
   }
 
@@ -212,6 +228,47 @@ export default function TreatmentPlanCard({
           <p className="text-sm font-semibold text-red-700">
             {overdue.length} installment(s) overdue hain
           </p>
+        </div>
+      )}
+
+      {justPaid && (
+        <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+          <p className="font-display font-semibold text-emerald-800">
+            {justPaid.month} ki payment save ho gayi
+          </p>
+          <p className="mt-1 text-sm text-emerald-800/80">
+            Mile Rs. {justPaid.paid.toLocaleString()} · Baqaya Rs.{' '}
+            {justPaid.remaining.toLocaleString()}
+          </p>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            <a
+              href={buildWhatsAppLink({
+                phoneOverride: patientPhone,
+                customMessage: [
+                  `Assalam o Alaikum ${patientName},`,
+                  '',
+                  `${plan.title}`,
+                  `${justPaid.month} ki payment mil gayi: Rs. ${justPaid.paid.toLocaleString()}`,
+                  `Ab tak diya : Rs. ${(paidTotal).toLocaleString()}`,
+                  `Baqaya      : Rs. ${justPaid.remaining.toLocaleString()}`,
+                  '',
+                  'Shukriya.',
+                ].join('\n'),
+              })}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-full bg-whatsapp px-4 py-2 text-sm font-semibold text-white"
+            >
+              Patient ko WhatsApp Karein
+            </a>
+            <button
+              onClick={() => setJustPaid(null)}
+              className="rounded-full px-4 py-2 text-sm text-emerald-800/70 hover:underline"
+            >
+              Band karein
+            </button>
+          </div>
         </div>
       )}
 

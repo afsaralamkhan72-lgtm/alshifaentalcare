@@ -1,6 +1,7 @@
 'use client'
 
 import { buildWhatsAppLink } from '@/lib/whatsapp'
+import { toothLabel } from '@/lib/teeth'
 import { CLINIC } from '@/clinic.config'
 
 interface Props {
@@ -35,7 +36,7 @@ export default function LabOrderActions({
     '',
     `Patient: ${patientName}`,
     workType ? `Work: ${workType}` : '',
-    teeth.length ? `Teeth (FDI): ${teeth.join(', ')}` : '',
+    teeth.length ? `Teeth: ${teeth.map(toothLabel).join(', ')}` : '',
     shade ? `Shade: ${shade}` : '',
     material ? `Material: ${material}` : '',
     dueDate ? `Due: ${new Date(dueDate).toLocaleDateString('en-GB')}` : '',

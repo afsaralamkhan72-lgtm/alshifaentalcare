@@ -3,9 +3,14 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { buildWhatsAppLink } from '@/lib/whatsapp'
+import { CLINIC } from '@/clinic.config'
 
 interface Props {
   patientId: string
+  patientName: string
+  patientPhone: string
+  portalCode?: string | null
   /** Pehle likhe hue doctor names, suggestion ke liye */
   knownDoctors: string[]
   /** Pehle se maujood treatments, suggestion ke liye */
@@ -16,6 +21,9 @@ interface Props {
 
 export default function InvoiceBuilder({
   patientId,
+  patientName,
+  patientPhone,
+  portalCode,
   knownDoctors,
   knownTreatments,
   defaultDoctor,
@@ -34,6 +42,11 @@ export default function InvoiceBuilder({
   const [months, setMonths] = useState('12')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [justSaved, setJustSaved] = useState<{
+    treatment: string
+    paid: number
+    remaining: number
+  } | null>(null)
 
   const rateNum = Number(rate || 0)
   const pct = Math.min(100, Math.max(0, Number(discountPct || 0)))
@@ -103,9 +116,9 @@ export default function InvoiceBuilder({
           type: 'income',
           category: 'treatment',
           treatment_name: `${treatment.trim() || 'Treatment'} (advance)`,
-          rate: payable,
-          discount_pct: pct,
-          discount_amount: discount,
+          rate: null,
+          discount_pct: 0,
+          discount_amount: 0,
           amount: advance,
           balance_due: 0,
           payment_method: method,
@@ -160,6 +173,11 @@ export default function InvoiceBuilder({
     }
 
     setSaving(false)
+    setJustSaved({
+      treatment: treatment.trim() || 'Treatment',
+      paid: receivingNum,
+      remaining,
+    })
     setTreatment('')
     setRate('')
     setDiscountPct('')
@@ -290,6 +308,62 @@ export default function InvoiceBuilder({
           </div>
         )}
       </div>
+
+      {justSaved && (
+        <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+          <p className="font-display font-semibold text-emerald-800">
+            Save ho gaya: {justSaved.treatment}
+          </p>
+          <p className="mt-1 text-sm text-emerald-800/80">
+            Mile Rs. {justSaved.paid.toLocaleString()}
+            {justSaved.remaining > 0
+              ? ` · Baqaya Rs. ${justSaved.remaining.toLocaleString()}`
+              : ' · poora hisaab clear'}
+          </p>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            <a
+              href={buildWhatsAppLink({
+                phoneOverride: patientPhone,
+                customMessage: [
+                  `Assalam o Alaikum ${patientName},`,
+                  '',
+                  `Aaj aap ka ${justSaved.treatment} hua.`,
+                  `Aap ne diya : Rs. ${justSaved.paid.toLocaleString()}`,
+                  justSaved.remaining > 0
+                    ? `Baqaya      : Rs. ${justSaved.remaining.toLocaleString()}`
+                    : 'Poora hisaab clear hai. Shukriya.',
+                  ...(portalCode
+                    ? [
+                        '',
+                        'Apna record dekhein:',
+                        typeof window !== 'undefined'
+                          ? `${window.location.origin}/portal/${portalCode}`
+                          : '',
+                        `Code: ${portalCode}`,
+                      ]
+                    : []),
+                  '',
+                  `${CLINIC.name} · ${CLINIC.phone.display}`,
+                ]
+                  .filter(Boolean)
+                  .join('\n'),
+              })}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-full bg-whatsapp px-4 py-2 text-sm font-semibold text-white"
+            >
+              Patient ko WhatsApp Karein
+            </a>
+            <button
+              onClick={() => setJustSaved(null)}
+              className="rounded-full px-4 py-2 text-sm text-emerald-800/70 hover:underline"
+            >
+              Band karein
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="mt-4 rounded-xl border border-clinic-teal/20 bg-clinic-mint/40 p-4">
         <label className="flex items-center gap-2 text-sm font-medium text-clinic-ink">

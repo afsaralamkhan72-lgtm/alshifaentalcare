@@ -106,6 +106,7 @@ export default function PatientsTable({
 
       const rows = inst ?? []
       planTotal = Number(plan.total_cost)
+      // sirf progress dikhane ke liye, paisa transactions se ginti hai
       planPaid =
         Number(plan.advance_paid) + rows.reduce((s, r) => s + Number(r.paid_amount), 0)
 
@@ -128,11 +129,11 @@ export default function PatientsTable({
       }
     }
 
-    // Plan se bahar ke treatments
-    const walkTotal = tx
-      .filter((t) => t.rate)
+    // CHARGE = kaam ki qeemat, PAYMENT = jo paise mile
+    const walkCharges = tx
+      .filter((t) => t.rate != null)
       .reduce((s, t) => s + (Number(t.rate) - Number(t.discount_amount ?? 0)), 0)
-    const walkPaid = tx.reduce((s, t) => s + Number(t.amount), 0)
+    const allPaid = tx.reduce((s, t) => s + Number(t.amount), 0)
 
     const dues = tx
       .filter((t) => Number(t.balance_due) > 0 && !t.settled_at)
@@ -143,15 +144,15 @@ export default function PatientsTable({
         due_date: t.due_date,
       }))
 
-    const total = planTotal + walkTotal
-    const paid = planPaid + (planPart ? Math.max(0, walkPaid - planPaid) : walkPaid)
+    const total = planTotal + walkCharges
+    const paid = allPaid
 
     setSummaries((prev) => ({
       ...prev,
       [id]: {
         total,
-        paid: Math.min(paid, total || paid),
-        balance: Math.max(0, total - Math.min(paid, total || paid)),
+        paid,
+        balance: Math.max(0, total - paid),
         dues,
         plan: planPart,
       },

@@ -8,6 +8,9 @@ interface Props {
   patientPhone: string
   mrNumber: string
   portalCode?: string | null
+  previousBalance?: number
+  todayCharge?: number
+  todayPaid?: number
   total: number
   paid: number
   balance: number
@@ -18,6 +21,9 @@ export default function InvoiceActions({
   patientPhone,
   mrNumber,
   portalCode,
+  previousBalance = 0,
+  todayCharge = 0,
+  todayPaid = 0,
   total,
   paid,
   balance,
@@ -37,9 +43,12 @@ export default function InvoiceActions({
       `Assalam o Alaikum ${patientName},`,
       `${CLINIC.name}, payment statement (${mrNumber})`,
       '',
-      `Total: Rs. ${total.toLocaleString()}`,
-      `Paid: Rs. ${paid.toLocaleString()}`,
-      `Balance: Rs. ${balance.toLocaleString()}`,
+      `Purana baqaya : Rs. ${previousBalance.toLocaleString()}`,
+      `Aaj ka kaam   : Rs. ${todayCharge.toLocaleString()}`,
+      `Aaj mile      : Rs. ${todayPaid.toLocaleString()}`,
+      `Ab baqaya     : Rs. ${balance.toLocaleString()}`,
+      '',
+      `(Kul charges Rs. ${total.toLocaleString()}, kul payment Rs. ${paid.toLocaleString()})`,
       ...(portalCode
         ? [
             '',

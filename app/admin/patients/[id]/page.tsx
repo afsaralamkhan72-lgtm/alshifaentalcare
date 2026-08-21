@@ -87,7 +87,7 @@ export default async function PatientDetailPage({ params }: Props) {
       .order('prescribed_date', { ascending: false }),
     supabase
       .from('transactions')
-      .select('id, amount, category, payment_method, description, transaction_date, treatment_name, treating_doctor')
+      .select('id, amount, category, payment_method, description, transaction_date, treatment_name, treating_doctor, rate, discount_amount')
       .eq('patient_id', id)
       .eq('type', 'income')
       .order('transaction_date', { ascending: false }),
@@ -110,15 +110,14 @@ export default async function PatientDetailPage({ params }: Props) {
   const appointments = apptRes.data ?? []
 
   // Financial roll-up across plans + walk-in payments
-  const planTotal = plans.reduce((s2, p) => s2 + Number(p.total_cost), 0)
-  const planPaid =
-    plans.reduce((s2, p) => s2 + Number(p.advance_paid), 0) +
-    installments.reduce((s2, i) => s2 + Number(i.paid_amount), 0)
-  const walkInPaid = payments
-    .filter((t) => t.category !== 'treatment-installment')
-    .reduce((s2, t) => s2 + Number(t.amount), 0)
-  const totalValue = planTotal + walkInPaid
-  const totalPaid = planPaid + walkInPaid
+  // CHARGE = kaam ki qeemat, PAYMENT = jo paise mile
+  const planCharges = plans.reduce((s2, p) => s2 + Number(p.total_cost), 0)
+  const walkInCharges = payments
+    .filter((t) => t.rate != null)
+    .reduce((s2, t) => s2 + (Number(t.rate) - Number(t.discount_amount ?? 0)), 0)
+
+  const totalValue = planCharges + walkInCharges
+  const totalPaid = payments.reduce((s2, t) => s2 + Number(t.amount), 0)
   const balance = Math.max(0, totalValue - totalPaid)
 
   // Visits, treatments aur prescriptions ko aik timeline mein mila dein

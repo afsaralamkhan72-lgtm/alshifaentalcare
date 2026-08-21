@@ -147,6 +147,18 @@ export function clinicJsonLd(logoUrl?: string | null, closedDay?: string | null)
   }
 }
 
+/**
+ * Timings ka jumla banata hai. Agar chutti ka din set ho to
+ * "Open Daily" khud ba khud hat jata hai.
+ */
+export function timingsLine(closedDay?: string | null) {
+  const day = closedDay?.trim()
+  if (!day) return CLINIC.timings.full
+
+  // Chutti ho to "Open Daily" ghalat hoga, hours + chutti likhein
+  return `${CLINIC.timings.short} · ${day} closed`
+}
+
 /** WhatsApp message ke aakhir mein lagne wali do lines */
 export const CLINIC_SIGNATURE = [
   CLINIC.doctor.name,

@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import LabOrderActions from '@/components/admin/LabOrderActions'
 import ClinicLogo from '@/components/ClinicLogo'
+import { toothLabel } from '@/lib/teeth'
 import { CLINIC } from '@/clinic.config'
 
 interface LabCase {
@@ -156,7 +157,7 @@ export default async function LabOrderPage({ params }: { params: Promise<{ id: s
           </div>
 
           <div className="mt-3">
-            <p className="text-xs text-clinic-ink/50">Tooth Numbers (FDI)</p>
+            <p className="text-xs text-clinic-ink/50">Tooth Numbers</p>
             {teeth.length === 0 ? (
               <p className="font-medium text-clinic-ink">·</p>
             ) : (
@@ -166,7 +167,7 @@ export default async function LabOrderPage({ params }: { params: Promise<{ id: s
                     key={t}
                     className="rounded-md border border-clinic-teal bg-white px-2 py-1 font-display text-sm font-semibold text-clinic-teal"
                   >
-                    {t}
+                    {toothLabel(t)}
                   </span>
                 ))}
               </div>

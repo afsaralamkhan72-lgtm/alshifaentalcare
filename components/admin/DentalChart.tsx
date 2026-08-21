@@ -1,5 +1,7 @@
 'use client'
 
+import { localNumber, toothLabel, isWisdom } from '@/lib/teeth'
+
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -118,8 +120,8 @@ export default function DentalChart({ patientId, initialRecords }: DentalChartPr
                 active ? 'ring-2 ring-clinic-teal ring-offset-1' : ''
               }`}
             >
-              {tooth}
-            </button>
+                {localNumber(tooth)}
+              </button>
           )
         })}
       </div>
@@ -165,7 +167,7 @@ export default function DentalChart({ patientId, initialRecords }: DentalChartPr
       {selectedTooth && (
         <div className="mt-6 rounded-xl bg-clinic-mint/50 p-4">
           <div className="flex items-center justify-between">
-            <p className="font-display font-semibold text-clinic-ink">Tooth #{selectedTooth}</p>
+            <p className="font-display font-semibold text-clinic-ink">Tooth #{toothLabel(selectedTooth)}</p>
             <button onClick={() => setSelectedTooth(null)} className="text-sm text-clinic-ink/40 hover:text-clinic-ink">
               ✕
             </button>

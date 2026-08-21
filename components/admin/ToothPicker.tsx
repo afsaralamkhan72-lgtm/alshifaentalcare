@@ -1,5 +1,7 @@
 'use client'
 
+import { localNumber, toothLabel, isWisdom } from '@/lib/teeth'
+
 /** FDI notation, arranged the way a dentist reads a chart (patient's view) */
 export const FDI_QUADRANTS = {
   upperRight: ['18', '17', '16', '15', '14', '13', '12', '11'],
@@ -30,13 +32,16 @@ export default function ToothPicker({ selected, onChange }: Props) {
               key={t}
               type="button"
               onClick={() => toggle(t)}
-              className={`h-9 w-9 shrink-0 rounded-md text-xs font-semibold transition-colors ${
+              title={isWisdom(t) ? `${toothLabel(t)} (aqal daarh)` : toothLabel(t)}
+              className={`h-9 w-9 shrink-0 rounded-md text-sm font-semibold transition-colors ${
                 on
                   ? 'bg-clinic-teal text-white'
-                  : 'bg-clinic-mint text-clinic-ink/60 hover:bg-clinic-teal/20'
+                  : isWisdom(t)
+                    ? 'bg-clinic-amber/15 text-clinic-ink/70 hover:bg-clinic-teal/20'
+                    : 'bg-clinic-mint text-clinic-ink/60 hover:bg-clinic-teal/20'
               }`}
             >
-              {t}
+              {localNumber(t)}
             </button>
           )
         })}
@@ -48,6 +53,11 @@ export default function ToothPicker({ selected, onChange }: Props) {
     <div>
       <div className="overflow-x-auto rounded-xl border border-clinic-teal/10 bg-white p-3">
         {/* Upper arch */}
+        <div className="mb-1 flex justify-center gap-3 text-[10px] font-semibold uppercase tracking-wide text-clinic-ink/40">
+          <span className="w-[19rem] text-center">Upper Right</span>
+          <span className="w-px" />
+          <span className="w-[19rem] text-center">Upper Left</span>
+        </div>
         <div className="flex justify-center gap-3">
           <Row teeth={FDI_QUADRANTS.upperRight} />
           <div className="w-px bg-clinic-teal/20" />
@@ -62,11 +72,15 @@ export default function ToothPicker({ selected, onChange }: Props) {
           <div className="w-px bg-clinic-teal/20" />
           <Row teeth={FDI_QUADRANTS.lowerLeft} />
         </div>
-
-        <div className="mt-2 flex justify-center gap-8 text-[10px] uppercase tracking-wide text-clinic-ink/30">
-          <span>Right</span>
-          <span>Left</span>
+        <div className="mt-1 flex justify-center gap-3 text-[10px] font-semibold uppercase tracking-wide text-clinic-ink/40">
+          <span className="w-[19rem] text-center">Lower Right</span>
+          <span className="w-px" />
+          <span className="w-[19rem] text-center">Lower Left</span>
         </div>
+
+        <p className="mt-3 text-center text-[11px] text-clinic-ink/50">
+          Wast se shuru, 8 = aqal daarh (wisdom tooth)
+        </p>
       </div>
 
       <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -76,7 +90,7 @@ export default function ToothPicker({ selected, onChange }: Props) {
         ) : (
           <>
             <span className="rounded-full bg-clinic-teal px-3 py-1 text-xs font-semibold text-white">
-              {selected.join(', ')}
+              {selected.map(toothLabel).join(', ')}
             </span>
             <button
               type="button"
