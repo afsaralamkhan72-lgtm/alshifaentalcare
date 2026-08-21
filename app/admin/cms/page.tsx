@@ -22,6 +22,18 @@ const SERVICE_FIELDS: FieldDef[] = [
   { key: 'is_active', label: 'Show on website', type: 'checkbox' },
 ]
 
+const CLINIC_PHOTO_FIELDS: FieldDef[] = [
+  { key: 'image_url', label: 'Clinic ki Picture', type: 'image', bucket: 'media', folder: 'clinic' },
+  {
+    key: 'caption',
+    label: 'Caption (optional)',
+    type: 'text',
+    placeholder: 'Reception, Waiting Area, Dental Unit...',
+  },
+  { key: 'sort_order', label: 'Sort Order (chhota number pehle)', type: 'number' },
+  { key: 'is_active', label: 'Website par dikhayein', type: 'checkbox' },
+]
+
 const GALLERY_FIELDS: FieldDef[] = [
   { key: 'title', label: 'Title', type: 'text' },
   { key: 'category', label: 'Category', type: 'select', options: DEPARTMENT_OPTIONS },
@@ -73,10 +85,12 @@ export default async function CMSPage() {
   await requireAdmin()
   const supabase = await createClient()
 
-  const [settingsRes, services, gallery, videos, doctors, testimonials, blog] = await Promise.all([
+  const [settingsRes, services, gallery, clinicPhotos, videos, doctors, testimonials, blog] =
+    await Promise.all([
     supabase.from('site_settings').select('key, value'),
     supabase.from('services').select('*').order('sort_order'),
     supabase.from('gallery').select('*').order('sort_order'),
+    supabase.from('clinic_photos').select('*').order('sort_order'),
     supabase.from('videos').select('*').order('sort_order'),
     supabase.from('doctors').select('*').order('sort_order'),
     supabase.from('testimonials').select('*').order('created_at', { ascending: false }),
@@ -108,6 +122,16 @@ export default async function CMSPage() {
           rows={services.data ?? []}
           displayKey="title"
           subtitleKey="department"
+        />
+
+        <CMSContentManager
+          table="clinic_photos"
+          title="Clinic Photos"
+          hint="Clinic ke andar aur bahar ki tasveerein, website par nazar aayengi."
+          fields={CLINIC_PHOTO_FIELDS}
+          rows={clinicPhotos.data ?? []}
+          displayKey="caption"
+          subtitleKey="image_url"
         />
 
         <CMSContentManager

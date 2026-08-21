@@ -39,6 +39,15 @@ export default function CMSSettings({ initial }: Props) {
     ...(initial.hero_banner ?? {}),
   } as Record<string, string | boolean>)
 
+  const [ceo, setCeo] = useState({
+    enabled: true,
+    name: '',
+    title: 'Founder & CEO',
+    message: '',
+    image_url: '',
+    ...(initial.ceo_profile ?? {}),
+  } as Record<string, string | boolean>)
+
   const [status, setStatus] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -55,6 +64,7 @@ export default function CMSSettings({ initial }: Props) {
       { key: 'clinic_info', value: clinic, updated_by: user?.id ?? null },
       { key: 'emergency_popup', value: popup, updated_by: user?.id ?? null },
       { key: 'hero_banner', value: hero, updated_by: user?.id ?? null },
+      { key: 'ceo_profile', value: ceo, updated_by: user?.id ?? null },
     ]
 
     const { error } = await supabase.from('site_settings').upsert(rows, { onConflict: 'key' })
@@ -209,6 +219,62 @@ export default function CMSSettings({ initial }: Props) {
               rows={2}
               value={(hero.subheading as string) ?? ''}
               onChange={(e) => setHero((p) => ({ ...p, subheading: e.target.value }))}
+              className={inputClass}
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-clinic-teal/10 bg-white p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="font-display font-semibold text-clinic-ink">CEO / Owner</p>
+            <p className="mt-1 text-xs text-clinic-ink/50">Website par taaruf ke liye.</p>
+          </div>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={Boolean(ceo.enabled)}
+              onChange={(e) => setCeo((p) => ({ ...p, enabled: e.target.checked }))}
+              className="h-4 w-4 accent-clinic-teal"
+            />
+            Dikhayein
+          </label>
+        </div>
+
+        <div className="mt-4">
+          <ImageUploader
+            label="CEO ki Photo"
+            bucket="media"
+            folder="ceo"
+            value={(ceo.image_url as string) || null}
+            onChange={(url) => setCeo((p) => ({ ...p, image_url: url ?? '' }))}
+          />
+        </div>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className="text-sm font-medium text-clinic-ink">Naam</label>
+            <input
+              value={(ceo.name as string) ?? ''}
+              onChange={(e) => setCeo((p) => ({ ...p, name: e.target.value }))}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-clinic-ink">Title</label>
+            <input
+              value={(ceo.title as string) ?? ''}
+              onChange={(e) => setCeo((p) => ({ ...p, title: e.target.value }))}
+              className={inputClass}
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="text-sm font-medium text-clinic-ink">Paigham</label>
+            <textarea
+              rows={3}
+              value={(ceo.message as string) ?? ''}
+              onChange={(e) => setCeo((p) => ({ ...p, message: e.target.value }))}
               className={inputClass}
             />
           </div>

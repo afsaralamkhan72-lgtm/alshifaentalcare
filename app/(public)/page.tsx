@@ -7,6 +7,7 @@ import WhyChooseUs from '@/components/public/WhyChooseUs'
 import DoctorIntro from '@/components/public/DoctorIntro'
 import HomeSections from '@/components/public/HomeSections'
 import ProcessAndFaq from '@/components/public/ProcessAndFaq'
+import ClinicShowcase from '@/components/public/ClinicShowcase'
 import Link from 'next/link'
 import { CLINIC } from '@/clinic.config'
 
@@ -90,6 +91,7 @@ export default async function HomePage() {
       </section>
 
       <WhyChooseUs />
+      <ClinicShowcase />
       <ProcessAndFaq />
       <HomeSections />
     </>

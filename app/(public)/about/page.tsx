@@ -2,6 +2,7 @@ import Image from 'next/image'
 import PageHeader from '@/components/public/PageHeader'
 import { createClient } from '@/lib/supabase/server'
 import { CLINIC } from '@/clinic.config'
+import ClinicShowcase from '@/components/public/ClinicShowcase'
 
 const DEFAULT_HISTORY =
   `${CLINIC.name} dental aur homeopathic dono services aik chhat ke neeche pesh karta hai. Ye tafseel Edit Website se badli ja sakti hai.`
@@ -86,6 +87,7 @@ export default async function AboutPage() {
           <p className="mt-3 max-w-3xl whitespace-pre-line text-clinic-ink/70">{history}</p>
         </div>
       </section>
-    </>
+          <ClinicShowcase />
+</>
   )
 }
