@@ -29,7 +29,7 @@ export default function LabOrderActions({
 }: Props) {
   // The whole work order as a WhatsApp message, sent straight to the lab
   const lines = [
-    `*Al Shifa Health Care — Lab Work Order*`,
+    `*Al Shifa Health Care, Lab Work Order*`,
     `Case: ${caseNumber}`,
     '',
     `Patient: ${patientName}`,
@@ -83,13 +83,9 @@ export default function LabOrderActions({
           </a>
         ) : (
           <span className="rounded-full bg-amber-50 px-4 py-2 text-xs text-amber-700">
-            Is lab ka WhatsApp number save nahi hai — case edit kar ke daal dein.
+            Is lab ka WhatsApp number save nahi hai, case edit kar ke daal dein.
           </span>
         )}
-
-        <p className="text-xs text-clinic-ink/50">
-          PDF sirf aap ke device par banti hai.
-        </p>
       </div>
     </>
   )

@@ -128,7 +128,7 @@ export default function PatientHistorySummary({
                 <span className="font-medium capitalize text-clinic-ink">
                   {r.condition.replace(/_/g, ' ')}
                 </span>
-                {r.notes && <span className="text-clinic-ink/60">— {r.notes}</span>}
+                {r.notes && <span className="text-clinic-ink/60">{r.notes}</span>}
                 <span className="ml-auto text-xs text-clinic-ink/40">
                   {new Date(r.treatment_date).toLocaleDateString('en-GB')}
                 </span>

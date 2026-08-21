@@ -151,7 +151,7 @@ export default function PrescriptionForm({ patients }: { patients: Patient[] }) 
         <option value="">Select patient...</option>
         {patients.map((p) => (
           <option key={p.id} value={p.id}>
-            {p.mr_number} — {p.full_name} ({p.department})
+            {p.mr_number}, {p.full_name} ({p.department})
           </option>
         ))}
       </select>

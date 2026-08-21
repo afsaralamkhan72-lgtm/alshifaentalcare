@@ -35,7 +35,7 @@ export default async function VideosPage() {
           </div>
         ) : (
           <p className="rounded-2xl border border-dashed border-clinic-teal/20 bg-clinic-mint/40 p-8 text-center text-sm text-clinic-ink/60">
-            Koi video abhi add nahi hua — Admin Panel se YouTube link add karein.
+            Koi video abhi add nahi hua, Admin Panel se YouTube link add karein.
           </p>
         )}
       </section>

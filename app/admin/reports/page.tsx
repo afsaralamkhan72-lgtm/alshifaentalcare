@@ -54,7 +54,7 @@ export default async function ReportsPage({
   const income = tx.filter((t) => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0)
   const expense = tx.filter((t) => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0)
 
-  // Income grouped by category — shows which treatments actually earn
+  // Income grouped by category, shows which treatments actually earn
   const byCategory = new Map<string, number>()
   for (const t of tx) {
     if (t.type !== 'income') continue

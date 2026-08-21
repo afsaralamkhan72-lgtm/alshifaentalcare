@@ -14,7 +14,7 @@ export default function TreatmentPlanForm({ patientId }: Props) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  const [title, setTitle] = useState('Orthodontics — Braces')
+  const [title, setTitle] = useState('Orthodontics, Braces')
   const [totalCost, setTotalCost] = useState('')
   const [advance, setAdvance] = useState('0')
   const [months, setMonths] = useState('24')

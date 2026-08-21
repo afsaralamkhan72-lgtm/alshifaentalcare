@@ -2,7 +2,7 @@
  * Compresses an image in the browser BEFORE uploading to Supabase Storage.
  *
  * Approach: resize down to a sensible max dimension, then re-encode as WebP
- * at high quality (0.85). This is "compress but not blur" — the image stays
+ * at high quality (0.85). This is "compress but not blur", the image stays
  * visually sharp on screen, but file size typically drops 70–90% vs the
  * original phone/camera photo, so the free 1GB Storage lasts much longer.
  */
@@ -27,7 +27,7 @@ export async function compressImage(
   const ctx = canvas.getContext('2d')
   if (!ctx) return file
 
-  // High-quality downscaling — prevents the jagged/blurry look of naive resizing
+  // High-quality downscaling, prevents the jagged/blurry look of naive resizing
   ctx.imageSmoothingEnabled = true
   ctx.imageSmoothingQuality = 'high'
   ctx.drawImage(bitmap, 0, 0, width, height)

@@ -41,7 +41,7 @@ export default async function GalleryPage() {
           </div>
         ) : (
           <p className="rounded-2xl border border-dashed border-clinic-teal/20 bg-clinic-mint/40 p-8 text-center text-sm text-clinic-ink/60">
-            Gallery abhi khali hai — Admin Panel se before/after images add karein.
+            Gallery abhi khali hai, Admin Panel se before/after images add karein.
           </p>
         )}
       </section>

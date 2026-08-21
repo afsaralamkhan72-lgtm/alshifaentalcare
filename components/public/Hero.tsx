@@ -27,7 +27,7 @@ export default async function Hero() {
 
   return (
     <section className="relative overflow-hidden bg-clinic-teal">
-      {/* Ambient background shape — the "one accessory" for the hero */}
+      {/* Ambient background shape, the "one accessory" for the hero */}
       <div className="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full bg-clinic-teal-light/40 blur-3xl" />
 
       <div className="relative mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">

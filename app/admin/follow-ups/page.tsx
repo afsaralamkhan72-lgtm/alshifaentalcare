@@ -51,7 +51,7 @@ export default async function FollowUpsPage() {
     <div>
       <h1 className="font-display text-2xl font-semibold text-clinic-ink">Follow-ups</h1>
       <p className="mt-1 text-sm text-clinic-ink/60">
-        Jin patients ka agla visit due hai — RCT checkup, braces tightening, wire change.
+        Jin patients ka agla visit due hai, RCT checkup, braces tightening, wire change.
       </p>
 
       {overdue.length > 0 && (
@@ -74,7 +74,7 @@ export default async function FollowUpsPage() {
         {upcoming.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-clinic-teal/20 bg-clinic-mint/40 p-8 text-center text-sm text-clinic-ink/50">
             Koi follow-up due nahi. Patient ke profile mein visit note likhte waqt &quot;Next
-            visit&quot; date daalein — wo yahan aa jayega.
+            visit&quot; date daalein, wo yahan aa jayega.
           </div>
         ) : (
           upcoming.map((r) => <FollowUpRow key={r.id} row={r} />)
@@ -105,7 +105,7 @@ function FollowUpRow({ row, overdue = false }: { row: VisitRow; overdue?: boolea
             {patient?.mr_number} · {patient?.phone}
           </p>
           <p className="mt-1 text-sm text-clinic-ink/70">
-            {row.procedure ?? 'Visit'} —{' '}
+            {row.procedure ?? 'Visit'} ·{' '}
             {new Date(row.visit_date).toLocaleDateString('en-GB')}
           </p>
           {row.notes && <p className="mt-1 text-xs text-clinic-ink/50">{row.notes}</p>}

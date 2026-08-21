@@ -76,7 +76,7 @@ export default async function LabPage({
         <div>
           <h1 className="font-display text-2xl font-semibold text-clinic-ink">Lab Work</h1>
           <p className="mt-1 text-sm text-clinic-ink/60">
-            Crown, bridge, denture ke work orders — lab ko WhatsApp par bhejein.
+            Crown, bridge, denture ke work orders, lab ko WhatsApp par bhejein.
           </p>
         </div>
         <LabCaseForm
@@ -150,7 +150,7 @@ export default async function LabPage({
                         }`}
                       >
                         Due {new Date(c.due_date).toLocaleDateString('en-GB')}
-                        {overdue ? ' — late' : ''}
+                        {overdue ? ', late' : ''}
                       </p>
                     )}
                   </div>

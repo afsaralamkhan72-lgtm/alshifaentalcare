@@ -78,7 +78,7 @@ export default function TreatmentPlanCard({
       category: 'treatment-installment',
       amount: inst.amount,
       payment_method: method,
-      description: `${plan.title} — installment #${inst.installment_no} (${patientName})`,
+      description: `${plan.title}, installment #${inst.installment_no} (${patientName})`,
       transaction_date: today,
       recorded_by: user?.id ?? null,
     })

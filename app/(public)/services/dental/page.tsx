@@ -43,7 +43,7 @@ export default async function DentalServicesPage() {
           </div>
         ) : (
           <p className="rounded-2xl border border-dashed border-clinic-teal/20 bg-clinic-mint/40 p-8 text-center text-sm text-clinic-ink/60">
-            Dental services abhi CMS mein add nahi hui — Admin Panel se add karein.
+            Dental services abhi CMS mein add nahi hui, Admin Panel se add karein.
           </p>
         )}
       </section>

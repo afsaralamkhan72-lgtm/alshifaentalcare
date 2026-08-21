@@ -64,7 +64,7 @@ export default function PatientsToolbar() {
     setForm(INITIAL)
     setOpen(false)
 
-    // Registration flows straight into the history wizard — no hunting
+    // Registration flows straight into the history wizard, no hunting
     // through the profile page to find it.
     router.push(`/admin/patients/${created.id}/history`)
   }

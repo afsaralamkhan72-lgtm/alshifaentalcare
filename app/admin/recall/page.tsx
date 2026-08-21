@@ -64,7 +64,7 @@ export default async function RecallPage() {
     <div>
       <h1 className="font-display text-2xl font-semibold text-clinic-ink">Recall</h1>
       <p className="mt-1 text-sm text-clinic-ink/60">
-        Jin patients ko dobara bulana hai — scaling, check-up, ortho review.
+        Jin patients ko dobara bulana hai, scaling, check-up, ortho review.
       </p>
 
       <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-3">
@@ -96,7 +96,7 @@ export default async function RecallPage() {
         6 Mahine Se Nahi Aaye
       </h2>
       <p className="mt-1 text-sm text-clinic-ink/60">
-        In ka koi visit record nahi hua. Aik WhatsApp message inhein wapas laa sakta hai.
+        In ka koi visit record nahi hua. 
       </p>
       <DormantList patients={dormant} />
     </div>

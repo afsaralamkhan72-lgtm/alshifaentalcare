@@ -37,7 +37,7 @@ export default function RecallList({
   const router = useRouter()
   const [busyId, setBusyId] = useState<string | null>(null)
 
-  /** Patient came in — push the next due date forward by the interval */
+  /** Patient came in, push the next due date forward by the interval */
   async function markDone(r: RecallRow) {
     setBusyId(r.id)
     const today = new Date()
@@ -59,7 +59,7 @@ export default function RecallList({
     router.refresh()
   }
 
-  /** Not now — push it out by one month */
+  /** Not now, push it out by one month */
   async function snooze(r: RecallRow) {
     setBusyId(r.id)
     const next = new Date(r.next_due)

@@ -13,7 +13,7 @@ const POINTS = [
   },
   {
     title: 'Complete Patient Records',
-    body: 'Your dental chart, prescriptions and full history — available at every visit.',
+    body: 'Your dental chart, prescriptions and full history, available at every visit.',
     icon: (
       <path
         d="M8 3h8a2 2 0 0 1 2 2v16l-6-3-6 3V5a2 2 0 0 1 2-2Z"

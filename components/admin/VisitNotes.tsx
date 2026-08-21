@@ -30,7 +30,7 @@ export default function VisitNotes({
   const [text, setText] = useState('')
   const [nextVisit, setNextVisit] = useState('')
 
-  // Quick presets — the common follow-up gaps at this clinic
+  // Quick presets, the common follow-up gaps at this clinic
   function setWeeksAhead(weeks: number) {
     const d = new Date(visitDate)
     d.setDate(d.getDate() + weeks * 7)

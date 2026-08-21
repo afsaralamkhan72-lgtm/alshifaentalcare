@@ -70,7 +70,7 @@ export function buildPrescriptionWhatsAppLink({
     ...items.map((item, i) => {
       const parts = [item.name_en, item.name_ur, item.potency, item.dosage, item.frequency, item.duration]
         .filter(Boolean)
-        .join(' — ')
+        .join(', ')
       return `${i + 1}. ${parts}`
     }),
   ]

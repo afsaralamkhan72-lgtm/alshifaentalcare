@@ -268,7 +268,7 @@ export default async function PatientDetailPage({ params }: Props) {
         </div>
       </div>
 
-      {/* Treatment plans — orthodontics and any other multi-month course */}
+      {/* Treatment plans, orthodontics and any other multi-month course */}
       <div className="mt-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -283,7 +283,7 @@ export default async function PatientDetailPage({ params }: Props) {
         <div className="mt-4 grid gap-4">
           {plans.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-clinic-teal/20 bg-clinic-mint/40 p-6 text-center text-sm text-clinic-ink/60">
-              Koi treatment plan nahi hai. Braces jaise long treatment ke liye plan banayein —
+              Koi treatment plan nahi hai. Braces jaise long treatment ke liye plan banayein ·
               har month ki installment khud ban jayegi.
             </div>
           ) : (
@@ -384,7 +384,7 @@ export default async function PatientDetailPage({ params }: Props) {
         </div>
       </div>
 
-      {/* Appointment history — matched on phone number */}
+      {/* Appointment history, matched on phone number */}
       <div className="mt-8">
         <h2 className="font-display text-lg font-semibold text-clinic-ink">Appointments</h2>
         <div className="mt-3 divide-y divide-clinic-teal/10 rounded-2xl border border-clinic-teal/10 bg-white">

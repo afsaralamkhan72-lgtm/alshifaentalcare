@@ -58,7 +58,7 @@ export default async function PatientHistoryPage({
   const clinic = (clinicRow?.value ?? {}) as Record<string, string>
 
   // Once finalised, the full-page summary is the default view. Before that,
-  // the wizard is — unless the doctor explicitly asks for the summary.
+  // the wizard is, unless the doctor explicitly asks for the summary.
   const started = Boolean(history?.completed_step)
   const showSummary = view === 'summary' || (view !== 'form' && Boolean(history?.is_finalized))
 
@@ -78,7 +78,7 @@ export default async function PatientHistoryPage({
             {patient.mr_number} ·{' '}
             {showSummary
               ? 'Poori history aik page par.'
-              : 'Select the options and move on — each step saves automatically.'}
+              : 'Select the options and move on, each step saves automatically.'}
           </p>
         </div>
 

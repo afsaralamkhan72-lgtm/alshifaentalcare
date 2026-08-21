@@ -4,7 +4,7 @@ const STEPS = [
   {
     n: '01',
     title: 'Send a Message',
-    body: 'Message us on WhatsApp or call the clinic. Tell us the problem in your own words — no forms to fill.',
+    body: 'Message us on WhatsApp or call the clinic. Tell us the problem in your own words, no forms to fill.',
   },
   {
     n: '02',
@@ -19,7 +19,7 @@ const STEPS = [
   {
     n: '04',
     title: 'Treatment & Follow-up',
-    body: 'Treatment at your pace, with instalments where needed — and a follow-up reminder when the next visit is due.',
+    body: 'Treatment at your pace, with instalments where needed, and a follow-up reminder when the next visit is due.',
   },
 ]
 

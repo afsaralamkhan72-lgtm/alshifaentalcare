@@ -223,14 +223,14 @@ export default function AssistantBar() {
       if (!data || data.length === 0) {
         lines.push({ label: 'Last visit', value: 'Koi visit record nahi' })
       } else {
-        lines.push({ label: 'Last visit', value: `${fmt(data[0].visit_date)} — ${data[0].procedure ?? 'Visit'}` })
+        lines.push({ label: 'Last visit', value: `${fmt(data[0].visit_date)}, ${data[0].procedure ?? 'Visit'}` })
         if (data[0].notes) lines.push({ label: 'Notes', value: data[0].notes })
         const next = data.find((v) => v.next_visit)?.next_visit
         lines.push({ label: 'Next visit', value: next ? fmt(next) : 'Set nahi hai' })
         if (data[1]) {
           lines.push({
             label: 'Us se pehle',
-            value: `${fmt(data[1].visit_date)} — ${data[1].procedure ?? 'Visit'}`,
+            value: `${fmt(data[1].visit_date)}, ${data[1].procedure ?? 'Visit'}`,
           })
         }
       }
@@ -269,7 +269,7 @@ export default function AssistantBar() {
         if (nextDue) {
           lines.push({
             label: 'Next installment',
-            value: `Rs. ${Number(nextDue.amount).toLocaleString()} — ${fmt(nextDue.due_date)}`,
+            value: `Rs. ${Number(nextDue.amount).toLocaleString()}, ${fmt(nextDue.due_date)}`,
           })
         }
         if (overdue.length > 0) {
@@ -317,7 +317,7 @@ export default function AssistantBar() {
         for (const a of data) {
           lines.push({
             label: fmt(a.preferred_date),
-            value: `${a.treatment_name ?? 'Consultation'} — ${a.status}`,
+            value: `${a.treatment_name ?? 'Consultation'}, ${a.status}`,
           })
         }
       }
@@ -434,7 +434,7 @@ export default function AssistantBar() {
             {choices.length > 0 && (
               <div className="mt-4">
                 <p className="text-xs text-clinic-ink/50">
-                  Aik se zyada patient mile — kis ka matlab tha?
+                  Aik se zyada patient mile, kis ka matlab tha?
                 </p>
                 <div className="mt-2 grid gap-2">
                   {choices.map((p) => (

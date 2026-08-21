@@ -65,7 +65,7 @@ export default async function AboutPage() {
               <p className="mt-1 text-sm font-medium text-clinic-teal">{doctor.qualification}</p>
             ) : (
               <p className="mt-1 text-sm text-clinic-ink/40">
-                Qualification Admin Panel se add karein — abhi CMS mein khali hai.
+                Qualification Admin Panel se add karein, abhi CMS mein khali hai.
               </p>
             )}
 

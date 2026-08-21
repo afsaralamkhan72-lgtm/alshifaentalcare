@@ -122,7 +122,7 @@ export default async function BirthdaysPage() {
       {enriched.length === 0 && (
         <div className="mt-6 rounded-2xl border border-dashed border-clinic-teal/20 bg-clinic-mint/40 p-8 text-center text-sm text-clinic-ink/60">
           Abhi kisi patient ki birthday save nahi hui. Patient add ya edit karte waqt
-          &quot;Date of Birth&quot; daalein — ye optional hai.
+          &quot;Date of Birth&quot; daalein, ye optional hai.
         </div>
       )}
     </div>

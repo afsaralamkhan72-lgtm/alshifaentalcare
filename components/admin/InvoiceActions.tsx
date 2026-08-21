@@ -21,7 +21,7 @@ export default function InvoiceActions({
   paid,
   balance,
 }: Props) {
-  // Text summary for WhatsApp — the PDF itself stays on the device,
+  // Text summary for WhatsApp, the PDF itself stays on the device,
   // nothing is uploaded to Supabase.
   // Portal link is appended so the patient can check the same figures
   // themselves later, without calling the clinic.
@@ -34,7 +34,7 @@ export default function InvoiceActions({
     phoneOverride: patientPhone,
     customMessage: [
       `Assalam o Alaikum ${patientName},`,
-      `Al Shifa Health Care — payment statement (${mrNumber})`,
+      `Al Shifa Health Care, payment statement (${mrNumber})`,
       '',
       `Total: Rs. ${total.toLocaleString()}`,
       `Paid: Rs. ${paid.toLocaleString()}`,
@@ -46,7 +46,7 @@ export default function InvoiceActions({
             portalUrl,
             `Code: ${portalCode}`,
             '',
-            'Link kholein aur ye code likhein — aap ko apni appointment,',
+            'Link kholein aur ye code likhein, aap ko apni appointment,',
             'baqaya raqam aur har payment ki tafseel nazar aa jayegi.',
             'Ye link zaati hai, kisi aur ke sath share na karein.',
           ]
@@ -89,9 +89,6 @@ export default function InvoiceActions({
         >
           Send Summary on WhatsApp
         </a>
-        <p className="text-xs text-clinic-ink/50">
-          PDF sirf aap ke device par banegi — Supabase par kuch save nahi hota.
-        </p>
       </div>
     </>
   )

@@ -3,7 +3,7 @@ import './globals.css'
 
 export const metadata: Metadata = {
   title: 'Al Shifa Health Care | Dr. Muhammad Khalid Mahmood',
-  description: 'Dental & Homeopathic Clinic — Numaish, Nizami Road, Karachi',
+  description: 'Dental & Homeopathic Clinic, Numaish, Nizami Road, Karachi',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

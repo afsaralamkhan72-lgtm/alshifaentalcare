@@ -172,7 +172,7 @@ export default function AppointmentBoard({ appointments }: { appointments: Appoi
           appointments.map((a) => {
             const confirmLink = buildWhatsAppLink({
               phoneOverride: a.phone,
-              customMessage: `Assalam o Alaikum ${a.patient_name}, aap ka appointment ${a.preferred_date ?? ''} ${a.preferred_time ?? ''} confirm ho gaya hai. Al Shifa Health Care — Numaish, Nizami Road, Karachi.`,
+              customMessage: `Assalam o Alaikum ${a.patient_name}, aap ka appointment ${a.preferred_date ?? ''} ${a.preferred_time ?? ''} confirm ho gaya hai. Al Shifa Health Care, Numaish, Nizami Road, Karachi.`,
             })
 
             return (

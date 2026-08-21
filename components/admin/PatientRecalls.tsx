@@ -99,7 +99,7 @@ export default function PatientRecalls({
         <div>
           <h2 className="font-display text-lg font-semibold text-clinic-ink">Recalls</h2>
           <p className="text-sm text-clinic-ink/60">
-            When to call the patient back — you'll be reminded automatically.
+            When to call the patient back, you'll be reminded automatically.
           </p>
         </div>
         <button

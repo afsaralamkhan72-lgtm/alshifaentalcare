@@ -236,8 +236,7 @@ export default async function PortalRecordPage({
       </div>
 
       <p className="mt-8 text-xs text-clinic-ink/40">
-        This page shows appointments and payments only. For treatment details, prescriptions or
-        reports, please speak to the doctor at the clinic.
+        Treatment aur prescription ki tafseel ke liye clinic par raabta karein.
       </p>
     </Shell>
   )

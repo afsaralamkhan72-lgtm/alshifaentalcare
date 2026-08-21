@@ -6,7 +6,7 @@ interface Stat {
 }
 
 // Kept factual/non-numeric by default (no invented "X years" or "Y patients")
-// — Dr. Sahib can overwrite these from the CMS with real figures anytime.
+//, Dr. Sahib can overwrite these from the CMS with real figures anytime.
 const DEFAULT_STATS: Stat[] = [
   { value: '2', label: 'Specialties Under One Roof' },
   { value: 'Daily', label: '10:00 AM – 5:00 PM' },

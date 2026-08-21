@@ -2,7 +2,7 @@ interface TickerProps {
   items: string[]
 }
 
-// Pure-CSS marquee — no JS animation library, so it stays light and fast.
+// Pure-CSS marquee, no JS animation library, so it stays light and fast.
 // Duplicated list = seamless infinite loop. Pauses on hover and respects
 // prefers-reduced-motion globally (see app/globals.css).
 export default function Ticker({ items }: TickerProps) {

@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import InvoiceActions from '@/components/admin/InvoiceActions'
 import ClinicLogo from '@/components/ClinicLogo'
+import InvoiceBuilder from '@/components/admin/InvoiceBuilder'
 
 export default async function InvoicePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -68,6 +69,8 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
 
       <div className="mt-3" />
 
+      <InvoiceBuilder patientId={patient.id} total={grandTotal} paid={grandPaid} />
+
       <InvoiceActions
         patientName={patient.full_name}
         patientPhone={patient.phone}
@@ -79,39 +82,46 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
       />
 
       {/* This block is what gets printed */}
-      <div id="invoice-sheet" className="mx-auto max-w-2xl rounded-2xl border border-clinic-teal/10 bg-white p-8">
-        <div className="flex items-start gap-4 border-b border-clinic-teal/20 pb-4">
-          <ClinicLogo logoUrl={clinic.logo_url} size={56} />
+      <div
+        id="invoice-sheet"
+        className="mx-auto max-w-2xl overflow-hidden rounded-2xl border border-clinic-teal/20 bg-white"
+      >
+        <div className="flex items-start gap-4 bg-clinic-teal px-8 py-6 text-white">
+          <div className="rounded-lg bg-white p-1.5">
+            <ClinicLogo logoUrl={clinic.logo_url} size={48} />
+          </div>
           <div>
-          <p className="font-display text-2xl font-semibold text-clinic-teal">
+          <p className="font-display text-2xl font-semibold text-white">
             {clinic.name ?? 'Al Shifa Health Care'}
           </p>
-          <p className="text-sm text-clinic-ink/60">
+          <p className="text-sm text-white/90">
             {clinic.doctor_name ?? 'Dr. Muhammad Khalid Mahmood'}
           </p>
-          <p className="mt-1 text-xs text-clinic-ink/50">
+          <p className="mt-1 text-xs text-white/80">
             {clinic.address ?? 'Numaish, Nizami Road, Karachi'} · {clinic.phone ?? '0342-2078639'}
           </p>
           </div>
         </div>
 
+        <div className="px-8 py-6">
+
         <p className="mt-6 font-display text-lg font-semibold text-clinic-ink">Payment Statement</p>
 
         <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
           <div>
-            <p className="text-xs text-clinic-ink/50">Patient</p>
+            <p className="text-xs font-medium text-clinic-ink/70">Patient</p>
             <p className="font-medium text-clinic-ink">{patient.full_name}</p>
           </div>
           <div>
-            <p className="text-xs text-clinic-ink/50">MR Number</p>
+            <p className="text-xs font-medium text-clinic-ink/70">MR Number</p>
             <p className="font-medium text-clinic-ink">{patient.mr_number}</p>
           </div>
           <div>
-            <p className="text-xs text-clinic-ink/50">Phone</p>
+            <p className="text-xs font-medium text-clinic-ink/70">Phone</p>
             <p className="font-medium text-clinic-ink">{patient.phone}</p>
           </div>
           <div>
-            <p className="text-xs text-clinic-ink/50">Date</p>
+            <p className="text-xs font-medium text-clinic-ink/70">Date</p>
             <p className="font-medium text-clinic-ink">{new Date().toLocaleDateString('en-GB')}</p>
           </div>
         </div>
@@ -120,19 +130,19 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           <>
             <p className="mt-6 text-sm font-semibold text-clinic-ink">Treatment Plans</p>
             <table className="mt-2 w-full text-sm">
-              <thead className="text-left text-xs text-clinic-ink/50">
+              <thead className="bg-clinic-mint text-left text-xs font-semibold text-clinic-ink/80">
                 <tr>
-                  <th className="py-1">Treatment</th>
-                  <th className="py-1">Duration</th>
-                  <th className="py-1 text-right">Total</th>
+                  <th className="px-2 py-1.5">Treatment</th>
+                  <th className="px-2 py-1.5">Duration</th>
+                  <th className="px-2 py-1.5 text-right">Total</th>
                 </tr>
               </thead>
               <tbody>
                 {plans.map((p) => (
                   <tr key={p.id} className="border-t border-clinic-teal/10">
-                    <td className="py-2">{p.title}</td>
-                    <td className="py-2">{p.duration_months} months</td>
-                    <td className="py-2 text-right">Rs. {Number(p.total_cost).toLocaleString()}</td>
+                    <td className="px-2 py-2">{p.title}</td>
+                    <td className="px-2 py-2">{p.duration_months} months</td>
+                    <td className="px-2 py-2 text-right">Rs. {Number(p.total_cost).toLocaleString()}</td>
                   </tr>
                 ))}
               </tbody>
@@ -144,23 +154,23 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           <>
             <p className="mt-6 text-sm font-semibold text-clinic-ink">Payments Received</p>
             <table className="mt-2 w-full text-sm">
-              <thead className="text-left text-xs text-clinic-ink/50">
+              <thead className="bg-clinic-mint text-left text-xs font-semibold text-clinic-ink/80">
                 <tr>
-                  <th className="py-1">Date</th>
-                  <th className="py-1">Description</th>
-                  <th className="py-1">Method</th>
-                  <th className="py-1 text-right">Amount</th>
+                  <th className="px-2 py-1.5">Date</th>
+                  <th className="px-2 py-1.5">Description</th>
+                  <th className="px-2 py-1.5">Method</th>
+                  <th className="px-2 py-1.5 text-right">Amount</th>
                 </tr>
               </thead>
               <tbody>
                 {transactions.map((t, i) => (
                   <tr key={i} className="border-t border-clinic-teal/10">
-                    <td className="py-2">
+                    <td className="px-2 py-2">
                       {new Date(t.transaction_date).toLocaleDateString('en-GB')}
                     </td>
-                    <td className="py-2 text-clinic-ink/60">{t.description ?? t.category ?? '—'}</td>
-                    <td className="py-2 capitalize">{t.payment_method ?? '—'}</td>
-                    <td className="py-2 text-right">Rs. {Number(t.amount).toLocaleString()}</td>
+                    <td className="px-2 py-2 text-clinic-ink">{t.description ?? t.category ?? '—'}</td>
+                    <td className="px-2 py-2 capitalize">{t.payment_method ?? '—'}</td>
+                    <td className="px-2 py-2 text-right">Rs. {Number(t.amount).toLocaleString()}</td>
                   </tr>
                 ))}
               </tbody>
@@ -170,24 +180,23 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
 
         <div className="mt-6 border-t border-clinic-teal/20 pt-4">
           <div className="flex justify-between py-1 text-sm">
-            <span className="text-clinic-ink/60">Total Treatment Value</span>
+            <span className="text-clinic-ink">Total Treatment Value</span>
             <span className="font-medium">Rs. {grandTotal.toLocaleString()}</span>
           </div>
           <div className="flex justify-between py-1 text-sm">
-            <span className="text-clinic-ink/60">Total Paid</span>
+            <span className="text-clinic-ink">Total Paid</span>
             <span className="font-medium text-emerald-700">Rs. {grandPaid.toLocaleString()}</span>
           </div>
-          <div className="flex justify-between border-t border-clinic-teal/10 py-2 text-base">
-            <span className="font-semibold text-clinic-ink">Balance Due</span>
-            <span className="font-display font-semibold text-clinic-teal">
-              Rs. {balance.toLocaleString()}
-            </span>
+          <div className="mt-2 flex justify-between rounded-xl bg-clinic-teal px-4 py-3 text-base text-white">
+            <span className="font-semibold">Balance Due</span>
+            <span className="font-display font-semibold">Rs. {balance.toLocaleString()}</span>
           </div>
         </div>
 
-        <p className="mt-6 text-center text-xs text-clinic-ink/40">
-          {clinic.timings ?? 'Open Daily 10:00 AM – 5:00 PM'} · Shukriya
+        <p className="mt-6 border-t border-clinic-teal/20 pt-4 text-center text-xs text-clinic-ink/70">
+          {clinic.timings ?? 'Open Daily 10:00 AM to 5:00 PM'}
         </p>
+        </div>
       </div>
     </div>
   )

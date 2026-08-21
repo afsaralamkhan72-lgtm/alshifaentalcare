@@ -221,7 +221,7 @@ export default function CMSContentManager({
           <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6">
             <div className="flex items-center justify-between">
               <p className="font-display text-lg font-semibold text-clinic-ink">
-                {editingId ? 'Edit' : 'Add'} — {title}
+                {editingId ? 'Edit' : 'Add'}, {title}
               </p>
               <button
                 onClick={() => {

@@ -38,7 +38,7 @@ export default async function BlogPage() {
           </div>
         ) : (
           <p className="rounded-2xl border border-dashed border-clinic-teal/20 bg-clinic-mint/40 p-8 text-center text-sm text-clinic-ink/60">
-            Abhi koi blog post publish nahi hui — Admin Panel se likhna shuru karein.
+            Abhi koi blog post publish nahi hui, Admin Panel se likhna shuru karein.
           </p>
         )}
       </section>

@@ -48,7 +48,7 @@ export default async function BillingPage({
     .filter((t) => t.type === 'expense')
     .reduce((s, t) => s + Number(t.amount), 0)
 
-  // Income split by payment method — shows how much came via cash vs bank
+  // Income split by payment method, shows how much came via cash vs bank
   // vs mobile wallets in the selected period.
   const byMethod = METHODS.map((m) => ({
     method: m,

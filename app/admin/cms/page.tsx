@@ -92,8 +92,7 @@ export default async function CMSPage() {
     <div>
       <h1 className="font-display text-2xl font-semibold text-clinic-ink">Edit Website</h1>
       <p className="mt-1 text-sm text-clinic-ink/60">
-        Yahan se website ki har cheez edit karein — koi developer ki zaroorat nahi.
-        Changes save karte hi live ho jate hain.
+        Website ka content yahan se edit karein. Save karte hi live ho jata hai.
       </p>
 
       <div className="mt-6">
@@ -104,7 +103,7 @@ export default async function CMSPage() {
         <CMSContentManager
           table="services"
           title="Treatments / Services"
-          hint="Purani service par Edit dabayein aur picture laga dein — wo turant website par aa jayegi."
+          hint="Edit dabayein aur picture lagayein."
           fields={SERVICE_FIELDS}
           rows={services.data ?? []}
           displayKey="title"
@@ -123,7 +122,7 @@ export default async function CMSPage() {
         <CMSContentManager
           table="videos"
           title="Videos (YouTube)"
-          hint="Sirf YouTube links — koi heavy video upload nahi, space bachti hai."
+          hint=""
           fields={VIDEO_FIELDS}
           rows={videos.data ?? []}
           displayKey="title"
@@ -133,7 +132,7 @@ export default async function CMSPage() {
         <CMSContentManager
           table="doctors"
           title="Doctors Panel"
-          hint="Doctor ki photo, qualification aur tafseel — website ke Doctors page par dikhega."
+          hint="Doctor ki photo, qualification aur tafseel, website ke Doctors page par dikhega."
           fields={DOCTOR_FIELDS}
           rows={doctors.data ?? []}
           displayKey="full_name"

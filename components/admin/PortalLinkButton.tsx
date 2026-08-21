@@ -34,7 +34,7 @@ export default function PortalLinkButton({
         customMessage: [
           `Assalam o Alaikum ${patientName},`,
           '',
-          'Al Shifa Health Care mein aap ka record online dekha ja sakta hai —',
+          'Al Shifa Health Care mein aap ka record online dekha ja sakta hai ·',
           'appointment, agla visit aur payment ki tafseel.',
           '',
           url,
@@ -52,7 +52,7 @@ export default function PortalLinkButton({
   async function regenerate() {
     if (
       !confirm(
-        'Naya code banayein? Purana link kaam karna band kar dega — patient ko naya link bhejna hoga.'
+        'Naya code banayein? Purana link kaam karna band kar dega, patient ko naya link bhejna hoga.'
       )
     )
       return
@@ -72,7 +72,7 @@ export default function PortalLinkButton({
   if (!portalCode) {
     return (
       <span className="rounded-full bg-amber-50 px-3 py-2 text-xs text-amber-700">
-        Portal code nahi — phase7.sql chalayein
+        Portal code nahi, phase7.sql chalayein
       </span>
     )
   }
@@ -97,8 +97,7 @@ export default function PortalLinkButton({
             </div>
 
             <p className="mt-3 text-sm text-clinic-ink/60">
-              Patient is code se apna appointment aur payment record dekh sakta hai.
-              Treatment aur prescription ki tafseel portal par nahi dikhti.
+              Patient apna appointment aur payment record dekh sakta hai.
             </p>
 
             <div className="mt-4 rounded-xl bg-clinic-mint p-4 text-center">

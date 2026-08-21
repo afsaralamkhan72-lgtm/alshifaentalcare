@@ -20,7 +20,7 @@ export interface Step {
 
 /**
  * The 9-step clinical intake. Doctor mostly clicks options and moves on.
- * Everything is optional — a half-filled history is still saved.
+ * Everything is optional, a half-filled history is still saved.
  */
 export const HISTORY_STEPS: Step[] = [
   {

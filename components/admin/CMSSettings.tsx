@@ -81,9 +81,6 @@ export default function CMSSettings({ initial }: Props) {
             value={clinic.logo_url || null}
             onChange={(url) => setClinic((p) => ({ ...p, logo_url: url ?? '' }))}
           />
-          <p className="mt-1 text-xs text-clinic-ink/40">
-            Website ke header, footer aur sab invoices par lag jayega.
-          </p>
         </div>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2">

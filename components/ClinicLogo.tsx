@@ -40,7 +40,7 @@ export default function ClinicLogo({
       className="shrink-0"
       aria-label={name}
     >
-      {/* leaf arc — homeopathic side */}
+      {/* leaf arc, homeopathic side */}
       <path
         d="M10 30c0-10 7-18 16-18"
         stroke="#2E9E7B"
@@ -50,7 +50,7 @@ export default function ClinicLogo({
       />
       <path d="M17 15c-3-2-6-1-7 2 3 1 6 0 7-2Z" fill="#2E9E7B" />
       <path d="M22 10c-2-3-5-3-7-1 2 2 5 3 7 1Z" fill="#3FBF93" />
-      {/* tooth — dental side */}
+      {/* tooth, dental side */}
       <path
         d="M24 13c3-2 7-2 9 1 2 3 1 8 0 12-.7 2.6-1.3 6-3 6s-1.6-4-3-4-1.3 4-3 4-2.3-3.4-3-6c-1-4-2-9 0-12 2-3 6-3 9-1Z"
         stroke="#0B4F4A"

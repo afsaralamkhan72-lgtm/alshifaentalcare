@@ -157,7 +157,7 @@ export default async function LabOrderPage({ params }: { params: Promise<{ id: s
           <div className="mt-3">
             <p className="text-xs text-clinic-ink/50">Tooth Numbers (FDI)</p>
             {teeth.length === 0 ? (
-              <p className="font-medium text-clinic-ink">—</p>
+              <p className="font-medium text-clinic-ink">·</p>
             ) : (
               <div className="mt-1 flex flex-wrap gap-1.5">
                 {teeth.map((t) => (

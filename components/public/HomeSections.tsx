@@ -206,7 +206,7 @@ export default async function HomeSections() {
             Toothache or a Long-Standing Problem?
           </h2>
           <p className="mx-auto mt-3 max-w-lg text-white/70">
-            Book your time today. Open daily at Numaish, Nizami Road — 10:00 AM to 5:00 PM.
+            Book your time today. Open daily at Numaish, Nizami Road, 10:00 AM to 5:00 PM.
           </p>
           <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
             <WhatsAppButton label="Book on WhatsApp" />

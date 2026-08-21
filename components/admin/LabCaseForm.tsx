@@ -97,7 +97,7 @@ export default function LabCaseForm({
 
     let finalLabId: string | null = labId || null
 
-    // New lab typed in — save it so it's reusable next time
+    // New lab typed in, save it so it's reusable next time
     if (!labId && saveLab && labName.trim()) {
       const { data: newLab } = await supabase
         .from('labs')
@@ -174,7 +174,7 @@ export default function LabCaseForm({
                       onChange={(e) => pickLab(e.target.value)}
                       className={inputClass}
                     >
-                      <option value="">— Naya lab likhein —</option>
+                      <option value="">Naya lab likhein ·</option>
                       {labs.map((l) => (
                         <option key={l.id} value={l.id}>
                           {l.name}
@@ -231,7 +231,7 @@ export default function LabCaseForm({
                   <option value="">Select patient...</option>
                   {patients.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.mr_number} — {p.full_name}
+                      {p.mr_number}, {p.full_name}
                     </option>
                   ))}
                 </select>
@@ -240,7 +240,7 @@ export default function LabCaseForm({
               {/* Teeth */}
               <div>
                 <label className="text-sm font-medium text-clinic-ink">
-                  Tooth Numbers (FDI) — chart par click karein
+                  Tooth Numbers (FDI), chart par click karein
                 </label>
                 <div className="mt-2">
                   <ToothPicker selected={teeth} onChange={setTeeth} />

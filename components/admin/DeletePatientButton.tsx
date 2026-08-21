@@ -13,7 +13,7 @@ interface Props {
 /**
  * Deleting a patient also removes their dental chart, treatment plans,
  * installments, visit notes, prescriptions and history (ON DELETE CASCADE).
- * So we make the doctor type the name — no accidental clicks.
+ * So we make the doctor type the name, no accidental clicks.
  */
 export default function DeletePatientButton({ patientId, patientName, mrNumber }: Props) {
   const router = useRouter()
@@ -30,7 +30,7 @@ export default function DeletePatientButton({ patientId, patientName, mrNumber }
     setError('')
 
     const supabase = createClient()
-    // Soft delete — row stays in the database and can be restored
+    // Soft delete, row stays in the database and can be restored
     // from the Recycle Bin.
     const { error: err } = await supabase
       .from('patients')
@@ -73,10 +73,6 @@ export default function DeletePatientButton({ patientId, patientName, mrNumber }
                 <li>Prescriptions</li>
                 <li>Patient history</li>
               </ul>
-              <p className="mt-2 text-xs font-semibold">
-                Ghabrayein nahi — ye Recycle Bin mein chala jayega aur wahan se wapas laya
-                ja sakta hai.
-              </p>
             </div>
 
             <label className="mt-4 block text-sm text-clinic-ink">

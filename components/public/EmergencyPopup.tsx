@@ -12,7 +12,7 @@ interface PopupSettings {
   button_text: string
 }
 
-// Fallback values — used if CMS hasn't loaded yet or is offline
+// Fallback values, used if CMS hasn't loaded yet or is offline
 const DEFAULT_SETTINGS: PopupSettings = {
   enabled: true,
   delay_seconds: 10,
@@ -83,7 +83,7 @@ export default function EmergencyPopup() {
       </button>
 
       <div className="flex items-start gap-3 pr-5">
-        {/* Signature "vital pulse" dot — ties popup to a heartbeat/vitals motif */}
+        {/* Signature "vital pulse" dot, ties popup to a heartbeat/vitals motif */}
         <span className="relative mt-1 flex h-3 w-3 shrink-0">
           <span className="absolute inline-flex h-full w-full animate-pulse-ring rounded-full bg-clinic-amber motion-reduce:animate-none" />
           <span className="relative inline-flex h-3 w-3 rounded-full bg-clinic-amber" />
