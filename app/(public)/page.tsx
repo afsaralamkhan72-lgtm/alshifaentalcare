@@ -3,6 +3,10 @@ import Hero from '@/components/public/Hero'
 import Ticker from '@/components/public/Ticker'
 import TrustStats from '@/components/public/TrustStats'
 import ServiceCard from '@/components/public/ServiceCard'
+import WhyChooseUs from '@/components/public/WhyChooseUs'
+import DoctorIntro from '@/components/public/DoctorIntro'
+import HomeSections from '@/components/public/HomeSections'
+import Link from 'next/link'
 
 interface Service {
   id: string
@@ -53,6 +57,12 @@ export default async function HomePage() {
               Dental &amp; Homeopathic Treatments
             </h2>
           </div>
+          <Link
+            href="/services/dental"
+            className="shrink-0 text-sm font-semibold text-clinic-teal hover:underline"
+          >
+            Sab treatments →
+          </Link>
         </div>
 
         {services.length > 0 ? (
@@ -74,6 +84,10 @@ export default async function HomePage() {
           </p>
         )}
       </section>
+
+      <WhyChooseUs />
+      <DoctorIntro />
+      <HomeSections />
     </>
   )
 }
