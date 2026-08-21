@@ -85,7 +85,7 @@ export default function VisitNotes({
         <div>
           <h2 className="font-display text-lg font-semibold text-clinic-ink">Visit Notes</h2>
           <p className="text-sm text-clinic-ink/60">
-            Har visit ka record aur agla follow-up.
+            A record of every visit and the next follow-up.
           </p>
         </div>
         <button
@@ -173,7 +173,7 @@ export default function VisitNotes({
       <div className="mt-4 divide-y divide-clinic-teal/10 rounded-2xl border border-clinic-teal/10 bg-white">
         {notes.length === 0 ? (
           <p className="px-4 py-6 text-center text-sm text-clinic-ink/50">
-            Abhi koi visit record nahi hua.
+            No visits recorded yet.
           </p>
         ) : (
           notes.map((n) => (

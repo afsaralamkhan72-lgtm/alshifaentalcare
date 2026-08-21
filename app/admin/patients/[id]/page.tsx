@@ -127,7 +127,7 @@ export default async function PatientDetailPage({ params }: Props) {
         href="/admin/patients"
         className="text-sm text-clinic-ink/50 transition-colors hover:text-clinic-teal"
       >
-        ← Sab Patients
+        ← All Patients
       </Link>
 
       <div className="mt-3 rounded-2xl border border-clinic-teal/10 bg-white p-6">
@@ -267,7 +267,7 @@ export default async function PatientDetailPage({ params }: Props) {
           <div>
             <h2 className="font-display text-lg font-semibold text-clinic-ink">Treatment Plans</h2>
             <p className="text-sm text-clinic-ink/60">
-              Monthly installments, payment history aur balance.
+              Monthly instalments, payment history and balance.
             </p>
           </div>
           <TreatmentPlanForm patientId={patient.id} />
@@ -307,7 +307,7 @@ export default async function PatientDetailPage({ params }: Props) {
         <div className="mt-3 divide-y divide-clinic-teal/10 rounded-2xl border border-clinic-teal/10 bg-white">
           {prescriptions.length === 0 ? (
             <p className="px-4 py-6 text-center text-sm text-clinic-ink/50">
-              Koi prescription record nahi hui.
+              No prescriptions recorded.
             </p>
           ) : (
             prescriptions.map((rx) => {
@@ -352,7 +352,7 @@ export default async function PatientDetailPage({ params }: Props) {
               {payments.length === 0 ? (
                 <tr>
                   <td colSpan={4} className="px-4 py-6 text-center text-clinic-ink/50">
-                    Abhi koi payment record nahi hui.
+                    No payments recorded yet.
                   </td>
                 </tr>
               ) : (
@@ -382,7 +382,7 @@ export default async function PatientDetailPage({ params }: Props) {
         <div className="mt-3 divide-y divide-clinic-teal/10 rounded-2xl border border-clinic-teal/10 bg-white">
           {appointments.length === 0 ? (
             <p className="px-4 py-6 text-center text-sm text-clinic-ink/50">
-              Is number se koi appointment record nahi hui.
+              No appointments found for this number.
             </p>
           ) : (
             appointments.map((a) => (

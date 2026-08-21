@@ -44,7 +44,7 @@ export default async function DashboardPage() {
   return (
     <div>
       <h1 className="font-display text-2xl font-semibold text-clinic-ink">Dashboard</h1>
-      <p className="mt-1 text-sm text-clinic-ink/60">Clinic ka overall overview.</p>
+      <p className="mt-1 text-sm text-clinic-ink/60">Clinic overview.</p>
 
       <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-5">
         <StatCard label="Total Patients" value={stats.totalPatients} />
@@ -92,7 +92,7 @@ export default async function DashboardPage() {
             </table>
           </div>
         ) : (
-          <p className="mt-3 text-sm text-clinic-ink/50">Koi pending appointment request nahi hai.</p>
+          <p className="mt-3 text-sm text-clinic-ink/50">No pending appointment requests.</p>
         )}
       </div>
     </div>

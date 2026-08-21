@@ -41,25 +41,32 @@ export default function PatientsToolbar() {
     setError('')
 
     const supabase = createClient()
-    const { error: insertError } = await supabase.from('patients').insert({
-      full_name: form.full_name,
-      phone: form.phone,
-      department: form.department,
-      age: form.age ? Number(form.age) : null,
-      gender: form.gender || null,
-      date_of_birth: form.date_of_birth || null,
-      address: form.address || null,
-    })
+    const { data: created, error: insertError } = await supabase
+      .from('patients')
+      .insert({
+        full_name: form.full_name,
+        phone: form.phone,
+        department: form.department,
+        age: form.age ? Number(form.age) : null,
+        gender: form.gender || null,
+        date_of_birth: form.date_of_birth || null,
+        address: form.address || null,
+      })
+      .select('id')
+      .single()
 
     setSaving(false)
-    if (insertError) {
-      setError('Patient save nahi hua, dobara koshish karein.')
+    if (insertError || !created) {
+      setError('Could not save the patient. Please try again.')
       return
     }
 
     setForm(INITIAL)
     setOpen(false)
-    router.refresh()
+
+    // Registration flows straight into the history wizard — no hunting
+    // through the profile page to find it.
+    router.push(`/admin/patients/${created.id}/history`)
   }
 
   return (
@@ -147,7 +154,7 @@ export default function PatientsToolbar() {
                 disabled={saving}
                 className="mt-2 rounded-full bg-clinic-teal px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-clinic-teal-light disabled:opacity-60"
               >
-                {saving ? 'Saving...' : 'Save Patient'}
+                {saving ? 'Saving...' : 'Save & Start History →'}
               </button>
             </form>
           </div>

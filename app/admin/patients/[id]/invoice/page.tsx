@@ -62,7 +62,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         href={`/admin/patients/${id}`}
         className="text-sm text-clinic-ink/50 transition-colors hover:text-clinic-teal print:hidden"
       >
-        ← {patient.full_name} ki profile
+        ← {patient.full_name} 's profile
       </Link>
 
       <div className="mt-3" />

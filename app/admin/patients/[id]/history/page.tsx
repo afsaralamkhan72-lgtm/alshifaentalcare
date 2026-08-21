@@ -19,6 +19,23 @@ export default async function PatientHistoryPage({
 
   if (!patient) notFound()
 
+  let dentalRecords: {
+    id: string
+    tooth_number: string
+    condition: string
+    notes: string | null
+    treatment_date: string
+  }[] = []
+
+  if (patient.department === 'dental') {
+    const { data: dc } = await supabase
+      .from('dental_chart')
+      .select('id, tooth_number, condition, notes, treatment_date')
+      .eq('patient_id', id)
+      .order('treatment_date', { ascending: false })
+    dentalRecords = dc ?? []
+  }
+
   const { data: history, error } = await supabase
     .from('patient_history')
     .select('*')
@@ -34,14 +51,14 @@ export default async function PatientHistoryPage({
         href={`/admin/patients/${id}`}
         className="text-sm text-clinic-ink/50 hover:text-clinic-teal"
       >
-        ← {patient.full_name} ki profile
+        ← {patient.full_name} 's profile
       </Link>
 
       <h1 className="mt-2 font-display text-2xl font-semibold text-clinic-ink">
         Patient History
       </h1>
       <p className="mt-1 text-sm text-clinic-ink/60">
-        {patient.mr_number} · Options select karte jayein, har step khud save hota rahega.
+        {patient.mr_number} · Select the options and move on — each step saves automatically.
       </p>
 
       <div className="mt-6">
@@ -50,6 +67,7 @@ export default async function PatientHistoryPage({
           patientName={patient.full_name}
           department={patient.department}
           initial={(history ?? null) as HistoryRecord | null}
+          dentalRecords={dentalRecords}
           needsMigration={needsMigration}
         />
       </div>

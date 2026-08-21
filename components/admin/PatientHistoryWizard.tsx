@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { HISTORY_STEPS, type Field } from '@/lib/history-steps'
+import DentalChart from './DentalChart'
 
 type SectionData = Record<string, unknown>
 
@@ -27,18 +28,26 @@ interface Props {
   patientName: string
   department: string
   initial: HistoryRecord | null
+  dentalRecords: {
+    id: string
+    tooth_number: string
+    condition: string
+    notes: string | null
+    treatment_date: string
+  }[]
   /** true when the patient_history table doesn't exist yet */
   needsMigration?: boolean
 }
 
-// Step 8 (index 7) is the dental chart, which lives on the patient page
-const CHART_STEP_INDEX = 7
+// The dental chart is the final step, rendered after HISTORY_STEPS
+const CHART_STEP_INDEX = HISTORY_STEPS.length
 
 export default function PatientHistoryWizard({
   patientId,
   patientName,
   department,
   initial,
+  dentalRecords,
   needsMigration = false,
 }: Props) {
   const router = useRouter()
@@ -73,7 +82,8 @@ export default function PatientHistoryWizard({
 
   // The visible wizard steps, plus the dental chart entry shown in the tracker
   const totalSteps = HISTORY_STEPS.length + 1
-  const step = HISTORY_STEPS[stepIndex]
+  const onChartStep = stepIndex === CHART_STEP_INDEX
+  const step = HISTORY_STEPS[Math.min(stepIndex, HISTORY_STEPS.length - 1)]
   const section = data[step.column] ?? {}
 
   function setValue(key: string, value: unknown) {
@@ -127,13 +137,13 @@ export default function PatientHistoryWizard({
     setSaving(false)
 
     if (error) {
-      setStatus('Save nahi hua. Kya phase3.sql chalayi thi?')
+      setStatus('Could not save. Did you run the SETUP-ALL.sql?')
       return
     }
 
     if (finalize) {
       setFinalized(true)
-      setStatus('History finalize ho gayi — patient ki permanent profile ban gayi.')
+      setStatus('History finalised — this is now the patient record.')
       router.refresh()
       return
     }
@@ -189,22 +199,40 @@ export default function PatientHistoryWizard({
           )
         })}
 
-        {/* Dental chart lives on the patient page */}
-        <Link
-          href={`/admin/patients/${patientId}#dental-chart`}
-          className="flex items-center gap-2 rounded-full bg-clinic-mint px-3 py-1.5 text-xs font-medium text-clinic-ink/50 hover:text-clinic-teal"
+        <button
+          onClick={() => setStepIndex(CHART_STEP_INDEX)}
+          className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+            onChartStep ? 'bg-clinic-teal text-white' : 'bg-clinic-mint text-clinic-ink/50'
+          }`}
         >
-          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/60 text-[10px]">
+          <span
+            className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] ${
+              onChartStep ? 'bg-white/20' : 'bg-white/60'
+            }`}
+          >
             {totalSteps}
           </span>
           Dental Chart
-        </Link>
+        </button>
       </div>
 
       {/* Current step */}
       <div className="mt-6 border-t border-clinic-teal/10 pt-6">
-        <p className="font-display font-semibold text-clinic-ink">{step.title}</p>
+        <p className="font-display font-semibold text-clinic-ink">
+          {onChartStep ? 'Dental Chart' : step.title}
+        </p>
 
+        {onChartStep ? (
+          department === 'dental' ? (
+            <div className="mt-4">
+              <DentalChart patientId={patientId} initialRecords={dentalRecords} />
+            </div>
+          ) : (
+            <p className="mt-4 rounded-xl bg-clinic-mint/60 p-6 text-center text-sm text-clinic-ink/60">
+              Dental chart homeopathic patients ke liye applicable nahi. Finalize dabayein.
+            </p>
+          )
+        ) : (
         <div className="mt-4 grid gap-5 sm:grid-cols-2">
           {step.fields.filter(visible).map((field) => (
             <div key={field.key} className={field.full ? 'sm:col-span-2' : ''}>
@@ -292,6 +320,7 @@ export default function PatientHistoryWizard({
             </div>
           ))}
         </div>
+        )}
       </div>
 
       {/* Navigation */}
@@ -307,15 +336,17 @@ export default function PatientHistoryWizard({
         <div className="flex flex-wrap items-center gap-3">
           {status && <span className="text-xs text-clinic-ink/50">{status}</span>}
 
-          <button
-            onClick={() => save()}
-            disabled={saving}
-            className="rounded-full border border-clinic-teal px-4 py-2 text-sm font-semibold text-clinic-teal disabled:opacity-50"
-          >
-            {saving ? 'Saving...' : 'Save'}
-          </button>
+          {!onChartStep && (
+            <button
+              onClick={() => save()}
+              disabled={saving}
+              className="rounded-full border border-clinic-teal px-4 py-2 text-sm font-semibold text-clinic-teal disabled:opacity-50"
+            >
+              {saving ? 'Saving...' : 'Save'}
+            </button>
+          )}
 
-          {stepIndex < HISTORY_STEPS.length - 1 ? (
+          {stepIndex < CHART_STEP_INDEX ? (
             <button
               onClick={() => save(stepIndex + 1)}
               disabled={saving}
@@ -335,11 +366,6 @@ export default function PatientHistoryWizard({
         </div>
       </div>
 
-      {department !== 'dental' && stepIndex === CHART_STEP_INDEX && (
-        <p className="mt-3 text-xs text-clinic-ink/50">
-          Homeopathic patient ke liye dental chart applicable nahi.
-        </p>
-      )}
     </div>
   )
 }
