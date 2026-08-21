@@ -8,6 +8,7 @@ import TreatmentPlanCard, { type Installment, type Plan } from '@/components/adm
 import VisitNotes, { type VisitNote } from '@/components/admin/VisitNotes'
 import DeletePatientButton from '@/components/admin/DeletePatientButton'
 import PatientRecalls, { type PatientRecall } from '@/components/admin/PatientRecalls'
+import PortalLinkButton from '@/components/admin/PortalLinkButton'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -173,6 +174,12 @@ export default async function PatientDetailPage({ params }: Props) {
             >
               Invoice
             </Link>
+            <PortalLinkButton
+              patientId={patient.id}
+              patientName={patient.full_name}
+              patientPhone={patient.phone}
+              portalCode={patient.portal_code ?? null}
+            />
             <DeletePatientButton
               patientId={patient.id}
               patientName={patient.full_name}

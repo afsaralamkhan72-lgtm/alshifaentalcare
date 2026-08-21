@@ -5,14 +5,15 @@ treatment plans, appointments, follow-ups, birthdays, reports aur voice assistan
 
 ---
 
-## STEP 1 — SUPABASE SQL (sirf 2 files)
+## STEP 1 — SUPABASE SQL (3 files)
 
 Supabase → **SQL Editor** → New query:
 
 | # | File | Kya karti hai |
 |---|------|---------------|
 | 1 | `SETUP-ALL.sql` | **Poora database** — 21 tables, security, sample services, sab modules |
-| 2 | `admin-setup.sql` | Pehla login account |
+| 2 | `phase7.sql` | Patient Portal access codes |
+| 3 | `admin-setup.sql` | Pehla login account |
 
 `SETUP-ALL.sql` ka **pura content** copy kar ke paste karein aur **Run** dabayein. Bas.
 
@@ -44,6 +45,10 @@ Zip extract karein → GitHub repo mein **saari files** upload karein → Commit
 |------|-------|
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase ka Project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Publishable key (`sb_publishable_...`) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Secret key (`sb_secret_...`) — **patient portal ke liye zaroori** |
+
+> `SUPABASE_SERVICE_ROLE_KEY` sirf server par chalti hai, browser tak nahi jati.
+> Ye kabhi kisi ko na dein aur GitHub par push na karein.
 
 3. **Deploy** dabayein
 
