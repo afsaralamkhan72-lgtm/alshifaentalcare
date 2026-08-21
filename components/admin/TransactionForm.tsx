@@ -58,6 +58,7 @@ export default function TransactionForm() {
       description: form.description || null,
       transaction_date: form.transaction_date,
       recorded_by: user?.id ?? null,
+      doctor_id: form.type === 'income' ? (user?.id ?? null) : null,
     })
 
     setSaving(false)

@@ -1,4 +1,5 @@
 import Image from 'next/image'
+import { CLINIC } from '@/clinic.config'
 
 interface Props {
   logoUrl?: string | null
@@ -19,7 +20,7 @@ interface Props {
  */
 export default function ClinicLogo({
   logoUrl,
-  name = 'Al Shifa Health Care',
+  name = CLINIC.name,
   size = 44,
   withName = false,
   className = '',

@@ -8,6 +8,7 @@ import DoctorIntro from '@/components/public/DoctorIntro'
 import HomeSections from '@/components/public/HomeSections'
 import ProcessAndFaq from '@/components/public/ProcessAndFaq'
 import Link from 'next/link'
+import { CLINIC } from '@/clinic.config'
 
 interface Service {
   id: string
@@ -18,10 +19,10 @@ interface Service {
 }
 
 const TICKER_ITEMS = [
-  '📞 0342-2078639',
+  `📞 ${CLINIC.phone.display}`,
   '🦷 Dental & Homeopathic Care',
-  '📍 Numaish, Nizami Road, Karachi',
-  '🕐 Open Daily 10:00 AM – 5:00 PM',
+  `📍 ${CLINIC.address.full}`,
+  `🕐 ${CLINIC.timings.full}`,
   '💬 Book instantly on WhatsApp',
 ]
 

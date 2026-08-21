@@ -1,9 +1,10 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import { CLINIC } from '@/clinic.config'
 
 export const metadata: Metadata = {
-  title: 'Al Shifa Health Care | Dr. Muhammad Khalid Mahmood',
-  description: 'Dental & Homeopathic Clinic, Numaish, Nizami Road, Karachi',
+  title: `${CLINIC.name} | ${CLINIC.doctor.name}`,
+  description: `${CLINIC.tagline}, ${CLINIC.address.full}`,
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

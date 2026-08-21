@@ -1,9 +1,10 @@
 import Image from 'next/image'
 import PageHeader from '@/components/public/PageHeader'
 import { createClient } from '@/lib/supabase/server'
+import { CLINIC } from '@/clinic.config'
 
 const DEFAULT_HISTORY =
-  'Al Shifa Health Care apne shehar mein dental aur homeopathic dono services aik chhat ke neeche pesh karta hai. Yeh section Admin Panel ke "Edit Website" tab se clinic ki asal history ke sath update kiya ja sakta hai.'
+  `${CLINIC.name} dental aur homeopathic dono services aik chhat ke neeche pesh karta hai. Ye tafseel Edit Website se badli ja sakti hai.`
 
 async function getPrimaryDoctor() {
   try {
@@ -41,7 +42,7 @@ export default async function AboutPage() {
     <>
       <PageHeader
         eyebrow="About Us"
-        title="Al Shifa Health Care"
+        title={CLINIC.name}
         description="Dental aur Homeopathic care, ek trusted doctor ke sath."
       />
 
@@ -52,14 +53,14 @@ export default async function AboutPage() {
               <Image src={doctor.image_url} alt={doctor.full_name} fill className="object-cover" />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-4xl font-display text-clinic-teal/40">
-                {(doctor?.full_name ?? 'Dr. Muhammad Khalid Mahmood').charAt(0)}
+                {(doctor?.full_name ?? CLINIC.doctor.name).charAt(0)}
               </div>
             )}
           </div>
 
           <div>
             <h2 className="font-display text-2xl font-semibold text-clinic-ink">
-              {doctor?.full_name ?? 'Dr. Muhammad Khalid Mahmood'}
+              {doctor?.full_name ?? CLINIC.doctor.name}
             </h2>
             {doctor?.qualification ? (
               <p className="mt-1 text-sm font-medium text-clinic-teal">{doctor.qualification}</p>

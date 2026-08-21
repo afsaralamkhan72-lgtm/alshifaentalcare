@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import LabOrderActions from '@/components/admin/LabOrderActions'
 import ClinicLogo from '@/components/ClinicLogo'
+import { CLINIC } from '@/clinic.config'
 
 interface LabCase {
   id: string
@@ -83,13 +84,13 @@ export default async function LabOrderPage({ params }: { params: Promise<{ id: s
           <ClinicLogo logoUrl={clinic.logo_url} size={56} />
           <div>
             <p className="font-display text-xl font-semibold text-clinic-teal">
-              {clinic.name ?? 'Al Shifa Health Care'}
+              {clinic.name ?? CLINIC.name}
             </p>
             <p className="text-sm text-clinic-ink/60">
-              {clinic.doctor_name ?? 'Dr. Muhammad Khalid Mahmood'}
+              {clinic.doctor_name ?? CLINIC.doctor.name}
             </p>
             <p className="mt-1 text-xs text-clinic-ink/50">
-              {clinic.address ?? 'Numaish, Nizami Road, Karachi'} · {clinic.phone ?? '0342-2078639'}
+              {clinic.address ?? CLINIC.address.full} · {clinic.phone ?? CLINIC.phone.display}
             </p>
           </div>
           </div>

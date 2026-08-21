@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
+import { CLINIC } from '@/clinic.config'
 
 type Role = 'admin' | 'doctor' | 'receptionist'
 
@@ -55,7 +56,7 @@ export default function Sidebar({ role }: { role: Role }) {
         }`}
       >
         <div className="px-6 py-6">
-          <p className="font-display text-lg font-semibold">Al Shifa</p>
+          <p className="font-display text-lg font-semibold">{CLINIC.shortName}</p>
           <p className="text-xs text-white/50">Admin Panel</p>
         </div>
 

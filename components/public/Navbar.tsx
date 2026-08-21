@@ -4,6 +4,7 @@ import { useState } from 'react'
 import ClinicLogo from '@/components/ClinicLogo'
 import Link from 'next/link'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
+import { CLINIC } from '@/clinic.config'
 
 const NAV_LINKS = [
   { href: '/', label: 'Home' },
@@ -27,7 +28,7 @@ export default function Navbar({ logoUrl }: { logoUrl?: string | null }) {
         <Link href="/" className="flex items-center gap-2">
           <ClinicLogo logoUrl={logoUrl} size={38} />
           <span className="font-display text-lg font-semibold leading-tight text-clinic-teal">
-            Al Shifa <span className="text-clinic-ink">Health Care</span>
+            {CLINIC.name}
           </span>
         </Link>
 
@@ -51,10 +52,10 @@ export default function Navbar({ logoUrl }: { logoUrl?: string | null }) {
             Staff Login
           </Link>
           <a
-            href="tel:03422078639"
+            href={`tel:${CLINIC.phone.dial}`}
             className="text-sm font-semibold text-clinic-teal transition-colors hover:text-clinic-teal-light"
           >
-            0342-2078639
+            {CLINIC.phone.display}
           </a>
           <Link
             href="/booking"

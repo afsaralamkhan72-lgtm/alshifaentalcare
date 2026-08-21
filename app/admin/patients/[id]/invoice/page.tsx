@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import InvoiceActions from '@/components/admin/InvoiceActions'
 import ClinicLogo from '@/components/ClinicLogo'
 import InvoiceBuilder from '@/components/admin/InvoiceBuilder'
+import { CLINIC } from '@/clinic.config'
 
 export default async function InvoicePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -32,6 +33,19 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   ])
 
   const plans = plansRes.data ?? []
+
+  const [{ data: doctorRows }, { data: auth }] = await Promise.all([
+    supabase
+      .from('staff_profiles')
+      .select('id, full_name')
+      .in('role', ['doctor', 'admin'])
+      .eq('is_active', true)
+      .order('full_name'),
+    supabase.auth.getUser(),
+  ])
+
+  const doctors = doctorRows ?? []
+  const currentUserId = auth?.user?.id ?? null
   const transactions = txRes.data ?? []
   const clinic = (clinicRes.data?.value ?? {}) as Record<string, string>
 
@@ -69,7 +83,15 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
 
       <div className="mt-3" />
 
-      <InvoiceBuilder patientId={patient.id} total={grandTotal} paid={grandPaid} />
+      <InvoiceBuilder
+        patientId={patient.id}
+        total={grandTotal}
+        paid={grandPaid}
+        doctors={doctors}
+        currentDoctorId={
+          doctors.some((d) => d.id === currentUserId) ? currentUserId : null
+        }
+      />
 
       <InvoiceActions
         patientName={patient.full_name}
@@ -92,13 +114,13 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           </div>
           <div>
           <p className="font-display text-2xl font-semibold text-white">
-            {clinic.name ?? 'Al Shifa Health Care'}
+            {clinic.name ?? CLINIC.name}
           </p>
           <p className="text-sm text-white/90">
-            {clinic.doctor_name ?? 'Dr. Muhammad Khalid Mahmood'}
+            {clinic.doctor_name ?? CLINIC.doctor.name}
           </p>
           <p className="mt-1 text-xs text-white/80">
-            {clinic.address ?? 'Numaish, Nizami Road, Karachi'} · {clinic.phone ?? '0342-2078639'}
+            {clinic.address ?? CLINIC.address.full} · {clinic.phone ?? CLINIC.phone.display}
           </p>
           </div>
         </div>
@@ -194,7 +216,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         </div>
 
         <p className="mt-6 border-t border-clinic-teal/20 pt-4 text-center text-xs text-clinic-ink/70">
-          {clinic.timings ?? 'Open Daily 10:00 AM to 5:00 PM'}
+          {clinic.timings ?? CLINIC.timings.full}
         </p>
         </div>
       </div>

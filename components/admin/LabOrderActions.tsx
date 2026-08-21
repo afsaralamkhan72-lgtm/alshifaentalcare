@@ -1,6 +1,7 @@
 'use client'
 
 import { buildWhatsAppLink } from '@/lib/whatsapp'
+import { CLINIC } from '@/clinic.config'
 
 interface Props {
   caseNumber: string
@@ -29,7 +30,7 @@ export default function LabOrderActions({
 }: Props) {
   // The whole work order as a WhatsApp message, sent straight to the lab
   const lines = [
-    `*Al Shifa Health Care, Lab Work Order*`,
+    `*${CLINIC.name}, Lab Work Order*`,
     `Case: ${caseNumber}`,
     '',
     `Patient: ${patientName}`,
@@ -40,8 +41,8 @@ export default function LabOrderActions({
     dueDate ? `Due: ${new Date(dueDate).toLocaleDateString('en-GB')}` : '',
     instructions ? `\nInstructions: ${instructions}` : '',
     '',
-    'Dr. Muhammad Khalid Mahmood',
-    'Numaish, Nizami Road, Karachi · 0342-2078639',
+    CLINIC.doctor.name,
+    '${CLINIC.address.full} · ${CLINIC.phone.display}',
   ].filter(Boolean)
 
   const link = labWhatsapp

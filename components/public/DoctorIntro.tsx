@@ -2,6 +2,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import WhatsAppButton from './WhatsAppButton'
+import { CLINIC } from '@/clinic.config'
 
 interface Doctor {
   full_name: string
@@ -11,9 +12,9 @@ interface Doctor {
 }
 
 const FALLBACK: Doctor = {
-  full_name: 'Dr. Muhammad Khalid Mahmood',
-  qualification: 'Dental Surgeon & Homeopathic Physician',
-  bio: 'Serving families in Karachi for years from the clinic at Numaish, Nizami Road. Every patient gets unhurried time, careful attention, and a clear treatment plan they actually understand.',
+  full_name: CLINIC.doctor.name,
+  qualification: CLINIC.doctor.qualification,
+  bio: `Serving families for years from the clinic at ${CLINIC.address.area}. Every patient gets unhurried time, careful attention, and a clear treatment plan they actually understand.`,
   image_url: null,
 }
 

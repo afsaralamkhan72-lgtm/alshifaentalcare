@@ -2,6 +2,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/server'
 import WhatsAppButton from './WhatsAppButton'
+import { CLINIC } from '@/clinic.config'
 
 interface GalleryRow {
   id: string
@@ -206,15 +207,15 @@ export default async function HomeSections() {
             Toothache or a Long-Standing Problem?
           </h2>
           <p className="mx-auto mt-3 max-w-lg text-white/70">
-            Book your time today. Open daily at Numaish, Nizami Road, 10:00 AM to 5:00 PM.
+            Book your time today. {CLINIC.timings.full} at {CLINIC.address.area}.
           </p>
           <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
             <WhatsAppButton label="Book on WhatsApp" />
             <a
-              href="tel:03422078639"
+              href={`tel:${CLINIC.phone.dial}`}
               className="rounded-full border border-white/30 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-white/10"
             >
-              Call: 0342-2078639
+              Call: {CLINIC.phone.display}
             </a>
             <Link
               href="/contact"

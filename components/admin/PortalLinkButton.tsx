@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
+import { CLINIC } from '@/clinic.config'
 
 interface Props {
   patientId: string
@@ -34,7 +35,7 @@ export default function PortalLinkButton({
         customMessage: [
           `Assalam o Alaikum ${patientName},`,
           '',
-          'Al Shifa Health Care mein aap ka record online dekha ja sakta hai ·',
+          `${CLINIC.name} mein aap ka record online dekha ja sakta hai:`,
           'appointment, agla visit aur payment ki tafseel.',
           '',
           url,
@@ -43,7 +44,7 @@ export default function PortalLinkButton({
           '',
           'Ye link zaati hai, kisi aur ke sath share na karein.',
           '',
-          'Al Shifa Health Care · 0342-2078639',
+          '${CLINIC.name} · ${CLINIC.phone.display}',
         ].join('\n'),
       })
     : null

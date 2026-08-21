@@ -1,3 +1,4 @@
+import { CLINIC } from '@/clinic.config'
 const POINTS = [
   {
     title: 'Two Specialties, One Clinic',
@@ -40,7 +41,7 @@ export default function WhyChooseUs() {
     <section className="bg-clinic-mint/50 py-14">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <p className="text-sm font-semibold uppercase tracking-wide text-clinic-amber">
-          Why Al Shifa
+          Why {CLINIC.shortName}
         </p>
         <h2 className="mt-1 font-display text-2xl font-semibold text-clinic-ink sm:text-3xl">
           Care Built Around You

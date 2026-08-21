@@ -1,7 +1,8 @@
 import PageHeader from '@/components/public/PageHeader'
+import { CLINIC } from '@/clinic.config'
 
 const MAP_EMBED_SRC =
-  'https://www.google.com/maps?q=Numaish+Nizami+Road+Karachi&output=embed'
+  `https://www.google.com/maps?q=${encodeURIComponent(CLINIC.mapQuery)}&output=embed`
 
 export default function ContactPage() {
   return (
@@ -19,27 +20,27 @@ export default function ContactPage() {
               src={MAP_EMBED_SRC}
               className="h-72 w-full sm:h-full sm:min-h-[320px]"
               loading="lazy"
-              title="Al Shifa Health Care Location"
+              title={`${CLINIC.name} Location`}
             />
           </div>
 
           <div className="rounded-2xl bg-clinic-mint p-6 sm:p-8">
             <p className="font-display text-lg font-semibold text-clinic-ink">
-              Al Shifa Health Care
+              {CLINIC.name}
             </p>
-            <p className="mt-1 text-sm text-clinic-ink/70">Dr. Muhammad Khalid Mahmood</p>
-            <p className="mt-4 text-sm text-clinic-ink/70">Numaish, Nizami Road, Karachi</p>
+            <p className="mt-1 text-sm text-clinic-ink/70">{CLINIC.doctor.name}</p>
+            <p className="mt-4 text-sm text-clinic-ink/70">{CLINIC.address.full}</p>
             <p className="mt-1 text-sm text-clinic-ink/70">Timings: 10:00 AM – 5:00 PM (Daily)</p>
 
             <div className="mt-6 flex flex-col gap-3">
               <a
-                href="tel:03422078639"
+                href={`tel:${CLINIC.phone.dial}`}
                 className="rounded-full border border-clinic-teal px-5 py-2.5 text-center text-sm font-semibold text-clinic-teal transition-colors hover:bg-clinic-teal hover:text-white"
               >
-                Call: 0342-2078639
+                Call: {CLINIC.phone.display}
               </a>
               <a
-                href="https://wa.me/923422078639"
+                href={`https://wa.me/${CLINIC.phone.whatsapp}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="rounded-full bg-whatsapp px-5 py-2.5 text-center text-sm font-semibold text-white transition-colors hover:bg-[#1EBE5A]"

@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
+import { CLINIC } from '@/clinic.config'
 
 export interface BirthdayPatient {
   id: string
@@ -30,9 +31,9 @@ export default function BirthdayCard({ patient, age, offer, highlight = false }:
       '',
       `Offer: ${offer.offer_label}`,
       '',
-      'Al Shifa Health Care',
-      'Dr. Muhammad Khalid Mahmood',
-      'Numaish, Nizami Road, Karachi · 0342-2078639',
+      CLINIC.name,
+      CLINIC.doctor.name,
+      '${CLINIC.address.full} · ${CLINIC.phone.display}',
     ].join('\n'),
   })
 

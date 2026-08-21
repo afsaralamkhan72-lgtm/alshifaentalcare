@@ -1,8 +1,9 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { CLINIC } from '@/clinic.config'
 
 export const metadata = {
-  title: 'My Record | Al Shifa Health Care',
+  title: `My Record | ${CLINIC.name}`,
   robots: { index: false, follow: false },
 }
 
@@ -27,7 +28,7 @@ export default async function PortalEntryPage({
   return (
     <div className="flex min-h-screen items-center justify-center bg-clinic-teal px-4">
       <div className="w-full max-w-sm rounded-2xl bg-white p-8">
-        <p className="font-display text-xl font-semibold text-clinic-ink">Al Shifa Health Care</p>
+        <p className="font-display text-xl font-semibold text-clinic-ink">{CLINIC.name}</p>
         <p className="mt-1 text-sm text-clinic-ink/50">
           Apna record dekhne ke liye wo code likhein jo aap ko WhatsApp par bheja gaya tha.
         </p>
@@ -55,7 +56,7 @@ export default async function PortalEntryPage({
         </form>
 
         <p className="mt-5 text-xs text-clinic-ink/40">
-          Code na mile to clinic par raabta karein: 0342-2078639
+          Code na mile to clinic par raabta karein: {CLINIC.phone.display}
         </p>
 
         <Link href="/" className="mt-4 block text-xs text-clinic-teal hover:underline">

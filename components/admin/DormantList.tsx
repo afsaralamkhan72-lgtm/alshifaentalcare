@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
+import { CLINIC } from '@/clinic.config'
 
 export interface DormantPatient {
   id: string
@@ -32,9 +33,9 @@ export default function DormantList({ patients }: { patients: DormantPatient[] }
             `Dant ka routine check-up har chhe mahine baad zaroori hota hai.`,
             `Appointment ke liye is number par raabta karein.`,
             '',
-            'Al Shifa Health Care',
-            'Dr. Muhammad Khalid Mahmood',
-            'Numaish, Nizami Road, Karachi · 0342-2078639',
+            CLINIC.name,
+            CLINIC.doctor.name,
+            '${CLINIC.address.full} · ${CLINIC.phone.display}',
           ].join('\n'),
         })
 

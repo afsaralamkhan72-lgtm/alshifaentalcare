@@ -1,6 +1,7 @@
 'use client'
 
 import { buildWhatsAppLink } from '@/lib/whatsapp'
+import { CLINIC } from '@/clinic.config'
 
 interface Props {
   patientName: string
@@ -22,8 +23,8 @@ export default function FollowUpActions({
       `Aap ka agla visit (${procedure}) ${new Date(nextVisit).toLocaleDateString('en-GB')} ko due hai.`,
       `Baraye meherbani appointment confirm karwa lein.`,
       '',
-      'Al Shifa Health Care',
-      'Numaish, Nizami Road, Karachi · 0342-2078639',
+      CLINIC.name,
+      '${CLINIC.address.full} · ${CLINIC.phone.display}',
     ].join('\n'),
   })
 

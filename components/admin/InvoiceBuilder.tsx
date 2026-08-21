@@ -4,14 +4,29 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
+export interface DoctorOption {
+  id: string
+  full_name: string
+}
+
 interface Props {
   patientId: string
   total: number
   paid: number
+  doctors: DoctorOption[]
+  /** Logged-in staff, agar wo khud doctor hai to pehle se chun liya jaye */
+  currentDoctorId?: string | null
 }
 
-export default function InvoiceBuilder({ patientId, total, paid }: Props) {
+export default function InvoiceBuilder({
+  patientId,
+  total,
+  paid,
+  doctors,
+  currentDoctorId,
+}: Props) {
   const router = useRouter()
+  const [doctorId, setDoctorId] = useState(currentDoctorId ?? doctors[0]?.id ?? '')
   const [discountPct, setDiscountPct] = useState('')
   const [receiving, setReceiving] = useState('')
   const [method, setMethod] = useState('cash')
@@ -40,6 +55,7 @@ export default function InvoiceBuilder({ patientId, total, paid }: Props) {
       category: 'treatment-payment',
       amount: receivingNum,
       payment_method: method,
+      doctor_id: doctorId || null,
       description: pct > 0 ? `Payment received (${pct}% discount applied)` : 'Payment received',
       transaction_date: new Date().toISOString().slice(0, 10),
       recorded_by: user?.id ?? null,
@@ -58,7 +74,22 @@ export default function InvoiceBuilder({ patientId, total, paid }: Props) {
     <div className="mb-6 rounded-2xl border border-clinic-teal/20 bg-white p-5 print:hidden">
       <p className="font-display font-semibold text-clinic-ink">Bill Banayein</p>
 
-      <div className="mt-4 grid gap-4 sm:grid-cols-3">
+      <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div>
+          <label className="text-sm font-medium text-clinic-ink">Treatment kis doctor ne kiya</label>
+          <select
+            value={doctorId}
+            onChange={(e) => setDoctorId(e.target.value)}
+            className={inputClass}
+          >
+            <option value="">Select doctor</option>
+            {doctors.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.full_name}
+              </option>
+            ))}
+          </select>
+        </div>
         <div>
           <label className="text-sm font-medium text-clinic-ink">Discount (%)</label>
           <input

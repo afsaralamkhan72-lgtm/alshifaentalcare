@@ -34,8 +34,10 @@ export default function CMSSettings({ initial }: Props) {
   const [hero, setHero] = useState({
     heading: '',
     subheading: '',
+    image_url: '',
+    show_text: true,
     ...(initial.hero_banner ?? {}),
-  } as Record<string, string>)
+  } as Record<string, string | boolean>)
 
   const [status, setStatus] = useState('')
   const [saving, setSaving] = useState(false)
@@ -166,11 +168,37 @@ export default function CMSSettings({ initial }: Props) {
       <section className="rounded-2xl border border-clinic-teal/10 bg-white p-6">
         <p className="font-display font-semibold text-clinic-ink">Home Page Banner</p>
 
+        <div className="mt-4">
+          <ImageUploader
+            label="Cover Picture"
+            bucket="media"
+            folder="banner"
+            value={(hero.image_url as string) || null}
+            onChange={(url) => setHero((p) => ({ ...p, image_url: url ?? '' }))}
+          />
+          <p className="mt-1 text-xs text-clinic-ink/50">
+            Chaurai zyada wali tasveer behtar rehti hai (jaise 1600 x 600).
+          </p>
+        </div>
+
+        <label className="mt-4 flex items-center gap-2 text-sm text-clinic-ink">
+          <input
+            type="checkbox"
+            checked={Boolean(hero.show_text)}
+            onChange={(e) => setHero((p) => ({ ...p, show_text: e.target.checked }))}
+            className="h-4 w-4 accent-clinic-teal"
+          />
+          Tasveer ke upar likhai aur buttons dikhayein
+        </label>
+        <p className="ml-6 text-xs text-clinic-ink/50">
+          Off karein to sirf cover picture nazar aayegi.
+        </p>
+
         <div className="mt-4 grid gap-3">
           <div>
             <label className="text-sm font-medium text-clinic-ink">Heading</label>
             <input
-              value={hero.heading ?? ''}
+              value={(hero.heading as string) ?? ''}
               onChange={(e) => setHero((p) => ({ ...p, heading: e.target.value }))}
               className={inputClass}
             />
@@ -179,7 +207,7 @@ export default function CMSSettings({ initial }: Props) {
             <label className="text-sm font-medium text-clinic-ink">Subheading</label>
             <textarea
               rows={2}
-              value={hero.subheading ?? ''}
+              value={(hero.subheading as string) ?? ''}
               onChange={(e) => setHero((p) => ({ ...p, subheading: e.target.value }))}
               className={inputClass}
             />

@@ -1,6 +1,7 @@
 // Clinic's WhatsApp number in international format (no +, no spaces/dashes)
+import { CLINIC } from '@/clinic.config'
 // 0342-2078639 -> 92 342 2078639
-const CLINIC_WHATSAPP_NUMBER = '923422078639'
+const CLINIC_WHATSAPP_NUMBER = CLINIC.phone.whatsapp
 
 interface WhatsAppLinkOptions {
   treatmentName?: string
@@ -79,7 +80,7 @@ export function buildPrescriptionWhatsAppLink({
     lines.push('', `Notes: ${notesEn}`)
   }
 
-  lines.push('', 'Dr. Muhammad Khalid Mahmood', 'Al Shifa Health Care')
+  lines.push('', CLINIC.doctor.name, CLINIC.name)
 
   const number = toInternationalPKNumber(patientPhone)
   return `https://wa.me/${number}?text=${encodeURIComponent(lines.join('\n'))}`

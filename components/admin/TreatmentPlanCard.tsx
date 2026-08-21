@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
+import { CLINIC } from '@/clinic.config'
 
 export interface Installment {
   id: string
@@ -17,6 +18,7 @@ export interface Installment {
 
 export interface Plan {
   id: string
+  doctor_id?: string | null
   title: string
   total_cost: number
   advance_paid: number
@@ -78,6 +80,7 @@ export default function TreatmentPlanCard({
       category: 'treatment-installment',
       amount: inst.amount,
       payment_method: method,
+      doctor_id: plan.doctor_id ?? null,
       description: `${plan.title}, installment #${inst.installment_no} (${patientName})`,
       transaction_date: today,
       recorded_by: user?.id ?? null,
@@ -134,7 +137,7 @@ export default function TreatmentPlanCard({
           ]
         : []),
       '',
-      'Al Shifa Health Care · 0342-2078639',
+      '${CLINIC.name} · ${CLINIC.phone.display}',
     ].join('\n'),
   })
 

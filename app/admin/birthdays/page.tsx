@@ -1,10 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
 import BirthdayCard, { type BirthdayPatient } from '@/components/admin/BirthdayCard'
+import { CLINIC } from '@/clinic.config'
 
 const DEFAULT_OFFER = {
   enabled: true,
   message:
-    'Aap ko salgirah bohat bohat mubarak ho! Al Shifa Health Care ki taraf se aap ke liye is maheene free dental check-up ka tohfa hai.',
+    `Aap ko salgirah bohat bohat mubarak ho! ${CLINIC.name} ki taraf se aap ke liye is maheene free dental check-up ka tohfa hai.`,
   offer_label: 'Free Dental Check-up',
 }
 

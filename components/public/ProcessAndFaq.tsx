@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { CLINIC } from '@/clinic.config'
 
 const STEPS = [
   {
@@ -30,7 +31,7 @@ const FAQS = [
   },
   {
     q: 'What are the clinic timings?',
-    a: 'The clinic is open daily from 10:00 AM to 5:00 PM at Numaish, Nizami Road, Karachi.',
+    a: `The clinic is open ${CLINIC.timings.short} at ${CLINIC.address.full}.`,
   },
   {
     q: 'Can long treatments be paid in instalments?',
@@ -79,17 +80,17 @@ export default function ProcessAndFaq() {
           {[
             {
               label: 'Timings',
-              value: '10:00 AM – 5:00 PM',
+              value: CLINIC.timings.short,
               note: 'Open daily',
             },
             {
               label: 'Location',
-              value: 'Numaish, Nizami Road',
-              note: 'Karachi',
+              value: CLINIC.address.area,
+              note: CLINIC.address.city,
             },
             {
               label: 'Phone & WhatsApp',
-              value: '0342-2078639',
+              value: CLINIC.phone.display,
               note: 'Call or message anytime',
             },
           ].map((item) => (

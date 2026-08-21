@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
+import { CLINIC } from '@/clinic.config'
 
 export interface RecallRow {
   id: string
@@ -121,9 +122,9 @@ export default function RecallList({
             }.`,
             `Baraye meherbani appointment ke liye raabta karein.`,
             '',
-            'Al Shifa Health Care',
-            'Dr. Muhammad Khalid Mahmood',
-            'Numaish, Nizami Road, Karachi · 0342-2078639',
+            CLINIC.name,
+            CLINIC.doctor.name,
+            '${CLINIC.address.full} · ${CLINIC.phone.display}',
           ].join('\n'),
         })
 

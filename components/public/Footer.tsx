@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import ClinicLogo from '@/components/ClinicLogo'
 import { createClient } from '@/lib/supabase/server'
+import { CLINIC } from '@/clinic.config'
 
 interface ClinicInfo {
   logo_url?: string | null
@@ -13,11 +14,11 @@ interface ClinicInfo {
 }
 
 const DEFAULT_INFO: ClinicInfo = {
-  name: 'Al Shifa Health Care',
-  doctor_name: 'Dr. Muhammad Khalid Mahmood',
-  address: 'Numaish, Nizami Road, Karachi',
-  phone: '0342-2078639',
-  whatsapp: '923422078639',
+  name: CLINIC.name,
+  doctor_name: CLINIC.doctor.name,
+  address: CLINIC.address.full,
+  phone: CLINIC.phone.display,
+  whatsapp: CLINIC.phone.whatsapp,
   timings: '10:00 AM – 5:00 PM',
 }
 

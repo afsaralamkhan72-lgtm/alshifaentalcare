@@ -1,6 +1,7 @@
 'use client'
 
 import { buildWhatsAppLink } from '@/lib/whatsapp'
+import { CLINIC } from '@/clinic.config'
 
 interface Props {
   patientName: string
@@ -34,7 +35,7 @@ export default function InvoiceActions({
     phoneOverride: patientPhone,
     customMessage: [
       `Assalam o Alaikum ${patientName},`,
-      `Al Shifa Health Care, payment statement (${mrNumber})`,
+      `${CLINIC.name}, payment statement (${mrNumber})`,
       '',
       `Total: Rs. ${total.toLocaleString()}`,
       `Paid: Rs. ${paid.toLocaleString()}`,
@@ -52,8 +53,8 @@ export default function InvoiceActions({
           ]
         : []),
       '',
-      'Dr. Muhammad Khalid Mahmood',
-      'Al Shifa Health Care · 0342-2078639',
+      CLINIC.doctor.name,
+      '${CLINIC.name} · ${CLINIC.phone.display}',
     ].join('\n'),
   })
 

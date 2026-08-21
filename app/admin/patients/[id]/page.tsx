@@ -41,7 +41,7 @@ export default async function PatientDetailPage({ params }: Props) {
   // Treatment plans (orthodontics etc) + their monthly installments
   const { data: plansData } = await supabase
     .from('treatment_plans')
-    .select('id, title, total_cost, advance_paid, duration_months, monthly_amount, start_date, status')
+    .select('id, title, total_cost, advance_paid, duration_months, monthly_amount, start_date, status, doctor_id')
     .eq('patient_id', id)
     .order('created_at', { ascending: false })
 

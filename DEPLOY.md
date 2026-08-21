@@ -5,20 +5,18 @@ treatment plans, appointments, follow-ups, birthdays, reports aur voice assistan
 
 ---
 
-## STEP 1 — SUPABASE SQL (3 files)
+## STEP 1 — SUPABASE SQL (2 files)
 
 Supabase → **SQL Editor** → New query:
 
 | # | File | Kya karti hai |
 |---|------|---------------|
 | 1 | `SETUP-ALL.sql` | **Poora database** — 21 tables, security, sample services, sab modules |
-| 2 | `phase7.sql` | Patient Portal access codes |
-| 3 | `admin-setup.sql` | Pehla login account |
+| 2 | `admin-setup.sql` | Pehla login account |
 
-`SETUP-ALL.sql` ka **pura content** copy kar ke paste karein aur **Run** dabayein. Bas.
+`SETUP-ALL.sql` ka **pura content** copy kar ke paste karein aur **Run** dabayein.
 
-> Dobara chalana bhi mehfooz hai — purana data zaya nahi hota.
-> (Alag alag files `sql-individual/` folder mein hain, agar kabhi zaroorat pade.)
+> Dobara chalana bhi mehfooz hai, purana data zaya nahi hota.
 
 ### Admin account (file #5 se pehle)
 1. **Authentication → Users → Add user**

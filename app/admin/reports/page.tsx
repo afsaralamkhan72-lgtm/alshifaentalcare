@@ -33,7 +33,7 @@ export default async function ReportsPage({
   const [txRes, patientsRes, apptRes, plansRes] = await Promise.all([
     supabase
       .from('transactions')
-      .select('type, category, amount, payment_method')
+      .select('type, category, amount, payment_method, doctor_id, patient_id')
       .gte('transaction_date', from)
       .lte('transaction_date', to),
     supabase
@@ -51,6 +51,37 @@ export default async function ReportsPage({
   ])
 
   const tx = txRes.data ?? []
+
+  // Doctor-wise earnings and case counts
+  const { data: staff } = await supabase
+    .from('staff_profiles')
+    .select('id, full_name, role')
+    .in('role', ['doctor', 'admin'])
+
+  const nameById = new Map((staff ?? []).map((s2) => [s2.id, s2.full_name]))
+
+  const doctorTotals = new Map<string, { total: number; patients: Set<string>; entries: number }>()
+  for (const t of tx) {
+    if (t.type !== 'income') continue
+    const key = t.doctor_id ?? 'unassigned'
+    const row = doctorTotals.get(key) ?? { total: 0, patients: new Set<string>(), entries: 0 }
+    row.total += Number(t.amount)
+    row.entries += 1
+    if (t.patient_id) row.patients.add(t.patient_id)
+    doctorTotals.set(key, row)
+  }
+
+  const doctorRows = [...doctorTotals.entries()]
+    .map(([id, v]) => ({
+      id,
+      name: id === 'unassigned' ? 'Doctor set nahi' : (nameById.get(id) ?? 'Unknown'),
+      total: v.total,
+      cases: v.patients.size,
+      entries: v.entries,
+    }))
+    .sort((a, b) => b.total - a.total)
+
+  const maxDoctor = doctorRows[0]?.total ?? 1
   const income = tx.filter((t) => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0)
   const expense = tx.filter((t) => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0)
 
@@ -144,6 +175,39 @@ export default async function ReportsPage({
           </p>
         </div>
       </div>
+
+      <section className="mt-8 rounded-2xl border border-clinic-teal/10 bg-white p-6">
+        <p className="font-display font-semibold text-clinic-ink">Doctor-wise Earnings</p>
+        <p className="mt-1 text-sm text-clinic-ink/60">
+          Kis doctor ne kitna kamaya aur kitne patients dekhe.
+        </p>
+
+        {doctorRows.length === 0 ? (
+          <p className="mt-4 text-sm text-clinic-ink/50">Is mahine koi income record nahi hui.</p>
+        ) : (
+          <div className="mt-4 grid gap-3">
+            {doctorRows.map((d) => (
+              <div key={d.id}>
+                <div className="flex flex-wrap justify-between gap-2 text-sm">
+                  <span className="font-medium text-clinic-ink">{d.name}</span>
+                  <span className="text-clinic-ink">
+                    Rs. {d.total.toLocaleString()}
+                    <span className="ml-2 text-xs text-clinic-ink/60">
+                      {d.cases} patients · {d.entries} payments
+                    </span>
+                  </span>
+                </div>
+                <div className="mt-1 h-2 overflow-hidden rounded-full bg-clinic-mint">
+                  <div
+                    className="h-full rounded-full bg-clinic-teal"
+                    style={{ width: `${Math.max(4, (d.total / maxDoctor) * 100)}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
         {/* Income by category with simple bars */}

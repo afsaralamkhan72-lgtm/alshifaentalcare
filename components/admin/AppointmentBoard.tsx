@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
+import { CLINIC } from '@/clinic.config'
 
 export interface Appointment {
   id: string
@@ -172,7 +173,7 @@ export default function AppointmentBoard({ appointments }: { appointments: Appoi
           appointments.map((a) => {
             const confirmLink = buildWhatsAppLink({
               phoneOverride: a.phone,
-              customMessage: `Assalam o Alaikum ${a.patient_name}, aap ka appointment ${a.preferred_date ?? ''} ${a.preferred_time ?? ''} confirm ho gaya hai. Al Shifa Health Care, Numaish, Nizami Road, Karachi.`,
+              customMessage: `Assalam o Alaikum ${a.patient_name}, aap ka appointment ${a.preferred_date ?? ''} ${a.preferred_time ?? ''} confirm ho gaya hai. ${CLINIC.name}, ${CLINIC.address.full}.`,
             })
 
             return (

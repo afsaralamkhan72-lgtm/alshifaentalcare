@@ -1,5 +1,6 @@
 import { HISTORY_STEPS } from '@/lib/history-steps'
 import ClinicLogo from '@/components/ClinicLogo'
+import { CLINIC } from '@/clinic.config'
 
 type SectionData = Record<string, unknown>
 
@@ -49,13 +50,13 @@ export default function PatientHistorySummary({
           <ClinicLogo logoUrl={clinic.logo_url} size={56} />
           <div>
           <p className="font-display text-xl font-semibold text-clinic-teal">
-            {clinic.name ?? 'Al Shifa Health Care'}
+            {clinic.name ?? CLINIC.name}
           </p>
           <p className="text-sm text-clinic-ink/60">
-            {clinic.doctor_name ?? 'Dr. Muhammad Khalid Mahmood'}
+            {clinic.doctor_name ?? CLINIC.doctor.name}
           </p>
           <p className="mt-1 text-xs text-clinic-ink/50">
-            {clinic.address ?? 'Numaish, Nizami Road, Karachi'} · {clinic.phone ?? '0342-2078639'}
+            {clinic.address ?? CLINIC.address.full} · {clinic.phone ?? CLINIC.phone.display}
           </p>
           </div>
         </div>

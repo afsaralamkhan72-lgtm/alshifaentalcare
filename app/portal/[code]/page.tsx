@@ -2,13 +2,14 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
+import { CLINIC } from '@/clinic.config'
 
 function fmt(d: string | null) {
   return d ? new Date(d).toLocaleDateString('en-GB') : '—'
 }
 
 export const metadata = {
-  title: 'My Record | Al Shifa Health Care',
+  title: `My Record | ${CLINIC.name}`,
   robots: { index: false, follow: false },
 }
 
@@ -228,7 +229,7 @@ export default async function PortalRecordPage({
           Book on WhatsApp
         </a>
         <a
-          href="tel:03422078639"
+          href={`tel:${CLINIC.phone.dial}`}
           className="rounded-full border border-clinic-teal px-5 py-2.5 text-sm font-semibold text-clinic-teal"
         >
           Call the Clinic
@@ -263,9 +264,9 @@ function Shell({ children }: { children: React.ReactNode }) {
       <header className="border-b border-clinic-teal/10 bg-white">
         <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-4">
           <Link href="/" className="font-display font-semibold text-clinic-teal">
-            Al Shifa Health Care
+            {CLINIC.name}
           </Link>
-          <span className="text-xs text-clinic-ink/40">0342-2078639</span>
+          <span className="text-xs text-clinic-ink/40">{CLINIC.phone.display}</span>
         </div>
       </header>
       <main className="mx-auto max-w-2xl px-4 py-8">{children}</main>

@@ -1,16 +1,23 @@
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/server'
 import WhatsAppButton from './WhatsAppButton'
+import { CLINIC } from '@/clinic.config'
 
 const DEFAULTS = {
   heading: 'Dental & Homeopathic Care Under One Roof',
   subheading:
-    'Trusted treatment for your whole family in Numaish, Nizami Road, Karachi. Book your appointment with a single WhatsApp message.',
-  doctor_name: 'Dr. Muhammad Khalid Mahmood',
-  phone: '0342-2078639',
+    `Trusted treatment for your whole family in ${CLINIC.address.full}. Book your appointment with a single WhatsApp message.`,
+  doctor_name: CLINIC.doctor.name,
+  phone: CLINIC.phone.display,
 }
 
 export default async function Hero() {
-  let hero = { heading: DEFAULTS.heading, subheading: DEFAULTS.subheading }
+  let hero = {
+    heading: DEFAULTS.heading,
+    subheading: DEFAULTS.subheading,
+    image_url: '' as string,
+    show_text: true as boolean,
+  }
   let clinic = { doctor_name: DEFAULTS.doctor_name, phone: DEFAULTS.phone }
 
   try {
@@ -25,10 +32,45 @@ export default async function Hero() {
     // falls back to DEFAULTS
   }
 
+  const hasCover = Boolean(hero.image_url)
+
+  // Cover image lagi ho to wo banner ban jati hai. Text upar tabhi aata
+  // hai jab "text dikhayein" on ho, warna sirf tasveer.
+  if (hasCover && !hero.show_text) {
+    return (
+      <section className="relative w-full bg-clinic-teal">
+        <div className="relative mx-auto aspect-[1600/600] w-full max-w-[1600px]">
+          <Image
+            src={hero.image_url}
+            alt={CLINIC.name}
+            fill
+            priority
+            className="object-cover"
+            sizes="100vw"
+          />
+        </div>
+      </section>
+    )
+  }
+
   return (
     <section className="relative overflow-hidden bg-clinic-teal">
-      {/* Ambient background shape, the "one accessory" for the hero */}
-      <div className="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full bg-clinic-teal-light/40 blur-3xl" />
+      {hasCover ? (
+        <>
+          <Image
+            src={hero.image_url}
+            alt=""
+            fill
+            priority
+            className="object-cover"
+            sizes="100vw"
+          />
+          {/* Text parhne ke liye halka parda */}
+          <div className="absolute inset-0 bg-gradient-to-r from-clinic-teal/90 via-clinic-teal/70 to-clinic-teal/30" />
+        </>
+      ) : (
+        <div className="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full bg-clinic-teal-light/40 blur-3xl" />
+      )}
 
       <div className="relative mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
         <p className="text-sm font-medium uppercase tracking-widest text-white/60">
