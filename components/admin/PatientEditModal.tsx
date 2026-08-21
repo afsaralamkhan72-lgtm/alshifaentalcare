@@ -12,6 +12,7 @@ interface PatientEditModalProps {
     department: 'dental' | 'homeopathic'
     age: number | null
     gender: string | null
+    date_of_birth?: string | null
     address: string | null
     notes: string | null
   }
@@ -26,6 +27,7 @@ export default function PatientEditModal({ patient }: PatientEditModalProps) {
     department: patient.department,
     age: patient.age?.toString() ?? '',
     gender: patient.gender ?? '',
+    date_of_birth: patient.date_of_birth ?? '',
     address: patient.address ?? '',
     notes: patient.notes ?? '',
   })
@@ -50,6 +52,7 @@ export default function PatientEditModal({ patient }: PatientEditModalProps) {
         department: form.department,
         age: form.age ? Number(form.age) : null,
         gender: form.gender || null,
+        date_of_birth: form.date_of_birth || null,
         address: form.address || null,
         notes: form.notes || null,
       })
@@ -124,6 +127,15 @@ export default function PatientEditModal({ patient }: PatientEditModalProps) {
                   <option value="female">Female</option>
                   <option value="other">Other</option>
                 </select>
+              </div>
+              <div>
+                <label className="text-xs text-clinic-ink/50">Date of Birth (optional)</label>
+                <input
+                  type="date"
+                  value={form.date_of_birth}
+                  onChange={(e) => update('date_of_birth', e.target.value)}
+                  className={inputClass}
+                />
               </div>
               <textarea
                 placeholder="Address"

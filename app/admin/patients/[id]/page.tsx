@@ -5,6 +5,9 @@ import DentalChart from '@/components/admin/DentalChart'
 import PatientEditModal from '@/components/admin/PatientEditModal'
 import TreatmentPlanForm from '@/components/admin/TreatmentPlanForm'
 import TreatmentPlanCard, { type Installment, type Plan } from '@/components/admin/TreatmentPlanCard'
+import VisitNotes, { type VisitNote } from '@/components/admin/VisitNotes'
+import DeletePatientButton from '@/components/admin/DeletePatientButton'
+import PatientRecalls, { type PatientRecall } from '@/components/admin/PatientRecalls'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -56,9 +59,78 @@ export default async function PatientDetailPage({ params }: Props) {
     installments = (data ?? []) as (Installment & { plan_id: string })[]
   }
 
+  const { data: visitData } = await supabase
+    .from('visit_notes')
+    .select('id, visit_date, procedure, notes, next_visit')
+    .eq('patient_id', id)
+    .order('visit_date', { ascending: false })
+
+  const visits = (visitData ?? []) as VisitNote[]
+
+  const { data: recallData } = await supabase
+    .from('recalls')
+    .select('id, recall_type, interval_months, last_done, next_due, status')
+    .eq('patient_id', id)
+    .order('next_due', { ascending: true })
+
+  const recalls = (recallData ?? []) as PatientRecall[]
+
+  // Everything else that belongs to this patient's record
+  const [rxRes, payRes, apptRes] = await Promise.all([
+    supabase
+      .from('prescriptions')
+      .select('id, department, items, notes_en, prescribed_date')
+      .eq('patient_id', id)
+      .order('prescribed_date', { ascending: false }),
+    supabase
+      .from('transactions')
+      .select('id, amount, category, payment_method, description, transaction_date')
+      .eq('patient_id', id)
+      .eq('type', 'income')
+      .order('transaction_date', { ascending: false }),
+    // appointments are stored by phone, not patient_id
+    supabase
+      .from('appointments')
+      .select('id, treatment_name, preferred_date, preferred_time, status')
+      .eq('phone', patient.phone)
+      .order('preferred_date', { ascending: false }),
+  ])
+
+  const { data: history } = await supabase
+    .from('patient_history')
+    .select('completed_step, is_finalized')
+    .eq('patient_id', id)
+    .maybeSingle()
+
+  const prescriptions = rxRes.data ?? []
+  const payments = payRes.data ?? []
+  const appointments = apptRes.data ?? []
+
+  // Financial roll-up across plans + walk-in payments
+  const planTotal = plans.reduce((s2, p) => s2 + Number(p.total_cost), 0)
+  const planPaid =
+    plans.reduce((s2, p) => s2 + Number(p.advance_paid), 0) +
+    installments.reduce((s2, i) => s2 + Number(i.paid_amount), 0)
+  const walkInPaid = payments
+    .filter((t) => t.category !== 'treatment-installment')
+    .reduce((s2, t) => s2 + Number(t.amount), 0)
+  const totalValue = planTotal + walkInPaid
+  const totalPaid = planPaid + walkInPaid
+  const balance = Math.max(0, totalValue - totalPaid)
+
+  const lastVisit = visits[0]?.visit_date ?? null
+  const nextVisit = visits.find((v) => v.next_visit && v.next_visit >= new Date().toISOString().slice(0, 10))?.next_visit ?? null
+
   return (
     <div>
-      <div className="rounded-2xl border border-clinic-teal/10 bg-white p-6">
+      <Link
+        href="/admin/patients"
+        className="text-sm text-clinic-ink/50 transition-colors hover:text-clinic-teal"
+      >
+        ← Sab Patients
+      </Link>
+
+      <div className="mt-3 rounded-2xl border border-clinic-teal/10 bg-white p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-clinic-teal">{patient.mr_number}</p>
@@ -86,11 +158,26 @@ export default async function PatientDetailPage({ params }: Props) {
               }}
             />
             <Link
+              href={`/admin/patients/${patient.id}/history`}
+              className="rounded-full bg-clinic-teal px-4 py-2 text-sm font-semibold text-white"
+            >
+              {history?.is_finalized
+                ? 'View History'
+                : history?.completed_step
+                  ? `Continue History (${history.completed_step}/8)`
+                  : 'Start History'}
+            </Link>
+            <Link
               href={`/admin/patients/${patient.id}/invoice`}
               className="rounded-full border border-clinic-teal px-4 py-2 text-sm font-semibold text-clinic-teal"
             >
               Invoice
             </Link>
+            <DeletePatientButton
+              patientId={patient.id}
+              patientName={patient.full_name}
+              mrNumber={patient.mr_number}
+            />
           </div>
         </div>
 
@@ -111,6 +198,66 @@ export default async function PatientDetailPage({ params }: Props) {
             <p className="text-clinic-ink/40">Address</p>
             <p className="text-clinic-ink">{patient.address ?? '—'}</p>
           </div>
+          <div>
+            <p className="text-clinic-ink/40">Date of Birth</p>
+            <p className="text-clinic-ink">
+              {patient.date_of_birth
+                ? new Date(patient.date_of_birth).toLocaleDateString('en-GB')
+                : '—'}
+            </p>
+          </div>
+          <div>
+            <p className="text-clinic-ink/40">Last Visit</p>
+            <p className="text-clinic-ink">
+              {lastVisit ? new Date(lastVisit).toLocaleDateString('en-GB') : '—'}
+            </p>
+          </div>
+          <div>
+            <p className="text-clinic-ink/40">Next Visit</p>
+            <p className={nextVisit ? 'font-medium text-clinic-teal' : 'text-clinic-ink'}>
+              {nextVisit ? new Date(nextVisit).toLocaleDateString('en-GB') : '—'}
+            </p>
+          </div>
+          {patient.notes && (
+            <div className="col-span-2 sm:col-span-4">
+              <p className="text-clinic-ink/40">Notes</p>
+              <p className="text-clinic-ink">{patient.notes}</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Record summary at a glance */}
+      <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-5">
+        <div className="rounded-2xl border border-clinic-teal/10 bg-white p-4">
+          <p className="text-xs text-clinic-ink/50">Total Value</p>
+          <p className="mt-1 font-display text-lg font-semibold text-clinic-ink">
+            Rs. {totalValue.toLocaleString()}
+          </p>
+        </div>
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+          <p className="text-xs text-emerald-700/70">Paid</p>
+          <p className="mt-1 font-display text-lg font-semibold text-emerald-700">
+            Rs. {totalPaid.toLocaleString()}
+          </p>
+        </div>
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+          <p className="text-xs text-amber-700/70">Balance</p>
+          <p className="mt-1 font-display text-lg font-semibold text-amber-700">
+            Rs. {balance.toLocaleString()}
+          </p>
+        </div>
+        <div className="rounded-2xl border border-clinic-teal/10 bg-white p-4">
+          <p className="text-xs text-clinic-ink/50">Visits</p>
+          <p className="mt-1 font-display text-lg font-semibold text-clinic-ink">
+            {visits.length}
+          </p>
+        </div>
+        <div className="rounded-2xl border border-clinic-teal/10 bg-white p-4">
+          <p className="text-xs text-clinic-ink/50">Prescriptions</p>
+          <p className="mt-1 font-display text-lg font-semibold text-clinic-ink">
+            {prescriptions.length}
+          </p>
         </div>
       </div>
 
@@ -141,6 +288,118 @@ export default async function PatientDetailPage({ params }: Props) {
                 patientName={patient.full_name}
                 patientPhone={patient.phone}
               />
+            ))
+          )}
+        </div>
+      </div>
+
+      <div className="mt-8">
+        <PatientRecalls patientId={patient.id} recalls={recalls} />
+      </div>
+
+      <div className="mt-8">
+        <VisitNotes patientId={patient.id} notes={visits} />
+      </div>
+
+      {/* Prescription history */}
+      <div className="mt-8">
+        <h2 className="font-display text-lg font-semibold text-clinic-ink">Prescriptions</h2>
+        <div className="mt-3 divide-y divide-clinic-teal/10 rounded-2xl border border-clinic-teal/10 bg-white">
+          {prescriptions.length === 0 ? (
+            <p className="px-4 py-6 text-center text-sm text-clinic-ink/50">
+              Koi prescription record nahi hui.
+            </p>
+          ) : (
+            prescriptions.map((rx) => {
+              const items = (rx.items ?? []) as { name_en?: string; name_ur?: string }[]
+              return (
+                <div key={rx.id} className="px-4 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm font-medium capitalize text-clinic-ink">
+                      {rx.department}
+                    </p>
+                    <p className="text-xs text-clinic-ink/40">
+                      {new Date(rx.prescribed_date).toLocaleDateString('en-GB')}
+                    </p>
+                  </div>
+                  <p className="mt-1 text-sm text-clinic-ink/60">
+                    {items.map((it) => it.name_en || it.name_ur).filter(Boolean).join(' · ')}
+                  </p>
+                  {rx.notes_en && (
+                    <p className="mt-1 text-xs text-clinic-ink/50">{rx.notes_en}</p>
+                  )}
+                </div>
+              )
+            })
+          )}
+        </div>
+      </div>
+
+      {/* Payment history */}
+      <div className="mt-8">
+        <h2 className="font-display text-lg font-semibold text-clinic-ink">Payment History</h2>
+        <div className="mt-3 overflow-x-auto rounded-2xl border border-clinic-teal/10 bg-white">
+          <table className="w-full text-sm">
+            <thead className="bg-clinic-mint text-left text-clinic-ink/60">
+              <tr>
+                <th className="px-4 py-3">Date</th>
+                <th className="px-4 py-3">Description</th>
+                <th className="px-4 py-3">Method</th>
+                <th className="px-4 py-3 text-right">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {payments.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="px-4 py-6 text-center text-clinic-ink/50">
+                    Abhi koi payment record nahi hui.
+                  </td>
+                </tr>
+              ) : (
+                payments.map((t) => (
+                  <tr key={t.id} className="border-t border-clinic-teal/10">
+                    <td className="px-4 py-3">
+                      {new Date(t.transaction_date).toLocaleDateString('en-GB')}
+                    </td>
+                    <td className="px-4 py-3 text-clinic-ink/60">
+                      {t.description ?? t.category ?? '—'}
+                    </td>
+                    <td className="px-4 py-3 capitalize">{t.payment_method ?? '—'}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-emerald-700">
+                      Rs. {Number(t.amount).toLocaleString()}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Appointment history — matched on phone number */}
+      <div className="mt-8">
+        <h2 className="font-display text-lg font-semibold text-clinic-ink">Appointments</h2>
+        <div className="mt-3 divide-y divide-clinic-teal/10 rounded-2xl border border-clinic-teal/10 bg-white">
+          {appointments.length === 0 ? (
+            <p className="px-4 py-6 text-center text-sm text-clinic-ink/50">
+              Is number se koi appointment record nahi hui.
+            </p>
+          ) : (
+            appointments.map((a) => (
+              <div key={a.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+                <div>
+                  <p className="text-sm text-clinic-ink">{a.treatment_name ?? 'Consultation'}</p>
+                  <p className="text-xs text-clinic-ink/50">
+                    {a.preferred_date
+                      ? new Date(a.preferred_date).toLocaleDateString('en-GB')
+                      : '—'}
+                    {a.preferred_time ? ` · ${a.preferred_time}` : ''}
+                  </p>
+                </div>
+                <span className="rounded-full bg-clinic-mint px-3 py-1 text-xs font-semibold capitalize text-clinic-ink/60">
+                  {a.status}
+                </span>
+              </div>
             ))
           )}
         </div>

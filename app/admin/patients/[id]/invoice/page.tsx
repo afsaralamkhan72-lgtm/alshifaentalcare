@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import InvoiceActions from '@/components/admin/InvoiceActions'
@@ -57,6 +58,15 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
 
   return (
     <div>
+      <Link
+        href={`/admin/patients/${id}`}
+        className="text-sm text-clinic-ink/50 transition-colors hover:text-clinic-teal print:hidden"
+      >
+        ← {patient.full_name} ki profile
+      </Link>
+
+      <div className="mt-3" />
+
       <InvoiceActions
         patientName={patient.full_name}
         patientPhone={patient.phone}

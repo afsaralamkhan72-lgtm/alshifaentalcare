@@ -80,6 +80,20 @@ export default function TreatmentPlanCard({ plan, installments, patientName, pat
     router.refresh()
   }
 
+  async function deletePlan() {
+    if (
+      !confirm(
+        `"${plan.title}" plan aur us ki sab installments delete karein? Ye wapas nahi aayega.`
+      )
+    )
+      return
+    setBusyId('plan')
+    const supabase = createClient()
+    await supabase.from('treatment_plans').delete().eq('id', plan.id)
+    setBusyId(null)
+    router.refresh()
+  }
+
   async function undoPaid(inst: Installment) {
     setBusyId(inst.id)
     const supabase = createClient()
@@ -107,14 +121,23 @@ export default function TreatmentPlanCard({ plan, installments, patientName, pat
             {plan.duration_months} months · started {new Date(plan.start_date).toLocaleDateString('en-GB')}
           </p>
         </div>
-        <a
-          href={reminderLink}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="rounded-full bg-whatsapp px-4 py-2 text-xs font-semibold text-white"
-        >
-          Send Reminder
-        </a>
+        <div className="flex items-center gap-2">
+          <a
+            href={reminderLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-full bg-whatsapp px-4 py-2 text-xs font-semibold text-white"
+          >
+            Send Reminder
+          </a>
+          <button
+            onClick={deletePlan}
+            disabled={busyId === 'plan'}
+            className="rounded-full border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 disabled:opacity-40"
+          >
+            Delete Plan
+          </button>
+        </div>
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">

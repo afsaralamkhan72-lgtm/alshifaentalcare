@@ -15,12 +15,19 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { href: '/admin/dashboard', label: 'Dashboard', ready: true, roles: ['admin', 'doctor', 'receptionist'] },
+  { href: '/admin/appointments', label: 'Appointments', ready: true, roles: ['admin', 'doctor', 'receptionist'] },
   { href: '/admin/patients', label: 'Patients', ready: true, roles: ['admin', 'doctor', 'receptionist'] },
+  { href: '/admin/follow-ups', label: 'Follow-ups', ready: true, roles: ['admin', 'doctor', 'receptionist'] },
+  { href: '/admin/recall', label: 'Recall', ready: true, roles: ['admin', 'doctor', 'receptionist'] },
+  { href: '/admin/birthdays', label: 'Birthdays', ready: true, roles: ['admin', 'doctor', 'receptionist'] },
   { href: '/admin/dental-chart', label: 'Dental Chart', ready: true, roles: ['admin', 'doctor'] },
+  { href: '/admin/lab', label: 'Lab Cases', ready: true, roles: ['admin', 'doctor'] },
   { href: '/admin/billing', label: 'Billing & Accounts', ready: true, roles: ['admin', 'receptionist'] },
+  { href: '/admin/reports', label: 'Reports', ready: true, roles: ['admin'] },
   { href: '/admin/prescriptions', label: 'Prescriptions', ready: true, roles: ['admin', 'doctor'] },
   { href: '/admin/inventory', label: 'Inventory', ready: true, roles: ['admin', 'receptionist'] },
   { href: '/admin/cms', label: 'Edit Website', ready: true, roles: ['admin'] },
+  { href: '/admin/recycle-bin', label: 'Recycle Bin', ready: true, roles: ['admin'] },
 ]
 
 export default function Sidebar({ role }: { role: Role }) {
@@ -43,7 +50,7 @@ export default function Sidebar({ role }: { role: Role }) {
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-64 transform bg-clinic-teal text-white transition-transform lg:static lg:z-0 lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 w-64 shrink-0 transform bg-clinic-teal text-white transition-transform lg:static lg:z-0 lg:w-52 lg:translate-x-0 ${
           open ? 'translate-x-0' : '-translate-x-full'
         }`}
       >

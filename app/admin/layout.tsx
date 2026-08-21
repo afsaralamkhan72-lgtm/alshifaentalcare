@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Sidebar from '@/components/admin/Sidebar'
 import LogoutButton from '@/components/admin/LogoutButton'
+import AssistantBar from '@/components/admin/AssistantBar'
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -26,14 +27,15 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <div className="flex min-h-screen bg-clinic-sand">
       <Sidebar role={profile.role as 'admin' | 'doctor' | 'receptionist'} />
 
-      <div className="flex-1">
-        <header className="flex items-center justify-between border-b border-clinic-teal/10 bg-white px-6 py-4 pl-20 lg:pl-6">
+      <div className="min-w-0 flex-1">
+        <header className="flex items-center justify-between border-b border-clinic-teal/10 bg-white px-4 py-3 pl-20 sm:px-6 lg:pl-6">
           <div>
             <p className="text-sm text-clinic-ink/50">Welcome back,</p>
             <p className="font-display font-semibold text-clinic-ink">{profile.full_name}</p>
           </div>
           <div className="flex items-center gap-3">
-            <span className="rounded-full bg-clinic-mint px-3 py-1 text-xs font-semibold capitalize text-clinic-teal">
+            <AssistantBar />
+            <span className="hidden rounded-full bg-clinic-mint px-3 py-1 text-xs font-semibold capitalize text-clinic-teal sm:inline">
               {profile.role}
             </span>
             <LogoutButton />

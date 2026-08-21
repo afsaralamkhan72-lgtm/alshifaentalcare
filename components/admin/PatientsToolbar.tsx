@@ -10,6 +10,7 @@ interface FormState {
   department: 'dental' | 'homeopathic'
   age: string
   gender: string
+  date_of_birth: string
   address: string
 }
 
@@ -19,6 +20,7 @@ const INITIAL: FormState = {
   department: 'dental',
   age: '',
   gender: '',
+  date_of_birth: '',
   address: '',
 }
 
@@ -45,6 +47,7 @@ export default function PatientsToolbar() {
       department: form.department,
       age: form.age ? Number(form.age) : null,
       gender: form.gender || null,
+      date_of_birth: form.date_of_birth || null,
       address: form.address || null,
     })
 
@@ -119,6 +122,15 @@ export default function PatientsToolbar() {
                   <option value="female">Female</option>
                   <option value="other">Other</option>
                 </select>
+              </div>
+              <div>
+                <label className="text-xs text-clinic-ink/50">Date of Birth (optional)</label>
+                <input
+                  type="date"
+                  value={form.date_of_birth}
+                  onChange={(e) => update('date_of_birth', e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm outline-none focus:border-clinic-teal"
+                />
               </div>
               <textarea
                 placeholder="Address (optional)"

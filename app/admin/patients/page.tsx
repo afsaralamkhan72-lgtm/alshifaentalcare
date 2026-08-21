@@ -12,6 +12,7 @@ async function getPatients(params: SearchParams) {
   let query = supabase
     .from('patients')
     .select('id, mr_number, full_name, phone, department, age, created_at')
+    .is('deleted_at', null)
     .order('created_at', { ascending: false })
 
   if (params.department && params.department !== 'all') {

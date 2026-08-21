@@ -6,6 +6,7 @@ async function getDentalPatients() {
   const { data } = await supabase
     .from('patients')
     .select('id, mr_number, full_name, phone')
+    .is('deleted_at', null)
     .eq('department', 'dental')
     .order('created_at', { ascending: false })
     .limit(100)

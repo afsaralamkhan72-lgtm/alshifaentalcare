@@ -12,9 +12,9 @@ async function getDashboardStats() {
   const monthStart = firstDayOfMonth()
 
   const [totalRes, dentalRes, homeoRes, incomeRes, expenseRes, pendingRes] = await Promise.all([
-    supabase.from('patients').select('*', { count: 'exact', head: true }),
-    supabase.from('patients').select('*', { count: 'exact', head: true }).eq('department', 'dental'),
-    supabase.from('patients').select('*', { count: 'exact', head: true }).eq('department', 'homeopathic'),
+    supabase.from('patients').select('*', { count: 'exact', head: true }).is('deleted_at', null),
+    supabase.from('patients').select('*', { count: 'exact', head: true }).is('deleted_at', null).eq('department', 'dental'),
+    supabase.from('patients').select('*', { count: 'exact', head: true }).is('deleted_at', null).eq('department', 'homeopathic'),
     supabase.from('transactions').select('amount').eq('type', 'income').gte('transaction_date', monthStart),
     supabase.from('transactions').select('amount').eq('type', 'expense').gte('transaction_date', monthStart),
     supabase

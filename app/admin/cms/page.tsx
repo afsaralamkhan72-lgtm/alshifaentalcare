@@ -9,11 +9,16 @@ const DEPARTMENT_OPTIONS = [
 ]
 
 const SERVICE_FIELDS: FieldDef[] = [
+  { key: 'image_url', label: 'Treatment ki Picture', type: 'image', bucket: 'media', folder: 'services' },
   { key: 'title', label: 'Treatment Name', type: 'text', required: true },
   { key: 'department', label: 'Department', type: 'select', options: DEPARTMENT_OPTIONS, required: true },
-  { key: 'short_description', label: 'Short Description', type: 'textarea' },
-  { key: 'image_url', label: 'Treatment Picture', type: 'image', bucket: 'media', folder: 'services' },
-  { key: 'sort_order', label: 'Sort Order', type: 'number' },
+  {
+    key: 'short_description',
+    label: 'Short Description',
+    type: 'textarea',
+    placeholder: 'Website par card mein ye likha aayega',
+  },
+  { key: 'sort_order', label: 'Sort Order (chhota number pehle)', type: 'number' },
   { key: 'is_active', label: 'Show on website', type: 'checkbox' },
 ]
 
@@ -32,11 +37,21 @@ const VIDEO_FIELDS: FieldDef[] = [
 ]
 
 const DOCTOR_FIELDS: FieldDef[] = [
+  { key: 'image_url', label: 'Doctor ki Photo', type: 'image', bucket: 'media', folder: 'doctors' },
   { key: 'full_name', label: 'Full Name', type: 'text', required: true },
-  { key: 'qualification', label: 'Qualification', type: 'text' },
-  { key: 'bio', label: 'Bio', type: 'textarea' },
-  { key: 'image_url', label: 'Photo', type: 'image', bucket: 'media', folder: 'doctors' },
-  { key: 'sort_order', label: 'Sort Order', type: 'number' },
+  {
+    key: 'qualification',
+    label: 'Qualification',
+    type: 'text',
+    placeholder: 'BDS, RDS / DHMS',
+  },
+  {
+    key: 'bio',
+    label: 'Bio / Tafseel',
+    type: 'textarea',
+    placeholder: 'Tajurba, specialization, aur mareezon ke liye paigham...',
+  },
+  { key: 'sort_order', label: 'Sort Order (chhota number pehle)', type: 'number' },
 ]
 
 const TESTIMONIAL_FIELDS: FieldDef[] = [
@@ -89,7 +104,7 @@ export default async function CMSPage() {
         <CMSContentManager
           table="services"
           title="Treatments / Services"
-          hint="Dental aur Homeopathic treatments — picture aur detail ke sath."
+          hint="Purani service par Edit dabayein aur picture laga dein — wo turant website par aa jayegi."
           fields={SERVICE_FIELDS}
           rows={services.data ?? []}
           displayKey="title"
@@ -118,6 +133,7 @@ export default async function CMSPage() {
         <CMSContentManager
           table="doctors"
           title="Doctors Panel"
+          hint="Doctor ki photo, qualification aur tafseel — website ke Doctors page par dikhega."
           fields={DOCTOR_FIELDS}
           rows={doctors.data ?? []}
           displayKey="full_name"

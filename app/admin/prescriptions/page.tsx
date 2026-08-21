@@ -17,6 +17,7 @@ async function getData() {
     supabase
       .from('patients')
       .select('id, full_name, phone, department, mr_number')
+      .is('deleted_at', null)
       .order('created_at', { ascending: false })
       .limit(200),
     supabase
