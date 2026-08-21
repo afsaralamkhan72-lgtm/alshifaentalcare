@@ -30,6 +30,8 @@ export default function InvoiceBuilder({
   const [method, setMethod] = useState('cash')
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
   const [dueDate, setDueDate] = useState('')
+  const [isPlan, setIsPlan] = useState(false)
+  const [months, setMonths] = useState('12')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -52,6 +54,81 @@ export default function InvoiceBuilder({
     const {
       data: { user },
     } = await supabase.auth.getUser()
+
+    // Lamba treatment (ortho waghera): plan + har mahine ki row bana dein
+    if (isPlan) {
+      const m = Math.max(1, Number(months || 1))
+      const advance = receivingNum
+      const monthly = Math.round((payable - advance) / m)
+
+      const { data: plan, error: planErr } = await supabase
+        .from('treatment_plans')
+        .insert({
+          patient_id: patientId,
+          title: treatment.trim() || 'Treatment Plan',
+          total_cost: payable,
+          advance_paid: advance,
+          duration_months: m,
+          monthly_amount: monthly,
+          start_date: date,
+          treating_doctor: doctorName.trim() || null,
+        })
+        .select('id')
+        .single()
+
+      if (planErr || !plan) {
+        setSaving(false)
+        setError('Plan nahi bana. Kya SETUP-ALL.sql chalayi thi?')
+        return
+      }
+
+      const rows = []
+      const base = new Date(date)
+      for (let i = 1; i <= m; i++) {
+        const due = new Date(base)
+        due.setMonth(due.getMonth() + i)
+        rows.push({
+          plan_id: plan.id,
+          installment_no: i,
+          due_date: due.toISOString().slice(0, 10),
+          amount: monthly,
+        })
+      }
+      await supabase.from('installments').insert(rows)
+
+      // Advance ko bhi income mein record karein
+      if (advance > 0) {
+        await supabase.from('transactions').insert({
+          patient_id: patientId,
+          type: 'income',
+          category: 'treatment',
+          treatment_name: `${treatment.trim() || 'Treatment'} (advance)`,
+          rate: payable,
+          discount_pct: pct,
+          discount_amount: discount,
+          amount: advance,
+          balance_due: 0,
+          payment_method: method,
+          treating_doctor: doctorName.trim() || null,
+          transaction_date: date,
+          settled_at: new Date().toISOString(),
+          recorded_by: user?.id ?? null,
+        })
+      }
+
+      if (doctorName.trim()) {
+        await supabase.from('treating_doctors').insert({ name: doctorName.trim() })
+      }
+
+      setSaving(false)
+      setTreatment('')
+      setRate('')
+      setDiscountPct('')
+      setReceiving('')
+      setIsPlan(false)
+      router.refresh()
+      return
+    }
 
     const { error: err } = await supabase.from('transactions').insert({
       patient_id: patientId,
@@ -183,7 +260,7 @@ export default function InvoiceBuilder({
           />
         </div>
 
-        {remaining > 0 && (
+        {remaining > 0 && !isPlan && (
           <div>
             <label className="text-sm font-medium text-clinic-ink">
               Baqi paise kab tak
@@ -214,6 +291,47 @@ export default function InvoiceBuilder({
         )}
       </div>
 
+      <div className="mt-4 rounded-xl border border-clinic-teal/20 bg-clinic-mint/40 p-4">
+        <label className="flex items-center gap-2 text-sm font-medium text-clinic-ink">
+          <input
+            type="checkbox"
+            checked={isPlan}
+            onChange={(e) => setIsPlan(e.target.checked)}
+            className="h-4 w-4 accent-clinic-teal"
+          />
+          Ye lamba treatment hai, har mahine payment aayegi (Braces, RCT course...)
+        </label>
+
+        {isPlan && (
+          <div className="mt-3 flex flex-wrap items-end gap-3">
+            <div>
+              <label className="text-xs text-clinic-ink/70">Kitne mahine</label>
+              <input
+                type="number"
+                min="1"
+                value={months}
+                onChange={(e) => setMonths(e.target.value)}
+                className="mt-1 w-28 rounded-lg border border-clinic-teal/30 px-3 py-2 text-sm"
+              />
+            </div>
+            <div className="rounded-lg bg-white px-4 py-2">
+              <p className="text-xs text-clinic-ink/70">Har mahine takreeban</p>
+              <p className="font-display font-semibold text-clinic-teal">
+                Rs.{' '}
+                {Math.max(
+                  0,
+                  Math.round((payable - receivingNum) / Math.max(1, Number(months || 1)))
+                ).toLocaleString()}
+              </p>
+            </div>
+            <p className="text-xs text-clinic-ink/60">
+              &quot;Aaj kitne rupay mile&quot; advance ban jayega. Har mahine ki alag row ban
+              jayegi jahan asal raqam likh sakenge.
+            </p>
+          </div>
+        )}
+      </div>
+
       <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl bg-clinic-mint p-4 sm:grid-cols-4">
         <Figure label="Rate" value={rateNum} />
         <Figure label="Discount" value={discount} tone="teal" />
@@ -238,7 +356,7 @@ export default function InvoiceBuilder({
           disabled={saving || rateNum <= 0}
           className="rounded-full bg-clinic-teal px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-40"
         >
-          {saving ? 'Saving...' : 'Bill Mein Add Karein'}
+          {saving ? 'Saving...' : isPlan ? 'Monthly Plan Banayein' : 'Bill Mein Add Karein'}
         </button>
 
         {error && <span className="text-sm text-red-600">{error}</span>}

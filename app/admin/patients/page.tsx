@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import PatientsToolbar from '@/components/admin/PatientsToolbar'
+import PatientsTable, { type PatientRow } from '@/components/admin/PatientsTable'
 
 interface SearchParams {
   department?: string
@@ -22,7 +23,7 @@ async function getPatients(params: SearchParams) {
 
   let query = supabase
     .from('patients')
-    .select('id, mr_number, full_name, phone, department, age, created_at')
+    .select('id, mr_number, full_name, phone, department, age, created_at, portal_code, primary_doctor')
     .is('deleted_at', null)
     .order('created_at', { ascending: false })
 
@@ -81,50 +82,8 @@ export default async function PatientsPage({
         </button>
       </form>
 
-      <div className="mt-6 overflow-x-auto rounded-2xl border border-clinic-teal/10 bg-white">
-        <table className="w-full text-sm">
-          <thead className="bg-clinic-mint text-left text-clinic-ink/60">
-            <tr>
-              <th className="px-4 py-3">MR#</th>
-              <th className="px-4 py-3">Name</th>
-              <th className="px-4 py-3">Phone</th>
-              <th className="px-4 py-3">Department</th>
-              <th className="px-4 py-3">Age</th>
-              <th className="px-4 py-3"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {patients.map((p) => (
-              <tr key={p.id} className="border-t border-clinic-teal/10">
-                <td className="px-4 py-3 font-medium text-clinic-ink">{p.mr_number}</td>
-                <td className="px-4 py-3">{p.full_name}</td>
-                <td className="px-4 py-3">{p.phone}</td>
-                <td className="px-4 py-3">
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${
-                      p.department === 'dental' ? 'bg-clinic-teal/10 text-clinic-teal' : 'bg-clinic-amber/10 text-clinic-amber'
-                    }`}
-                  >
-                    {p.department}
-                  </span>
-                </td>
-                <td className="px-4 py-3">{p.age ?? '—'}</td>
-                <td className="px-4 py-3 text-right">
-                  <Link href={`/admin/patients/${p.id}`} className="text-sm font-semibold text-clinic-teal hover:underline">
-                    View →
-                  </Link>
-                </td>
-              </tr>
-            ))}
-            {patients.length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-clinic-ink/50">
-                  Koi patient nahi mila.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+      <div className="mt-6">
+        <PatientsTable patients={patients as PatientRow[]} knownDoctors={knownDoctors} />
       </div>
     </div>
   )
