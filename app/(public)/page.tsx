@@ -19,11 +19,12 @@ interface Service {
   department: 'dental' | 'homeopathic'
 }
 
-const TICKER_ITEMS = [
+const BASE_TICKER = [
   `📞 ${CLINIC.phone.display}`,
   '🦷 Dental & Homeopathic Care',
   `📍 ${CLINIC.address.full}`,
   `🕐 ${CLINIC.timings.full}`,
+
   '💬 Book instantly on WhatsApp',
 ]
 
@@ -45,11 +46,28 @@ async function getFeaturedServices(): Promise<Service[]> {
 export default async function HomePage() {
   const services = await getFeaturedServices()
 
+  let closedDay = ''
+  try {
+    const supabase = await createClient()
+    const { data } = await supabase
+      .from('site_settings')
+      .select('value')
+      .eq('key', 'clinic_info')
+      .maybeSingle()
+    closedDay = ((data?.value ?? {}) as Record<string, string>).closed_day || ''
+  } catch {
+    // koi chutti set nahi
+  }
+
+  const tickerItems = closedDay
+    ? [...BASE_TICKER, `🚫 ${closedDay} closed`]
+    : BASE_TICKER
+
   return (
     <>
       <Hero />
       <DoctorIntro />
-      <Ticker items={TICKER_ITEMS} />
+      <Ticker items={tickerItems} />
       <TrustStats />
 
       <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6">

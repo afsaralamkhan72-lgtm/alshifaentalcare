@@ -106,7 +106,20 @@ export const SITE_URL =
  * Google ko clinic ke baare mein batane wali maloomat (structured data).
  * Is se Google search mein pata, timings aur phone number dikhata hai.
  */
-export function clinicJsonLd(logoUrl?: string | null) {
+export function clinicJsonLd(logoUrl?: string | null, closedDay?: string | null) {
+  const allDays = [
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
+  ]
+  const openDays = closedDay
+    ? allDays.filter((d) => d.toLowerCase() !== closedDay.trim().toLowerCase())
+    : allDays
+
   return {
     '@context': 'https://schema.org',
     '@type': 'Dentist',
@@ -124,15 +137,7 @@ export function clinicJsonLd(logoUrl?: string | null) {
     openingHoursSpecification: [
       {
         '@type': 'OpeningHoursSpecification',
-        dayOfWeek: [
-          'Monday',
-          'Tuesday',
-          'Wednesday',
-          'Thursday',
-          'Friday',
-          'Saturday',
-          'Sunday',
-        ],
+        dayOfWeek: openDays,
         opens: '10:00',
         closes: '17:00',
       },

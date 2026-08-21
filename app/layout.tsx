@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
+import { createClient } from '@/lib/supabase/server'
 import { CLINIC, SITE_URL, clinicJsonLd } from '@/clinic.config'
 
 export const metadata: Metadata = {
@@ -38,7 +39,23 @@ export const viewport: Viewport = {
   themeColor: '#0B4F4A',
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  let closedDay = ''
+  let logoUrl = ''
+  try {
+    const supabase = await createClient()
+    const { data } = await supabase
+      .from('site_settings')
+      .select('value')
+      .eq('key', 'clinic_info')
+      .maybeSingle()
+    const info = (data?.value ?? {}) as Record<string, string>
+    closedDay = info.closed_day || ''
+    logoUrl = info.logo_url || ''
+  } catch {
+    // defaults
+  }
+
   return (
     <html lang="en">
       <head>
@@ -50,7 +67,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* Google ko clinic ki maloomat: pata, timings, phone */}
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(clinicJsonLd()) }}
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(clinicJsonLd(logoUrl || null, closedDay || null)),
+          }}
         />
         {children}
       </body>

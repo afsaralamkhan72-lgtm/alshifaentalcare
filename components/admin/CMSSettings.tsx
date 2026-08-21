@@ -11,9 +11,19 @@ interface Props {
 }
 
 export default function CMSSettings({ initial }: Props) {
+  const [social, setSocial] = useState({
+    facebook: '',
+    instagram: '',
+    tiktok: '',
+    youtube: '',
+    google_business: '',
+    ...(initial.social_links ?? {}),
+  } as Record<string, string>)
+
   const [clinic, setClinic] = useState({
     logo_url: '',
     name: '',
+    closed_day: '',
     doctor_name: '',
     address: '',
     phone: '',
@@ -65,6 +75,7 @@ export default function CMSSettings({ initial }: Props) {
       { key: 'emergency_popup', value: popup, updated_by: user?.id ?? null },
       { key: 'hero_banner', value: hero, updated_by: user?.id ?? null },
       { key: 'ceo_profile', value: ceo, updated_by: user?.id ?? null },
+      { key: 'social_links', value: social, updated_by: user?.id ?? null },
     ]
 
     const { error } = await supabase.from('site_settings').upsert(rows, { onConflict: 'key' })
@@ -103,6 +114,7 @@ export default function CMSSettings({ initial }: Props) {
             ['phone', 'Phone (display)'],
             ['whatsapp', 'WhatsApp (923XXXXXXXXX)'],
             ['timings', 'Timings'],
+            ['closed_day', 'Chutti ka din (jaise: Friday)'],
           ].map(([key, label]) => (
             <div key={key}>
               <label className="text-sm font-medium text-clinic-ink">{label}</label>
@@ -278,6 +290,33 @@ export default function CMSSettings({ initial }: Props) {
               className={inputClass}
             />
           </div>
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-clinic-teal/10 bg-white p-6">
+        <p className="font-display font-semibold text-clinic-ink">Social Media</p>
+        <p className="mt-1 text-xs text-clinic-ink/50">
+          Poora link daalein. Jo khali chhodenge uska icon website par nahi aayega.
+        </p>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          {[
+            ['facebook', 'Facebook', 'https://facebook.com/...'],
+            ['instagram', 'Instagram', 'https://instagram.com/...'],
+            ['tiktok', 'TikTok', 'https://tiktok.com/@...'],
+            ['youtube', 'YouTube', 'https://youtube.com/@...'],
+            ['google_business', 'Google Business / Reviews', 'https://g.page/...'],
+          ].map(([key, label, ph]) => (
+            <div key={key}>
+              <label className="text-sm font-medium text-clinic-ink">{label}</label>
+              <input
+                placeholder={ph}
+                value={social[key] ?? ''}
+                onChange={(e) => setSocial((p) => ({ ...p, [key]: e.target.value }))}
+                className={inputClass}
+              />
+            </div>
+          ))}
         </div>
       </section>
 

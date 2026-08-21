@@ -1,5 +1,6 @@
 import PageHeader from '@/components/public/PageHeader'
 import { CLINIC } from '@/clinic.config'
+import SocialLinks from '@/components/public/SocialLinks'
 
 const MAP_EMBED_SRC =
   `https://www.google.com/maps?q=${encodeURIComponent(CLINIC.mapQuery)}&output=embed`
@@ -56,6 +57,15 @@ export default function ContactPage() {
           </div>
         </div>
       </section>
-    </>
+          <section className="mx-auto max-w-6xl px-4 pb-14 sm:px-6">
+        <p className="text-sm font-semibold uppercase tracking-wide text-clinic-amber">
+          Follow Us
+        </p>
+        <div className="mt-3">
+          <SocialLinks />
+        </div>
+      </section>
+
+</>
   )
 }

@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { CLINIC } from '@/clinic.config'
+import { createClient } from '@/lib/supabase/server'
 
 const STEPS = [
   {
@@ -31,7 +32,7 @@ const FAQS = [
   },
   {
     q: 'What are the clinic timings?',
-    a: `The clinic is open ${CLINIC.timings.short} at ${CLINIC.address.full}.`,
+    a: '',
   },
   {
     q: 'Can long treatments be paid in instalments?',
@@ -51,7 +52,20 @@ const FAQS = [
   },
 ]
 
-export default function ProcessAndFaq() {
+export default async function ProcessAndFaq() {
+  let closedDay = ''
+  try {
+    const supabase = await createClient()
+    const { data } = await supabase
+      .from('site_settings')
+      .select('value')
+      .eq('key', 'clinic_info')
+      .maybeSingle()
+    closedDay = ((data?.value ?? {}) as Record<string, string>).closed_day || ''
+  } catch {
+    // koi chutti set nahi
+  }
+
   return (
     <>
       {/* How it works */}
@@ -81,7 +95,7 @@ export default function ProcessAndFaq() {
             {
               label: 'Timings',
               value: CLINIC.timings.short,
-              note: 'Open daily',
+              note: closedDay ? `${closedDay} closed` : 'Open daily',
             },
             {
               label: 'Location',
@@ -117,7 +131,14 @@ export default function ProcessAndFaq() {
         </h2>
 
         <div className="mt-8 divide-y divide-clinic-teal/10 rounded-2xl border border-clinic-teal/10 bg-white">
-          {FAQS.map((f) => (
+          {FAQS.map((f) => {
+            const answer =
+              f.q === 'What are the clinic timings?'
+                ? `The clinic is open ${CLINIC.timings.short} at ${CLINIC.address.full}.${
+                    closedDay ? ` ${closedDay} closed.` : ''
+                  }`
+                : f.a
+            return (
             <details key={f.q} className="group px-6 py-4">
               <summary className="flex cursor-pointer items-center justify-between gap-4 font-medium text-clinic-ink marker:content-['']">
                 {f.q}
@@ -125,9 +146,10 @@ export default function ProcessAndFaq() {
                   +
                 </span>
               </summary>
-              <p className="mt-3 text-sm leading-relaxed text-clinic-ink/60">{f.a}</p>
+              <p className="mt-3 text-sm leading-relaxed text-clinic-ink/60">{answer}</p>
             </details>
-          ))}
+            )
+          })}
         </div>
 
         <p className="mt-6 text-center text-sm text-clinic-ink/60">

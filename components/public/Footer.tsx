@@ -2,9 +2,11 @@ import Link from 'next/link'
 import ClinicLogo from '@/components/ClinicLogo'
 import { createClient } from '@/lib/supabase/server'
 import { CLINIC } from '@/clinic.config'
+import SocialLinks from '@/components/public/SocialLinks'
 
 interface ClinicInfo {
   logo_url?: string | null
+  closed_day?: string | null
   name: string
   doctor_name: string
   address: string
@@ -46,9 +48,17 @@ export default async function Footer() {
             )}
             <p className="font-display text-lg font-semibold text-white">{info.name}</p>
           </div>
+          <div className="mt-4">
+            <SocialLinks tone="dark" />
+          </div>
           <p className="mt-2 text-sm text-white/70">{info.doctor_name}</p>
           <p className="mt-4 text-sm text-white/70">{info.address}</p>
-          <p className="mt-1 text-sm text-white/70">Open Daily: {info.timings}</p>
+          <p className="mt-1 text-sm text-white/70">{info.timings}</p>
+          {info.closed_day && (
+            <p className="mt-0.5 text-sm font-medium text-clinic-amber">
+              {info.closed_day} closed
+            </p>
+          )}
         </div>
 
         <div>
