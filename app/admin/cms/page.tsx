@@ -63,7 +63,12 @@ const DOCTOR_FIELDS: FieldDef[] = [
     type: 'textarea',
     placeholder: 'Tajurba, specialization, aur mareezon ke liye paigham...',
   },
-  { key: 'sort_order', label: 'Sort Order (chhota number pehle)', type: 'number' },
+  {
+    key: 'sort_order',
+    label: 'Home page par tarteeb (1 = sabse pehle aur sabse bara)',
+    type: 'number',
+  },
+  { key: 'show_on_home', label: 'Home page par dikhayein', type: 'checkbox' },
 ]
 
 const TESTIMONIAL_FIELDS: FieldDef[] = [
@@ -156,7 +161,7 @@ export default async function CMSPage() {
         <CMSContentManager
           table="doctors"
           title="Doctors Panel"
-          hint="Doctor ki photo, qualification aur tafseel, website ke Doctors page par dikhega."
+          hint="Tarteeb 1 wala doctor home page par bara dikhega, baaqi uske neeche chhote."
           fields={DOCTOR_FIELDS}
           rows={doctors.data ?? []}
           displayKey="full_name"
