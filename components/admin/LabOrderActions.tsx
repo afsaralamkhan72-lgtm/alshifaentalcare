@@ -70,7 +70,7 @@ export default function LabOrderActions({
           onClick={() => window.print()}
           className="rounded-full bg-clinic-teal px-5 py-2.5 text-sm font-semibold text-white"
         >
-          Save as PDF / Print
+          Download PDF
         </button>
 
         {link ? (

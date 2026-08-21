@@ -21,7 +21,7 @@ export default function HistoryPrintButton() {
         onClick={() => window.print()}
         className="rounded-full bg-clinic-teal px-4 py-2 text-sm font-semibold text-white"
       >
-        Save as PDF / Print
+        Download PDF
       </button>
     </>
   )

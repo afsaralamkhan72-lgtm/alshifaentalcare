@@ -80,7 +80,14 @@ export default function InvoiceActions({
           onClick={() => window.print()}
           className="rounded-full bg-clinic-teal px-5 py-2.5 text-sm font-semibold text-white"
         >
-          Save as PDF / Print
+          Download PDF
+        </button>
+
+        <button
+          onClick={() => window.print()}
+          className="rounded-full border border-clinic-teal px-5 py-2.5 text-sm font-semibold text-clinic-teal"
+        >
+          Print
         </button>
         <a
           href={link}

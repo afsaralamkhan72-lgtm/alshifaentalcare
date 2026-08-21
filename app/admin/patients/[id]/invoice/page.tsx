@@ -264,8 +264,19 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                   {plan.title} — Instalment Schedule
                 </p>
                 <p className="text-xs font-medium text-clinic-ink/70">
-                  {paidCount} / {rows.length} paid · Rs.{' '}
-                  {Number(plan.monthly_amount).toLocaleString()} per month
+                  Total Rs. {Number(plan.total_cost).toLocaleString()} · Diya Rs.{' '}
+                  {(
+                    Number(plan.advance_paid) +
+                    rows.reduce((sum, r) => sum + Number(r.paid_amount), 0)
+                  ).toLocaleString()}{' '}
+                  · Baqaya Rs.{' '}
+                  {Math.max(
+                    0,
+                    Number(plan.total_cost) -
+                      Number(plan.advance_paid) -
+                      rows.reduce((sum, r) => sum + Number(r.paid_amount), 0)
+                  ).toLocaleString()}{' '}
+                  · {paidCount} / {rows.length} months
                 </p>
               </div>
 
@@ -275,15 +286,21 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                     <tr>
                       <th className="px-2 py-1.5">#</th>
                       <th className="px-2 py-1.5">Month</th>
-                      <th className="px-2 py-1.5 text-right">Amount</th>
+                      <th className="px-2 py-1.5 text-right">Expected</th>
+                      <th className="px-2 py-1.5 text-right">Diya</th>
+                      <th className="px-2 py-1.5 text-right">Balance</th>
                       <th className="px-2 py-1.5">Status</th>
                       <th className="px-2 py-1.5">Paid On</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {rows.map((r) => {
+                    {(() => {
+                      let running = Number(plan.total_cost) - Number(plan.advance_paid)
+                      return rows.map((r) => {
                       const isPaid = Number(r.paid_amount) > 0
                       const overdue = !isPaid && r.due_date < today
+                      if (isPaid) running = Math.max(0, running - Number(r.paid_amount))
+                      const bal = running
                       return (
                         <tr key={r.installment_no} className="border-t border-clinic-teal/10">
                           <td className="px-2 py-2">{r.installment_no}</td>
@@ -293,8 +310,14 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                               year: 'numeric',
                             })}
                           </td>
-                          <td className="px-2 py-2 text-right">
+                          <td className="px-2 py-2 text-right text-clinic-ink/70">
                             Rs. {Number(r.amount).toLocaleString()}
+                          </td>
+                          <td className="px-2 py-2 text-right font-semibold text-clinic-ink">
+                            {isPaid ? `Rs. ${Number(r.paid_amount).toLocaleString()}` : '—'}
+                          </td>
+                          <td className="px-2 py-2 text-right text-clinic-ink/70">
+                            Rs. {bal.toLocaleString()}
                           </td>
                           <td className="px-2 py-2">
                             <span
@@ -318,7 +341,8 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                           </td>
                         </tr>
                       )
-                    })}
+                      })
+                    })()}
                   </tbody>
                 </table>
               </div>

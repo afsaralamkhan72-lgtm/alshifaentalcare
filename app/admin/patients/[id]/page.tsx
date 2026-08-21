@@ -10,6 +10,7 @@ import DeletePatientButton from '@/components/admin/DeletePatientButton'
 import PatientRecalls, { type PatientRecall } from '@/components/admin/PatientRecalls'
 import PortalLinkButton from '@/components/admin/PortalLinkButton'
 import VisitTimeline, { type TimelineEntry } from '@/components/admin/VisitTimeline'
+import PatientQuickActions from '@/components/admin/PatientQuickActions'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -149,6 +150,12 @@ export default async function PatientDetailPage({ params }: Props) {
       }
     }),
   ].sort((a, b) => b.date.localeCompare(a.date))
+
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const upcomingAppt =
+    appointments.find(
+      (a) => a.preferred_date && a.preferred_date >= todayStr && a.status !== 'cancelled'
+    )?.preferred_date ?? null
 
   const lastVisit = visits[0]?.visit_date ?? null
   const nextVisit = visits.find((v) => v.next_visit && v.next_visit >= new Date().toISOString().slice(0, 10))?.next_visit ?? null
@@ -299,12 +306,27 @@ export default async function PatientDetailPage({ params }: Props) {
         </div>
       </div>
 
+      <PatientQuickActions
+        patientId={patient.id}
+        patientName={patient.full_name}
+        patientPhone={patient.phone}
+        mrNumber={patient.mr_number}
+        portalCode={patient.portal_code ?? null}
+        department={patient.department}
+        hasPlan={plans.length > 0}
+        total={totalValue}
+        paid={totalPaid}
+        balance={balance}
+        nextAppointment={upcomingAppt}
+        nextVisit={nextVisit}
+      />
+
       <div className="mt-6">
         <VisitTimeline entries={timeline} patientId={patient.id} />
       </div>
 
       {/* Treatment plans, orthodontics and any other multi-month course */}
-      <div className="mt-8">
+      <div id="treatment-plans" className="mt-8 scroll-mt-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="font-display text-lg font-semibold text-clinic-ink">Treatment Plans</h2>
@@ -340,7 +362,7 @@ export default async function PatientDetailPage({ params }: Props) {
         <PatientRecalls patientId={patient.id} recalls={recalls} />
       </div>
 
-      <div className="mt-8">
+      <div id="visit-notes" className="mt-8 scroll-mt-6">
         <VisitNotes patientId={patient.id} notes={visits} />
       </div>
 
