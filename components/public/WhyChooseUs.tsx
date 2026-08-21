@@ -1,19 +1,19 @@
 const POINTS = [
   {
-    title: 'Do Specialties, Aik Chhat',
-    body: 'Dental aur Homeopathic — dono ka ilaj aik hi jagah, aik hi doctor ki nigrani mein.',
+    title: 'Two Specialties, One Clinic',
+    body: 'Dental and homeopathic treatment in the same place, under the care of one doctor.',
     icon: (
       <path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6" strokeLinecap="round" strokeLinejoin="round" />
     ),
   },
   {
-    title: 'WhatsApp Par Appointment',
-    body: 'Line mein lagne ki zaroorat nahi. Aik message bhejein, waqt confirm ho jayega.',
+    title: 'Appointments on WhatsApp',
+    body: 'No waiting in line. Send one message and your time is confirmed.',
     icon: <path d="M21 12a9 9 0 1 1-4.2-7.6L21 3l-1.4 4.2A8.9 8.9 0 0 1 21 12Z" strokeLinecap="round" strokeLinejoin="round" />,
   },
   {
-    title: 'Har Marz Ka Record',
-    body: 'Aap ka dental chart, nuskhe aur poori history mehfooz — har visit par saamne.',
+    title: 'Complete Patient Records',
+    body: 'Your dental chart, prescriptions and full history — available at every visit.',
     icon: (
       <path
         d="M8 3h8a2 2 0 0 1 2 2v16l-6-3-6 3V5a2 2 0 0 1 2-2Z"
@@ -23,8 +23,8 @@ const POINTS = [
     ),
   },
   {
-    title: 'Aasan Qist Ka Nizam',
-    body: 'Braces jaise lambe ilaj mahana qiston mein — har payment ka tehreeri record.',
+    title: 'Easy Instalment Plans',
+    body: 'Long treatments like braces in monthly instalments, with a written record of every payment.',
     icon: (
       <path
         d="M3 10h18M3 6h18v12H3zM7 15h4"
@@ -40,10 +40,10 @@ export default function WhyChooseUs() {
     <section className="bg-clinic-mint/50 py-14">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <p className="text-sm font-semibold uppercase tracking-wide text-clinic-amber">
-          Kyun Al Shifa
+          Why Al Shifa
         </p>
         <h2 className="mt-1 font-display text-2xl font-semibold text-clinic-ink sm:text-3xl">
-          Aap Ke Aaram Ka Khayal
+          Care Built Around You
         </h2>
 
         <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">

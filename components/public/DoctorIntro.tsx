@@ -13,7 +13,7 @@ interface Doctor {
 const FALLBACK: Doctor = {
   full_name: 'Dr. Muhammad Khalid Mahmood',
   qualification: 'Dental Surgeon & Homeopathic Physician',
-  bio: 'Numaish, Nizami Road par barson se Karachi ke khandano ka ilaj. Har mareez ko waqt, tawajjah aur aik saaf ilaj ka mansooba milta hai — bina jaldi ke, bina uljhan ke.',
+  bio: 'Serving families in Karachi for years from the clinic at Numaish, Nizami Road. Every patient gets unhurried time, careful attention, and a clear treatment plan they actually understand.',
   image_url: null,
 }
 
@@ -42,7 +42,8 @@ export default async function DoctorIntro() {
     .join('')
 
   return (
-    <section className="mx-auto max-w-6xl px-4 py-14 sm:px-6">
+    <section className="border-b border-clinic-teal/10 bg-white">
+      <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6">
       <div className="grid items-center gap-8 lg:grid-cols-[280px_1fr]">
         <div className="relative mx-auto h-64 w-64 overflow-hidden rounded-3xl bg-clinic-teal lg:mx-0">
           {doctor.image_url ? (
@@ -62,7 +63,7 @@ export default async function DoctorIntro() {
 
         <div>
           <p className="text-sm font-semibold uppercase tracking-wide text-clinic-amber">
-            Aap Ke Doctor
+            Meet Your Doctor
           </p>
           <h2 className="mt-1 font-display text-2xl font-semibold text-clinic-ink sm:text-3xl">
             {doctor.full_name}
@@ -73,14 +74,15 @@ export default async function DoctorIntro() {
           <p className="mt-4 max-w-xl leading-relaxed text-clinic-ink/70">{doctor.bio}</p>
 
           <div className="mt-6 flex flex-wrap items-center gap-3">
-            <WhatsAppButton label="Consultation Book Karein" />
+            <WhatsAppButton label="Book a Consultation" />
             <Link
               href="/about"
               className="rounded-full border border-clinic-teal px-5 py-2.5 text-sm font-semibold text-clinic-teal transition-colors hover:bg-clinic-teal hover:text-white"
             >
-              Clinic Ke Baare Mein
+              About the Clinic
             </Link>
           </div>
+        </div>
         </div>
       </div>
     </section>

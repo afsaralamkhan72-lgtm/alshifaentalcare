@@ -2,9 +2,9 @@ import { createClient } from '@/lib/supabase/server'
 import WhatsAppButton from './WhatsAppButton'
 
 const DEFAULTS = {
-  heading: 'Dental & Homeopathic Care — Aik Chhat Ke Neeche',
+  heading: 'Dental & Homeopathic Care Under One Roof',
   subheading:
-    'Numaish, Nizami Road, Karachi mein aap ke pure family ke liye trusted dental treatment aur homeopathic consultation. Har appointment ek WhatsApp message door hai.',
+    'Trusted treatment for your whole family in Numaish, Nizami Road, Karachi. Book your appointment with a single WhatsApp message.',
   doctor_name: 'Dr. Muhammad Khalid Mahmood',
   phone: '0342-2078639',
 }

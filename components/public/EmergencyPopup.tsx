@@ -17,7 +17,7 @@ const DEFAULT_SETTINGS: PopupSettings = {
   enabled: true,
   delay_seconds: 10,
   title: 'Emergency? Need Consultation?',
-  message: 'Abhi WhatsApp par doctor se raabta karein',
+  message: 'Message the doctor on WhatsApp right now',
   button_text: 'Chat on WhatsApp',
 }
 

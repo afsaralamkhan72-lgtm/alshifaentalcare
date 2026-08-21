@@ -60,7 +60,7 @@ export default function BookingForm() {
         </p>
         <p className="mt-2 text-sm text-clinic-ink/70">
           Hamari team jald aap se raabta karegi. Agar jaldi hai to abhi WhatsApp par bhi
-          confirm kar sakte hain.
+          confirm your appointment.
         </p>
         <a
           href={buildWhatsAppLink({ treatmentName: form.treatment_name || undefined })}
@@ -145,7 +145,7 @@ export default function BookingForm() {
 
       {status === 'error' && (
         <p className="text-sm text-red-600">
-          Kuch masla hua — dobara koshish karein ya seedha WhatsApp par message karein.
+          Something went wrong. Please try again, or message us directly on WhatsApp.
         </p>
       )}
 

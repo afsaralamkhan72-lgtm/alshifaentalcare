@@ -6,6 +6,7 @@ import ServiceCard from '@/components/public/ServiceCard'
 import WhyChooseUs from '@/components/public/WhyChooseUs'
 import DoctorIntro from '@/components/public/DoctorIntro'
 import HomeSections from '@/components/public/HomeSections'
+import ProcessAndFaq from '@/components/public/ProcessAndFaq'
 import Link from 'next/link'
 
 interface Service {
@@ -21,6 +22,7 @@ const TICKER_ITEMS = [
   '🦷 Dental & Homeopathic Care',
   '📍 Numaish, Nizami Road, Karachi',
   '🕐 Open Daily 10:00 AM – 5:00 PM',
+  '💬 Book instantly on WhatsApp',
 ]
 
 async function getFeaturedServices(): Promise<Service[]> {
@@ -44,6 +46,7 @@ export default async function HomePage() {
   return (
     <>
       <Hero />
+      <DoctorIntro />
       <Ticker items={TICKER_ITEMS} />
       <TrustStats />
 
@@ -51,7 +54,7 @@ export default async function HomePage() {
         <div className="mb-8 flex items-end justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-wide text-clinic-amber">
-              Featured Services
+              Our Treatments
             </p>
             <h2 className="mt-1 font-display text-2xl font-semibold text-clinic-ink sm:text-3xl">
               Dental &amp; Homeopathic Treatments
@@ -61,7 +64,7 @@ export default async function HomePage() {
             href="/services/dental"
             className="shrink-0 text-sm font-semibold text-clinic-teal hover:underline"
           >
-            Sab treatments →
+            View all treatments →
           </Link>
         </div>
 
@@ -79,14 +82,14 @@ export default async function HomePage() {
           </div>
         ) : (
           <p className="rounded-2xl border border-dashed border-clinic-teal/20 bg-clinic-mint/40 p-8 text-center text-sm text-clinic-ink/60">
-            Abhi tak koi service CMS mein add nahi hui — Admin Panel &rarr; Edit Website se
-            services add karein, wo yahan automatically nazar aayengi.
+            No treatments have been added yet. Add them from Admin Panel &rarr; Edit Website
+            and they will appear here automatically.
           </p>
         )}
       </section>
 
       <WhyChooseUs />
-      <DoctorIntro />
+      <ProcessAndFaq />
       <HomeSections />
     </>
   )

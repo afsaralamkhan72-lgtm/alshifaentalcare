@@ -69,14 +69,14 @@ export default async function HomeSections() {
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold uppercase tracking-wide text-clinic-amber">
-                  Nataij
+                  Results
                 </p>
                 <h2 className="mt-1 font-display text-2xl font-semibold text-clinic-ink sm:text-3xl">
-                  Pehle Aur Baad Mein
+                  Before &amp; After
                 </h2>
               </div>
               <Link href="/gallery" className="text-sm font-semibold text-clinic-teal hover:underline">
-                Poori gallery →
+                View gallery →
               </Link>
             </div>
 
@@ -117,14 +117,14 @@ export default async function HomeSections() {
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <p className="text-sm font-semibold uppercase tracking-wide text-clinic-amber">
-                Mareezon Ki Raye
+                Patient Reviews
               </p>
               <h2 className="mt-1 font-display text-2xl font-semibold text-clinic-ink sm:text-3xl">
-                Log Kya Kehte Hain
+                What People Say
               </h2>
             </div>
             <Link href="/testimonials" className="text-sm font-semibold text-clinic-teal hover:underline">
-              Sab reviews →
+              All reviews →
             </Link>
           </div>
 
@@ -155,14 +155,14 @@ export default async function HomeSections() {
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold uppercase tracking-wide text-clinic-amber">
-                  Sehat Ki Baatein
+                  Health Tips
                 </p>
                 <h2 className="mt-1 font-display text-2xl font-semibold text-clinic-ink sm:text-3xl">
-                  Blog &amp; Health Tips
+                  From Our Blog
                 </h2>
               </div>
               <Link href="/blog" className="text-sm font-semibold text-clinic-teal hover:underline">
-                Sab articles →
+                All articles →
               </Link>
             </div>
 
@@ -203,13 +203,13 @@ export default async function HomeSections() {
       <section className="bg-clinic-teal">
         <div className="mx-auto max-w-6xl px-4 py-14 text-center sm:px-6">
           <h2 className="font-display text-2xl font-semibold text-white sm:text-3xl">
-            Dant Ka Dard Ho Ya Purana Marz
+            Toothache or a Long-Standing Problem?
           </h2>
           <p className="mx-auto mt-3 max-w-lg text-white/70">
-            Aaj hi waqt le lein. Numaish, Nizami Road par roz subah 10 se shaam 5 baje tak.
+            Book your time today. Open daily at Numaish, Nizami Road — 10:00 AM to 5:00 PM.
           </p>
           <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
-            <WhatsAppButton label="WhatsApp Par Book Karein" />
+            <WhatsAppButton label="Book on WhatsApp" />
             <a
               href="tel:03422078639"
               className="rounded-full border border-white/30 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-white/10"
@@ -220,7 +220,7 @@ export default async function HomeSections() {
               href="/contact"
               className="rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-clinic-teal"
             >
-              Naqsha Dekhein
+              Find Us
             </Link>
           </div>
         </div>
