@@ -7,8 +7,19 @@ interface SearchParams {
   q?: string
 }
 
+async function getKnownDoctors() {
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('treating_doctors')
+    .select('name')
+    .eq('is_active', true)
+    .order('name')
+  return (data ?? []).map((d) => d.name)
+}
+
 async function getPatients(params: SearchParams) {
   const supabase = await createClient()
+
   let query = supabase
     .from('patients')
     .select('id, mr_number, full_name, phone, department, age, created_at')
@@ -34,7 +45,10 @@ export default async function PatientsPage({
   searchParams: Promise<SearchParams>
 }) {
   const params = await searchParams
-  const patients = await getPatients(params)
+  const [patients, knownDoctors] = await Promise.all([
+    getPatients(params),
+    getKnownDoctors(),
+  ])
 
   return (
     <div>
@@ -43,7 +57,7 @@ export default async function PatientsPage({
           <h1 className="font-display text-2xl font-semibold text-clinic-ink">Patients</h1>
           <p className="mt-1 text-sm text-clinic-ink/60">{patients.length} patient(s) found</p>
         </div>
-        <PatientsToolbar />
+        <PatientsToolbar knownDoctors={knownDoctors} />
       </div>
 
       <form className="mt-6 flex flex-wrap gap-3">

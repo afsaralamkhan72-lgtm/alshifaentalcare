@@ -11,6 +11,7 @@ interface FormState {
   age: string
   gender: string
   date_of_birth: string
+  primary_doctor: string
   address: string
 }
 
@@ -21,10 +22,15 @@ const INITIAL: FormState = {
   age: '',
   gender: '',
   date_of_birth: '',
+  primary_doctor: '',
   address: '',
 }
 
-export default function PatientsToolbar() {
+export default function PatientsToolbar({
+  knownDoctors = [],
+}: {
+  knownDoctors?: string[]
+}) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState<FormState>(INITIAL)
@@ -50,6 +56,7 @@ export default function PatientsToolbar() {
         age: form.age ? Number(form.age) : null,
         gender: form.gender || null,
         date_of_birth: form.date_of_birth || null,
+        primary_doctor: form.primary_doctor || null,
         address: form.address || null,
       })
       .select('id')
@@ -59,6 +66,10 @@ export default function PatientsToolbar() {
     if (insertError || !created) {
       setError('Could not save the patient. Please try again.')
       return
+    }
+
+    if (form.primary_doctor.trim()) {
+      await supabase.from('treating_doctors').insert({ name: form.primary_doctor.trim() })
     }
 
     setForm(INITIAL)
@@ -130,6 +141,22 @@ export default function PatientsToolbar() {
                   <option value="other">Other</option>
                 </select>
               </div>
+              <div>
+                <label className="text-xs text-clinic-ink/50">Treating Doctor</label>
+                <input
+                  list="toolbar-doctors"
+                  placeholder="Doctor apna naam likhein"
+                  value={form.primary_doctor}
+                  onChange={(e) => update('primary_doctor', e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm outline-none focus:border-clinic-teal"
+                />
+                <datalist id="toolbar-doctors">
+                  {knownDoctors.map((d) => (
+                    <option key={d} value={d} />
+                  ))}
+                </datalist>
+              </div>
+
               <div>
                 <label className="text-xs text-clinic-ink/50">Date of Birth (optional)</label>
                 <input

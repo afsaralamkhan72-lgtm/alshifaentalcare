@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import InvoiceActions from '@/components/admin/InvoiceActions'
 import ClinicLogo from '@/components/ClinicLogo'
 import InvoiceBuilder from '@/components/admin/InvoiceBuilder'
+import DeleteTransactionButton from '@/components/admin/DeleteTransactionButton'
 import { CLINIC } from '@/clinic.config'
 
 export default async function InvoicePage({ params }: { params: Promise<{ id: string }> }) {
@@ -12,7 +13,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
 
   const { data: patient } = await supabase
     .from('patients')
-    .select('id, mr_number, full_name, phone, department, age, address, portal_code')
+    .select('id, mr_number, full_name, phone, department, age, address, portal_code, primary_doctor')
     .eq('id', id)
     .single()
 
@@ -54,6 +55,9 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
       .maybeSingle()
     if (me && (me.role === 'doctor' || me.role === 'admin')) defaultDoctor = me.full_name
   }
+
+  // Patient ka apna doctor sabse pehle
+  if (patient.primary_doctor) defaultDoctor = patient.primary_doctor
   const transactions = txRes.data ?? []
   const clinic = (clinicRes.data?.value ?? {}) as Record<string, string>
 
@@ -205,6 +209,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                     <th className="px-2 py-1.5 text-right">Discount</th>
                     <th className="px-2 py-1.5">Method</th>
                     <th className="px-2 py-1.5 text-right">Paid</th>
+                    <th className="px-2 py-1.5 print:hidden"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -228,6 +233,13 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                       <td className="px-2 py-2 capitalize">{t.payment_method ?? '—'}</td>
                       <td className="px-2 py-2 text-right font-semibold text-clinic-ink">
                         Rs. {Number(t.amount).toLocaleString()}
+                      </td>
+                      <td className="px-2 py-2 text-right print:hidden">
+                        <DeleteTransactionButton
+                          id={t.id}
+                          label={t.treatment_name ?? t.description ?? 'Entry'}
+                          amount={Number(t.amount)}
+                        />
                       </td>
                     </tr>
                   ))}
