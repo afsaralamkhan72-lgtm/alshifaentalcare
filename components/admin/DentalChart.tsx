@@ -1,6 +1,7 @@
 'use client'
 
 import { localNumber, toothLabel, isWisdom } from '@/lib/teeth'
+import ToothShape from './ToothShape'
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -31,6 +32,21 @@ const CONDITIONS = [
   { value: 'extraction', label: 'Extraction', dot: 'bg-gray-500' },
   { value: 'other', label: 'Other', dot: 'bg-clinic-amber/60' },
 ] as const
+
+/** Daant ke andar bharne ka rang, har condition ke liye */
+const TOOTH_FILL: Record<string, string> = {
+  healthy: '#FFFFFF',
+  missing: '#E5E3DF',
+  caries: '#FCA5A5',
+  filling: '#93C5FD',
+  rct: '#C4B5FD',
+  crown: '#FCD34D',
+  bridge: '#5EEAD4',
+  implant: '#86EFAC',
+  scaling: '#A5F3FC',
+  extraction: '#D1D5DB',
+  other: '#FBCFA3',
+}
 
 const TOOTH_STYLES: Record<string, string> = {
   healthy: 'bg-white border-clinic-ink/15 text-clinic-ink/40',
@@ -103,25 +119,41 @@ export default function DentalChart({ patientId, initialRecords }: DentalChartPr
     }
   }
 
-  function renderRow(teeth: string[]) {
+  function renderRow(teeth: string[], upper = true) {
     return (
       <div className="flex gap-1">
         {teeth.map((tooth) => {
           const latest = getLatestForTooth(records, tooth)
           const cond = latest?.condition ?? 'healthy'
-          const style = TOOTH_STYLES[cond] ?? TOOTH_STYLES.healthy
           const active = selectedTooth === tooth
 
           return (
             <button
               key={tooth}
               onClick={() => openTooth(tooth)}
-              className={`flex h-12 w-9 flex-col items-center justify-center rounded-lg border text-[10px] font-semibold transition-transform hover:scale-105 sm:h-14 sm:w-11 sm:text-xs ${style} ${
-                active ? 'ring-2 ring-clinic-teal ring-offset-1' : ''
+              title={`${toothLabel(tooth)}${cond !== 'healthy' ? ` — ${cond}` : ''}`}
+              className={`flex shrink-0 flex-col items-center rounded-lg px-0.5 py-1 transition-transform hover:scale-105 ${
+                active ? 'bg-clinic-teal/15 ring-2 ring-clinic-teal' : ''
               }`}
             >
-                {localNumber(tooth)}
-              </button>
+              {upper && (
+                <span className="text-[11px] font-semibold text-clinic-ink/60">
+                  {localNumber(tooth)}
+                </span>
+              )}
+              <ToothShape
+                number={localNumber(tooth)}
+                upper={upper}
+                selected={active}
+                fill={cond === 'healthy' ? undefined : (TOOTH_FILL[cond] ?? undefined)}
+                size={26}
+              />
+              {!upper && (
+                <span className="text-[11px] font-semibold text-clinic-ink/60">
+                  {localNumber(tooth)}
+                </span>
+              )}
+            </button>
           )
         })}
       </div>
@@ -156,9 +188,9 @@ export default function DentalChart({ patientId, initialRecords }: DentalChartPr
           </div>
           <div className="h-px w-full bg-clinic-teal/10" />
           <div className="flex gap-3">
-            {renderRow(LOWER_RIGHT)}
+            {renderRow(LOWER_RIGHT, false)}
             <div className="w-px bg-clinic-teal/20" />
-            {renderRow(LOWER_LEFT)}
+            {renderRow(LOWER_LEFT, false)}
           </div>
         </div>
       </div>

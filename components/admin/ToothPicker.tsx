@@ -1,6 +1,7 @@
 'use client'
 
 import { localNumber, toothLabel, isWisdom } from '@/lib/teeth'
+import ToothShape from './ToothShape'
 
 /** FDI notation, arranged the way a dentist reads a chart (patient's view) */
 export const FDI_QUADRANTS = {
@@ -22,7 +23,7 @@ export default function ToothPicker({ selected, onChange }: Props) {
     )
   }
 
-  function Row({ teeth }: { teeth: string[] }) {
+  function Row({ teeth, upper }: { teeth: string[]; upper: boolean }) {
     return (
       <div className="flex gap-1">
         {teeth.map((t) => {
@@ -33,15 +34,29 @@ export default function ToothPicker({ selected, onChange }: Props) {
               type="button"
               onClick={() => toggle(t)}
               title={isWisdom(t) ? `${toothLabel(t)} (aqal daarh)` : toothLabel(t)}
-              className={`h-9 w-9 shrink-0 rounded-md text-sm font-semibold transition-colors ${
-                on
-                  ? 'bg-clinic-teal text-white'
-                  : isWisdom(t)
-                    ? 'bg-clinic-amber/15 text-clinic-ink/70 hover:bg-clinic-teal/20'
-                    : 'bg-clinic-mint text-clinic-ink/60 hover:bg-clinic-teal/20'
+              className={`flex shrink-0 flex-col items-center rounded-md px-0.5 py-1 transition-colors ${
+                on ? 'bg-clinic-teal/10' : 'hover:bg-clinic-mint'
               }`}
             >
-              {localNumber(t)}
+              {upper && (
+                <span
+                  className={`text-xs font-semibold ${
+                    on ? 'text-clinic-teal' : 'text-clinic-ink/50'
+                  }`}
+                >
+                  {localNumber(t)}
+                </span>
+              )}
+              <ToothShape number={localNumber(t)} upper={upper} selected={on} size={26} />
+              {!upper && (
+                <span
+                  className={`text-xs font-semibold ${
+                    on ? 'text-clinic-teal' : 'text-clinic-ink/50'
+                  }`}
+                >
+                  {localNumber(t)}
+                </span>
+              )}
             </button>
           )
         })}
@@ -59,18 +74,18 @@ export default function ToothPicker({ selected, onChange }: Props) {
           <span className="w-[19rem] text-center">Upper Left</span>
         </div>
         <div className="flex justify-center gap-3">
-          <Row teeth={FDI_QUADRANTS.upperRight} />
+          <Row teeth={FDI_QUADRANTS.upperRight} upper />
           <div className="w-px bg-clinic-teal/20" />
-          <Row teeth={FDI_QUADRANTS.upperLeft} />
+          <Row teeth={FDI_QUADRANTS.upperLeft} upper />
         </div>
 
         <div className="my-2 border-t border-dashed border-clinic-teal/20" />
 
         {/* Lower arch */}
         <div className="flex justify-center gap-3">
-          <Row teeth={FDI_QUADRANTS.lowerRight} />
+          <Row teeth={FDI_QUADRANTS.lowerRight} upper={false} />
           <div className="w-px bg-clinic-teal/20" />
-          <Row teeth={FDI_QUADRANTS.lowerLeft} />
+          <Row teeth={FDI_QUADRANTS.lowerLeft} upper={false} />
         </div>
         <div className="mt-1 flex justify-center gap-3 text-[10px] font-semibold uppercase tracking-wide text-clinic-ink/40">
           <span className="w-[19rem] text-center">Lower Right</span>

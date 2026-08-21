@@ -9,6 +9,8 @@ interface Props {
   mrNumber: string
   portalCode?: string | null
   previousBalance?: number
+  /** Jo treatments ke paise abhi baqi hain */
+  dues?: { name: string; due: number; dueDate: string | null }[]
   todayCharge?: number
   todayPaid?: number
   total: number
@@ -22,6 +24,7 @@ export default function InvoiceActions({
   mrNumber,
   portalCode,
   previousBalance = 0,
+  dues = [],
   todayCharge = 0,
   todayPaid = 0,
   total,
@@ -47,6 +50,18 @@ export default function InvoiceActions({
       `Aaj ka kaam   : Rs. ${todayCharge.toLocaleString()}`,
       `Aaj mile      : Rs. ${todayPaid.toLocaleString()}`,
       `Ab baqaya     : Rs. ${balance.toLocaleString()}`,
+      ...(dues.length > 0
+        ? [
+            '',
+            'Baqaya kis kaam ka:',
+            ...dues.map(
+              (d) =>
+                `· ${d.name}: Rs. ${d.due.toLocaleString()}${
+                  d.dueDate ? ` (${new Date(d.dueDate).toLocaleDateString('en-GB')} tak)` : ''
+                }`
+            ),
+          ]
+        : []),
       '',
       `(Kul charges Rs. ${total.toLocaleString()}, kul payment Rs. ${paid.toLocaleString()})`,
       ...(portalCode

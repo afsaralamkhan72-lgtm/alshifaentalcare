@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useState } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -45,10 +45,11 @@ function fmt(d: string | null) {
 
 export default function PatientsTable({
   patients,
-  knownDoctors,
+  balances = {},
 }: {
   patients: PatientRow[]
-  knownDoctors: string[]
+  knownDoctors?: string[]
+  balances?: Record<string, number>
 }) {
   const router = useRouter()
   const [openId, setOpenId] = useState<string | null>(null)
@@ -241,72 +242,93 @@ export default function PatientsTable({
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-clinic-teal/10 bg-white">
-      <table className="w-full text-sm">
-        <thead className="bg-clinic-mint text-left text-clinic-ink/70">
-          <tr>
-            <th className="px-4 py-3">MR#</th>
-            <th className="px-4 py-3">Name</th>
-            <th className="px-4 py-3">Phone</th>
-            <th className="px-4 py-3">Department</th>
-            <th className="px-4 py-3">Age</th>
-            <th className="px-4 py-3 text-right"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {patients.map((p) => {
-            const isOpen = openId === p.id
-            const s = summaries[p.id]
+    <div className="grid gap-3">
+      {patients.map((p) => {
+        const isOpen = openId === p.id
+        const s = summaries[p.id]
 
-            return (
-              <Fragment key={p.id}>
-                <tr
-                  onClick={() => toggle(p.id)}
-                  className={`cursor-pointer border-t border-clinic-teal/10 transition-colors hover:bg-clinic-mint/40 ${
-                    isOpen ? 'bg-clinic-mint/50' : ''
-                  }`}
-                >
-                  <td className="px-4 py-3 font-medium text-clinic-ink">{p.mr_number}</td>
-                  <td className="px-4 py-3 text-clinic-ink">{p.full_name}</td>
-                  <td className="px-4 py-3 text-clinic-ink/70">{p.phone}</td>
-                  <td className="px-4 py-3">
-                    <span className="rounded-full bg-clinic-teal/10 px-2 py-0.5 text-xs font-semibold capitalize text-clinic-teal">
-                      {p.department}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-clinic-ink/70">{p.age ?? '—'}</td>
-                  <td className="px-4 py-3 text-right text-clinic-teal">
-                    {isOpen ? '▲' : '▼'}
-                  </td>
-                </tr>
+        return (
+          <div
+            key={p.id}
+            className={`rounded-2xl border bg-white transition-colors ${
+              isOpen ? 'border-clinic-teal' : 'border-clinic-teal/15'
+            }`}
+          >
+            {/* Patient ka sara data aik hi line mein */}
+            <div className="grid gap-3 p-4 sm:grid-cols-[auto_1fr_auto] sm:items-center">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-clinic-mint font-display text-sm font-semibold text-clinic-teal">
+                {p.full_name.slice(0, 2).toUpperCase()}
+              </div>
 
-                {isOpen && (
-                  <tr className="border-t border-clinic-teal/10">
-                    <td colSpan={6} className="bg-clinic-sand/60 px-4 py-5">
-                      {loading === p.id || !s ? (
-                        <p className="text-sm text-clinic-ink/60">Record khul raha hai...</p>
-                      ) : (
-                        <PatientPanel
-                          patient={p}
-                          summary={s}
-                          amount={amount}
-                          setAmount={setAmount}
-                          method={method}
-                          setMethod={setMethod}
-                          target={target}
-                          setTarget={setTarget}
-                          saving={saving}
-                          onPay={() => addPayment(p)}
-                        />
-                      )}
-                    </td>
-                  </tr>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                  <p className="font-display text-base font-semibold text-clinic-ink">
+                    {p.full_name}
+                  </p>
+                  <span className="rounded-full bg-clinic-teal/10 px-2 py-0.5 text-xs font-semibold capitalize text-clinic-teal">
+                    {p.department}
+                  </span>
+                  <span className="text-xs text-clinic-ink/50">{p.mr_number}</span>
+                </div>
+
+                <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-clinic-ink/70">
+                  <span>{p.phone}</span>
+                  {p.age != null && <span>{p.age} saal</span>}
+                  {p.primary_doctor && <span>Dr: {p.primary_doctor}</span>}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                {balances[p.id] > 0 && (
+                  <div className="rounded-xl bg-amber-50 px-3 py-2 text-right">
+                    <p className="text-[11px] font-medium text-amber-700/80">Baqaya</p>
+                    <p className="font-display font-semibold text-amber-700">
+                      Rs. {balances[p.id].toLocaleString()}
+                    </p>
+                  </div>
                 )}
-              </Fragment>
-            )
-          })}
-        </tbody>
-      </table>
+              <button
+                onClick={() => toggle(p.id)}
+                className={`rounded-full px-5 py-2 text-sm font-semibold transition-colors ${
+                  isOpen
+                    ? 'bg-clinic-ink text-white'
+                    : 'bg-clinic-teal text-white hover:bg-clinic-teal-light'
+                }`}
+              >
+                {isOpen ? 'Band Karein' : 'Open'}
+              </button>
+              </div>
+            </div>
+
+            {isOpen && (
+              <div className="border-t border-clinic-teal/10 bg-clinic-sand/60 p-4">
+                {loading === p.id || !s ? (
+                  <p className="text-sm text-clinic-ink/60">Record khul raha hai...</p>
+                ) : (
+                  <PatientPanel
+                    patient={p}
+                    summary={s}
+                    amount={amount}
+                    setAmount={setAmount}
+                    method={method}
+                    setMethod={setMethod}
+                    target={target}
+                    setTarget={setTarget}
+                    saving={saving}
+                    onPay={() => addPayment(p)}
+                  />
+                )}
+              </div>
+            )}
+          </div>
+        )
+      })}
+
+      {patients.length === 0 && (
+        <div className="rounded-2xl border border-dashed border-clinic-teal/20 bg-clinic-mint/40 p-8 text-center text-sm text-clinic-ink/60">
+          Koi patient nahi mila.
+        </div>
+      )}
     </div>
   )
 }

@@ -72,7 +72,7 @@ export default function PatientsToolbar({
     }
 
     setForm(INITIAL)
-    // Registration ke baad doctor khud faisla kare ke aage kya karna hai
+    setOpen(false)
     setCreated({ id: created.id, name: form.full_name })
     router.refresh()
   }
@@ -87,48 +87,41 @@ export default function PatientsToolbar({
       </button>
 
       {created && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center">
-            <p className="font-display text-lg font-semibold text-clinic-teal">
+        <div className="fixed inset-x-4 bottom-6 z-50 mx-auto max-w-md rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-lg sm:inset-x-auto sm:right-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="font-medium text-emerald-900">
               {created.name} register ho gaya
             </p>
-            <p className="mt-1 text-sm text-clinic-ink/60">Ab kya karna hai?</p>
+            <button
+              onClick={() => setCreated(null)}
+              className="text-emerald-800/50 hover:text-emerald-900"
+            >
+              ✕
+            </button>
+          </div>
 
-            <div className="mt-5 grid gap-2">
-              <Link
-                href={`/admin/patients/${created.id}/invoice`}
-                className="rounded-full bg-clinic-teal px-5 py-2.5 text-sm font-semibold text-white"
-              >
-                Payment / Bill
-              </Link>
-              <Link
-                href={`/admin/patients/${created.id}`}
-                className="rounded-full border border-clinic-teal px-5 py-2.5 text-sm font-semibold text-clinic-teal"
-              >
-                Patient ka Profile
-              </Link>
-              <Link
-                href={`/admin/patients/${created.id}/history`}
-                className="rounded-full border border-clinic-teal/30 px-5 py-2.5 text-sm font-semibold text-clinic-ink/70"
-              >
-                Detail History Bharein
-              </Link>
-              <button
-                onClick={() => {
-                  setCreated(null)
-                  setOpen(true)
-                }}
-                className="mt-1 text-sm text-clinic-ink/60 hover:underline"
-              >
-                Agla patient register karein
-              </button>
-              <button
-                onClick={() => setCreated(null)}
-                className="text-sm text-clinic-ink/50 hover:underline"
-              >
-                Bas, band karein
-              </button>
-            </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link
+              href={`/admin/patients/${created.id}/invoice`}
+              className="rounded-full bg-clinic-teal px-4 py-2 text-sm font-semibold text-white"
+            >
+              Bill Banayein
+            </Link>
+            <Link
+              href={`/admin/patients/${created.id}`}
+              className="rounded-full border border-clinic-teal px-4 py-2 text-sm font-semibold text-clinic-teal"
+            >
+              Profile
+            </Link>
+            <button
+              onClick={() => {
+                setCreated(null)
+                setOpen(true)
+              }}
+              className="rounded-full px-4 py-2 text-sm font-medium text-emerald-800/70 hover:underline"
+            >
+              Agla patient
+            </button>
           </div>
         </div>
       )}
@@ -144,28 +137,47 @@ export default function PatientsToolbar({
             </div>
 
             <form onSubmit={handleSubmit} className="mt-4 grid gap-3">
-              <input
-                required
-                placeholder="Full Name"
-                value={form.full_name}
-                onChange={(e) => update('full_name', e.target.value)}
-                className="rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm outline-none focus:border-clinic-teal"
-              />
-              <input
-                required
-                placeholder="Phone Number"
-                value={form.phone}
-                onChange={(e) => update('phone', e.target.value)}
-                className="rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm outline-none focus:border-clinic-teal"
-              />
-              <select
-                value={form.department}
-                onChange={(e) => update('department', e.target.value as FormState['department'])}
-                className="rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm outline-none focus:border-clinic-teal"
-              >
-                <option value="dental">Dental</option>
-                <option value="homeopathic">Homeopathic</option>
-              </select>
+              <div>
+                <label className="text-sm font-medium text-clinic-ink">Naam *</label>
+                <input
+                  required
+                  autoFocus
+                  placeholder="Patient ka poora naam"
+                  value={form.full_name}
+                  onChange={(e) => update('full_name', e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm outline-none focus:border-clinic-teal"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-clinic-ink">Phone *</label>
+                <input
+                  required
+                  placeholder="03XX-XXXXXXX"
+                  value={form.phone}
+                  onChange={(e) => update('phone', e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm outline-none focus:border-clinic-teal"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-clinic-ink">Department</label>
+                <div className="mt-1 flex gap-2">
+                  {(['dental', 'homeopathic'] as const).map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => update('department', d)}
+                      className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium capitalize transition-colors ${
+                        form.department === d
+                          ? 'bg-clinic-teal text-white'
+                          : 'bg-clinic-mint text-clinic-ink/70'
+                      }`}
+                    >
+                      {d}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <input
                   type="number"

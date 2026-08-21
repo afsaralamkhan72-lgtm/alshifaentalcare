@@ -26,7 +26,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
       .eq('patient_id', id),
     supabase
       .from('transactions')
-      .select('id, amount, category, payment_method, description, transaction_date, treatment_name, rate, discount_amount, treating_doctor')
+      .select('id, amount, category, payment_method, description, transaction_date, treatment_name, rate, discount_amount, treating_doctor, balance_due, due_date, settled_at')
       .eq('patient_id', id)
       .eq('type', 'income')
       .order('transaction_date', { ascending: false }),
@@ -123,10 +123,17 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
 
   for (const t of transactions) {
     const charge = t.rate != null ? Number(t.rate) - Number(t.discount_amount ?? 0) : 0
+    const rawLabel = t.treatment_name ?? t.description ?? 'Payment'
+    // "Dental Implants (baqaya)" jaise naam patient ko uljhate hain
+    const cleanLabel =
+      charge > 0
+        ? rawLabel.replace(/\s*\((baqaya|advance)\)\s*/i, '')
+        : `Payment${rawLabel.match(/month \d+/i) ? ` (${rawLabel.match(/month \d+/i)![0]})` : ''}`
+
     ledger.push({
       id: t.id,
       date: t.transaction_date,
-      label: t.treatment_name ?? t.description ?? 'Payment',
+      label: cleanLabel,
       doctor: (t.treating_doctor as string | null) ?? null,
       charge,
       payment: Number(t.amount),
@@ -134,7 +141,13 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
     })
   }
 
-  ledger.sort((a, b) => a.date.localeCompare(b.date))
+  ledger.sort((a, b) => {
+    if (a.date !== b.date) return a.date.localeCompare(b.date)
+    // Aik hi din: pehle kaam (charge), phir payment
+    const aIsCharge = a.charge > 0 ? 0 : 1
+    const bIsCharge = b.charge > 0 ? 0 : 1
+    return aIsCharge - bIsCharge
+  })
 
   let runningBalance = 0
   const ledgerRows = ledger.map((row) => {
@@ -155,6 +168,25 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   const previousBalance = ledgerRows
     .filter((r) => r.date < todayStr)
     .reduce((sum, r) => sum + r.charge - r.payment, 0)
+
+  // Jo treatments ke paise abhi baqi hain (ortho ke ilawa bhi)
+  const openDues = transactions
+    .filter((t) => Number(t.balance_due ?? 0) > 0 && !t.settled_at)
+    .map((t) => ({
+      id: t.id,
+      name: (t.treatment_name ?? t.description ?? 'Treatment') as string,
+      date: t.transaction_date as string,
+      rate: Number(t.rate ?? 0),
+      discount: Number(t.discount_amount ?? 0),
+      paid: Number(t.amount),
+      due: Number(t.balance_due),
+      dueDate: (t.due_date ?? null) as string | null,
+    }))
+    .sort((a, b) => (a.dueDate ?? '9999').localeCompare(b.dueDate ?? '9999'))
+
+  const overdueTotal = openDues
+    .filter((d) => d.dueDate && d.dueDate < new Date().toISOString().slice(0, 10))
+    .reduce((sum, d) => sum + d.due, 0)
 
   const grandTotal = planCharges + walkInCharges
   const grandPaid = transactions.reduce((s, t) => s + Number(t.amount), 0)
@@ -187,6 +219,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         mrNumber={patient.mr_number ?? ''}
         portalCode={patient.portal_code ?? null}
         previousBalance={previousBalance}
+        dues={openDues.map((d) => ({ name: d.name, due: d.due, dueDate: d.dueDate }))}
         todayCharge={todayCharge}
         todayPaid={todayPaid}
         total={grandTotal}
@@ -273,6 +306,73 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           </div>
         </div>
 
+        {openDues.length > 0 && (
+          <>
+            <div className="mt-6 flex flex-wrap items-baseline justify-between gap-2">
+              <p className="text-sm font-semibold text-clinic-ink">Baqaya Tafseel</p>
+              {overdueTotal > 0 && (
+                <p className="text-xs font-semibold text-red-700">
+                  Rs. {overdueTotal.toLocaleString()} ki tareekh guzar chuki
+                </p>
+              )}
+            </div>
+
+            <div className="mt-2 overflow-x-auto">
+              <table className="w-full min-w-[520px] text-sm">
+                <thead className="bg-clinic-mint text-left text-xs font-semibold text-clinic-ink/80">
+                  <tr>
+                    <th className="px-2 py-1.5">Treatment</th>
+                    <th className="px-2 py-1.5">Kab Hua</th>
+                    <th className="px-2 py-1.5 text-right">Qeemat</th>
+                    <th className="px-2 py-1.5 text-right">Diya</th>
+                    <th className="px-2 py-1.5 text-right">Baqaya</th>
+                    <th className="px-2 py-1.5">Kab Tak</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {openDues.map((d) => {
+                    const isOverdue =
+                      d.dueDate && d.dueDate < new Date().toISOString().slice(0, 10)
+                    return (
+                      <tr key={d.id} className="border-t border-clinic-teal/10">
+                        <td className="px-2 py-2 text-clinic-ink">{d.name}</td>
+                        <td className="px-2 py-2 whitespace-nowrap text-clinic-ink/70">
+                          {new Date(d.date).toLocaleDateString('en-GB')}
+                        </td>
+                        <td className="px-2 py-2 text-right text-clinic-ink/70">
+                          Rs. {(d.rate - d.discount).toLocaleString()}
+                        </td>
+                        <td className="px-2 py-2 text-right text-emerald-700">
+                          Rs. {d.paid.toLocaleString()}
+                        </td>
+                        <td className="px-2 py-2 text-right font-semibold text-clinic-ink">
+                          Rs. {d.due.toLocaleString()}
+                        </td>
+                        <td className="px-2 py-2 whitespace-nowrap">
+                          {d.dueDate ? (
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                                isOverdue
+                                  ? 'bg-red-50 text-red-700'
+                                  : 'bg-clinic-mint text-clinic-ink/70'
+                              }`}
+                            >
+                              {new Date(d.dueDate).toLocaleDateString('en-GB')}
+                              {isOverdue && ' · guzar gayi'}
+                            </span>
+                          ) : (
+                            <span className="text-clinic-ink/40">date set nahi</span>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+
         {ledgerRows.length > 0 && (
           <>
             <p className="mt-6 text-sm font-semibold text-clinic-ink">Poora Hisaab Kitab</p>
@@ -338,6 +438,19 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           const paidCount = rows.filter((r) => Number(r.paid_amount) > 0).length
           const today = new Date().toISOString().slice(0, 10)
 
+          // Ab tak kitna aana chahiye tha vs kitna aaya
+          const dueSoFar =
+            rows
+              .filter((r) => r.due_date <= today)
+              .reduce((sum, r) => sum + Number(r.amount), 0) + Number(plan.advance_paid)
+          const gotSoFar =
+            rows.reduce((sum, r) => sum + Number(r.paid_amount), 0) + Number(plan.advance_paid)
+          const arrearsNow = Math.max(0, dueSoFar - gotSoFar)
+          const planBalance = Math.max(0, Number(plan.total_cost) - gotSoFar)
+          const missedMonths = rows.filter(
+            (r) => r.due_date <= today && Number(r.paid_amount) === 0
+          ).length
+
           return (
             <div key={plan.id} className="mt-6">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -345,30 +458,32 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                   {plan.title} — Instalment Schedule
                 </p>
                 <p className="text-xs font-medium text-clinic-ink/70">
-                  Total Rs. {Number(plan.total_cost).toLocaleString()} · Diya Rs.{' '}
-                  {(
-                    Number(plan.advance_paid) +
-                    rows.reduce((sum, r) => sum + Number(r.paid_amount), 0)
-                  ).toLocaleString()}{' '}
-                  · Baqaya Rs.{' '}
-                  {Math.max(
-                    0,
-                    Number(plan.total_cost) -
-                      Number(plan.advance_paid) -
-                      rows.reduce((sum, r) => sum + Number(r.paid_amount), 0)
-                  ).toLocaleString()}{' '}
-                  · {paidCount} / {rows.length} months
+                  {paidCount} / {rows.length} months
                 </p>
               </div>
 
-              <div className="mt-2 overflow-x-auto">
-                <table className="w-full min-w-[480px] text-sm">
+              <div className="mt-3 overflow-hidden rounded-xl border border-clinic-teal/20">
+                <div className="grid grid-cols-2 sm:grid-cols-4">
+                  <PlanFigure label="Plan Total" value={Number(plan.total_cost)} />
+                  <PlanFigure label="Ab Tak Diya" value={gotSoFar} tone="green" />
+                  <PlanFigure
+                    label={missedMonths > 0 ? `Arrears (${missedMonths} month)` : 'Arrears'}
+                    value={arrearsNow}
+                    tone={arrearsNow > 0 ? 'red' : 'green'}
+                  />
+                  <PlanFigure label="Kul Baqaya" value={planBalance} tone="teal" />
+                </div>
+              </div>
+
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full min-w-[560px] text-sm">
                   <thead className="bg-clinic-mint text-left text-xs font-semibold text-clinic-ink/80">
                     <tr>
                       <th className="px-2 py-1.5">#</th>
                       <th className="px-2 py-1.5">Month</th>
                       <th className="px-2 py-1.5 text-right">Expected</th>
                       <th className="px-2 py-1.5 text-right">Diya</th>
+                      <th className="px-2 py-1.5 text-right">Arrears</th>
                       <th className="px-2 py-1.5 text-right">Balance</th>
                       <th className="px-2 py-1.5">Status</th>
                       <th className="px-2 py-1.5">Paid On</th>
@@ -376,11 +491,27 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                   </thead>
                   <tbody>
                     {(() => {
+                      let expectedSoFar = 0
+                      let paidSoFar = Number(plan.advance_paid)
                       let running = Number(plan.total_cost) - Number(plan.advance_paid)
-                      return rows.map((r) => {
+
+                      // Sirf wo mahine dikhayein jo guzar chuke, aur agla aik
+                      const firstUnpaidIdx = rows.findIndex((r) => Number(r.paid_amount) === 0)
+                      const lastElapsed = rows.filter((r) => r.due_date <= today).length
+                      const showUpto = Math.max(
+                        lastElapsed + 1,
+                        firstUnpaidIdx >= 0 ? firstUnpaidIdx + 1 : 1
+                      )
+
+                      return rows.slice(0, showUpto).map((r) => {
                       const isPaid = Number(r.paid_amount) > 0
                       const overdue = !isPaid && r.due_date < today
+
+                      if (r.due_date <= today) expectedSoFar += Number(r.amount)
+                      paidSoFar += Number(r.paid_amount)
                       if (isPaid) running = Math.max(0, running - Number(r.paid_amount))
+
+                      const arrears = Math.max(0, expectedSoFar + Number(plan.advance_paid) - paidSoFar)
                       const bal = running
                       return (
                         <tr key={r.installment_no} className="border-t border-clinic-teal/10">
@@ -396,6 +527,13 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                           </td>
                           <td className="px-2 py-2 text-right font-semibold text-clinic-ink">
                             {isPaid ? `Rs. ${Number(r.paid_amount).toLocaleString()}` : '—'}
+                          </td>
+                          <td
+                            className={`px-2 py-2 text-right font-semibold ${
+                              arrears > 0 ? 'text-red-700' : 'text-emerald-700'
+                            }`}
+                          >
+                            {arrears > 0 ? `Rs. ${arrears.toLocaleString()}` : 'Clear'}
                           </td>
                           <td className="px-2 py-2 text-right text-clinic-ink/70">
                             Rs. {bal.toLocaleString()}
@@ -485,6 +623,34 @@ function Figure({
         {label}
       </p>
       <p className="mt-1 font-display text-lg font-semibold">Rs. {value.toLocaleString()}</p>
+    </div>
+  )
+}
+
+function PlanFigure({
+  label,
+  value,
+  tone = 'plain',
+}: {
+  label: string
+  value: number
+  tone?: 'plain' | 'green' | 'red' | 'teal'
+}) {
+  const box =
+    tone === 'teal'
+      ? 'bg-clinic-teal text-white'
+      : tone === 'green'
+        ? 'bg-emerald-50 text-emerald-800'
+        : tone === 'red'
+          ? 'bg-red-50 text-red-700'
+          : 'bg-white text-clinic-ink'
+
+  return (
+    <div className={`border-r border-clinic-teal/15 p-3 text-center last:border-r-0 ${box}`}>
+      <p className={`text-[11px] font-medium ${tone === 'teal' ? 'text-white/80' : 'opacity-70'}`}>
+        {label}
+      </p>
+      <p className="mt-0.5 font-display font-semibold">Rs. {value.toLocaleString()}</p>
     </div>
   )
 }

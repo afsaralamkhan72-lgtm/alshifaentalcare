@@ -31,6 +31,7 @@ export interface Plan {
 interface Props {
   plan: Plan
   installments: Installment[]
+  patientId: string
   patientName: string
   patientPhone: string
   portalCode?: string | null
@@ -39,6 +40,7 @@ interface Props {
 export default function TreatmentPlanCard({
   plan,
   installments,
+  patientId,
   patientName,
   patientPhone,
   portalCode,
@@ -47,6 +49,7 @@ export default function TreatmentPlanCard({
   const [busyId, setBusyId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [entered, setEntered] = useState('')
+  const [visitNote, setVisitNote] = useState('')
   const [justPaid, setJustPaid] = useState<{
     month: string
     paid: number
@@ -61,9 +64,16 @@ export default function TreatmentPlanCard({
 
   const today = new Date().toISOString().slice(0, 10)
   const overdue = installments.filter((i) => Number(i.paid_amount) === 0 && i.due_date < today)
+
+  // Ab tak jitna aana chahiye tha, us ke muqable kitna aaya
+  const dueSoFar =
+    installments
+      .filter((i) => i.due_date <= today)
+      .reduce((sum, i) => sum + Number(i.amount), 0) + Number(plan.advance_paid)
+  const arrearsNow = Math.max(0, dueSoFar - paidTotal)
   const nextDue = installments.find((i) => Number(i.paid_amount) === 0)
 
-  async function markPaid(inst: Installment, customAmount?: number) {
+  async function markPaid(inst: Installment, customAmount?: number, note?: string) {
     const got = customAmount ?? Number(inst.amount)
     if (got <= 0) return
     setBusyId(inst.id)
@@ -95,6 +105,20 @@ export default function TreatmentPlanCard({
       recorded_by: user?.id ?? null,
     })
 
+    // Us din ka visit bhi record ho jaye, alag se likhna na pade
+    if (note && note.trim()) {
+      const next = new Date(today)
+      next.setMonth(next.getMonth() + 1)
+      await supabase.from('visit_notes').insert({
+        patient_id: patientId,
+        plan_id: plan.id,
+        visit_date: today,
+        procedure: note.trim(),
+        next_visit: next.toISOString().slice(0, 10),
+        doctor_id: user?.id ?? null,
+      })
+    }
+
     setJustPaid({
       month: new Date(inst.due_date).toLocaleDateString('en-GB', {
         month: 'long',
@@ -107,6 +131,7 @@ export default function TreatmentPlanCard({
     setBusyId(null)
     setEditingId(null)
     setEntered('')
+    setVisitNote('')
     router.refresh()
   }
 
@@ -196,7 +221,7 @@ export default function TreatmentPlanCard({
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-5">
         <div className="rounded-xl bg-clinic-mint p-3">
           <p className="text-xs text-clinic-ink/50">Total</p>
           <p className="font-display font-semibold text-clinic-ink">
@@ -209,8 +234,20 @@ export default function TreatmentPlanCard({
             Rs. {paidTotal.toLocaleString()}
           </p>
         </div>
+        <div className={`rounded-xl p-3 ${arrearsNow > 0 ? 'bg-red-50' : 'bg-emerald-50'}`}>
+          <p className={`text-xs ${arrearsNow > 0 ? 'text-red-700/80' : 'text-emerald-700/80'}`}>
+            Arrears {overdue.length > 0 ? `(${overdue.length} month)` : ''}
+          </p>
+          <p
+            className={`font-display font-semibold ${
+              arrearsNow > 0 ? 'text-red-700' : 'text-emerald-700'
+            }`}
+          >
+            {arrearsNow > 0 ? `Rs. ${arrearsNow.toLocaleString()}` : 'Clear'}
+          </p>
+        </div>
         <div className="rounded-xl bg-amber-50 p-3">
-          <p className="text-xs text-amber-700/70">Remaining</p>
+          <p className="text-xs text-amber-700/70">Kul Baqaya</p>
           <p className="font-display font-semibold text-amber-700">
             Rs. {remaining.toLocaleString()}
           </p>
@@ -365,8 +402,14 @@ export default function TreatmentPlanCard({
                           placeholder="Kitne mile"
                           className="w-24 rounded border border-clinic-teal/30 px-2 py-1 text-xs"
                         />
+                        <input
+                          value={visitNote}
+                          onChange={(e) => setVisitNote(e.target.value)}
+                          placeholder="Aaj kya kaam hua (optional)"
+                          className="w-44 rounded border border-clinic-teal/30 px-2 py-1 text-xs"
+                        />
                         <button
-                          onClick={() => markPaid(inst, Number(entered || 0))}
+                          onClick={() => markPaid(inst, Number(entered || 0), visitNote)}
                           disabled={busyId === inst.id}
                           className="rounded-full bg-clinic-teal px-2.5 py-1 text-xs font-semibold text-white disabled:opacity-40"
                         >
