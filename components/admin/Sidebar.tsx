@@ -24,6 +24,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/admin/dental-chart', label: 'Dental Chart', ready: true, roles: ['admin', 'doctor'] },
   { href: '/admin/lab', label: 'Lab Cases', ready: true, roles: ['admin', 'doctor'] },
   { href: '/admin/billing', label: 'Billing & Accounts', ready: true, roles: ['admin', 'receptionist'] },
+  { href: '/admin/dues', label: 'Baqaya Payments', ready: true, roles: ['admin', 'receptionist', 'doctor'] },
   { href: '/admin/reports', label: 'Reports', ready: true, roles: ['admin'] },
   { href: '/admin/prescriptions', label: 'Prescriptions', ready: true, roles: ['admin', 'doctor'] },
   { href: '/admin/inventory', label: 'Inventory', ready: true, roles: ['admin', 'receptionist'] },

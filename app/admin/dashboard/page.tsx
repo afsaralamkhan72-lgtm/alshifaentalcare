@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import StatCard from '@/components/admin/StatCard'
 import { toInternationalPKNumber } from '@/lib/whatsapp'
@@ -25,6 +26,22 @@ async function getDashboardStats() {
       .limit(5),
   ])
 
+  // Baqaya payments jo aaj ya us se pehle due hain
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const { data: dueRows } = await supabase
+    .from('transactions')
+    .select('balance_due, due_date, patients(full_name)')
+    .gt('balance_due', 0)
+    .is('settled_at', null)
+    .lte('due_date', todayStr)
+    .order('due_date', { ascending: true })
+
+  const dues = (dueRows ?? []) as unknown as {
+    balance_due: number
+    patients: { full_name: string } | null
+  }[]
+  const dueAmount = dues.reduce((sum, d) => sum + Number(d.balance_due), 0)
+
   const income = incomeRes.data?.reduce((sum, t) => sum + Number(t.amount), 0) ?? 0
   const expense = expenseRes.data?.reduce((sum, t) => sum + Number(t.amount), 0) ?? 0
 
@@ -35,11 +52,15 @@ async function getDashboardStats() {
     income,
     expense,
     pendingAppointments: pendingRes.data ?? [],
+    dues,
+    dueAmount,
   }
 }
 
 export default async function DashboardPage() {
   const stats = await getDashboardStats()
+
+  const { dues, dueAmount } = stats
 
   return (
     <div>

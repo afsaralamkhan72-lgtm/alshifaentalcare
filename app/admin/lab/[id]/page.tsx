@@ -77,7 +77,7 @@ export default async function LabOrderPage({ params }: { params: Promise<{ id: s
       {/* Printed sheet */}
       <div
         id="lab-sheet"
-        className="mx-auto max-w-2xl rounded-2xl border border-clinic-teal/10 bg-white p-8"
+        className="mx-auto max-w-2xl rounded-2xl border border-clinic-teal/10 bg-white p-4 sm:p-8"
       >
         <div className="flex items-start justify-between border-b border-clinic-teal/20 pb-4">
           <div className="flex items-start gap-4">

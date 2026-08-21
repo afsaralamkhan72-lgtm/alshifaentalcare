@@ -1,10 +1,16 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { CLINIC } from '@/clinic.config'
 
 export const metadata: Metadata = {
   title: `${CLINIC.name} | ${CLINIC.doctor.name}`,
   description: `${CLINIC.tagline}, ${CLINIC.address.full}`,
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  themeColor: '#0B4F4A',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

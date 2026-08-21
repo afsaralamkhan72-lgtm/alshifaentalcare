@@ -25,7 +25,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
       .eq('patient_id', id),
     supabase
       .from('transactions')
-      .select('amount, category, payment_method, description, transaction_date')
+      .select('id, amount, category, payment_method, description, transaction_date, treatment_name, rate, discount_amount, treating_doctor')
       .eq('patient_id', id)
       .eq('type', 'income')
       .order('transaction_date', { ascending: false }),
@@ -40,6 +40,9 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   ])
 
   const knownDoctors = (savedDoctors ?? []).map((d) => d.name)
+
+  const { data: serviceRows } = await supabase.from('services').select('title').order('title')
+  const knownTreatments = (serviceRows ?? []).map((r) => r.title)
 
   // Agar login kiya hua staff khud doctor hai to uska naam pehle se bhar dein
   let defaultDoctor: string | null = null
@@ -56,11 +59,20 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
 
   // Installments across all this patient's plans
   const planIds = plans.map((p) => p.id)
-  let installments: { plan_id: string; paid_amount: number }[] = []
+  let installments: {
+    plan_id: string
+    installment_no: number
+    due_date: string
+    amount: number
+    paid_amount: number
+    paid_date: string | null
+    payment_method: string | null
+  }[] = []
   if (planIds.length > 0) {
     const { data } = await supabase
       .from('installments')
-      .select('plan_id, paid_amount')
+      .select('plan_id, installment_no, due_date, amount, paid_amount, paid_date, payment_method')
+      .order('installment_no', { ascending: true })
       .in('plan_id', planIds)
     installments = data ?? []
   }
@@ -72,6 +84,11 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   const walkInPaid = transactions
     .filter((t) => t.category !== 'treatment-installment')
     .reduce((s, t) => s + Number(t.amount), 0)
+
+  const totalDiscount = transactions.reduce(
+    (sum, t) => sum + Number(t.discount_amount ?? 0),
+    0
+  )
 
   const grandTotal = planTotal + walkInPaid
   const grandPaid = planPaid + walkInPaid
@@ -90,9 +107,8 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
 
       <InvoiceBuilder
         patientId={patient.id}
-        total={grandTotal}
-        paid={grandPaid}
         knownDoctors={knownDoctors}
+        knownTreatments={knownTreatments}
         defaultDoctor={defaultDoctor}
       />
 
@@ -111,7 +127,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         id="invoice-sheet"
         className="mx-auto max-w-2xl overflow-hidden rounded-2xl border border-clinic-teal/20 bg-white"
       >
-        <div className="flex items-start gap-4 bg-clinic-teal px-8 py-6 text-white">
+        <div className="flex flex-wrap items-start gap-3 bg-clinic-teal px-4 py-5 text-white sm:gap-4 sm:px-8 sm:py-6">
           <div className="rounded-lg bg-white p-1.5">
             <ClinicLogo logoUrl={clinic.logo_url} size={48} />
           </div>
@@ -128,7 +144,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           </div>
         </div>
 
-        <div className="px-8 py-6">
+        <div className="px-4 py-5 sm:px-8 sm:py-6">
 
         <p className="mt-6 font-display text-lg font-semibold text-clinic-ink">Payment Statement</p>
 
@@ -154,7 +170,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         {plans.length > 0 && (
           <>
             <p className="mt-6 text-sm font-semibold text-clinic-ink">Treatment Plans</p>
-            <table className="mt-2 w-full text-sm">
+            <div className="mt-2 overflow-x-auto"><table className="w-full min-w-[420px] text-sm">
               <thead className="bg-clinic-mint text-left text-xs font-semibold text-clinic-ink/80">
                 <tr>
                   <th className="px-2 py-1.5">Treatment</th>
@@ -171,43 +187,146 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           </>
         )}
 
         {transactions.length > 0 && (
           <>
-            <p className="mt-6 text-sm font-semibold text-clinic-ink">Payments Received</p>
-            <table className="mt-2 w-full text-sm">
-              <thead className="bg-clinic-mint text-left text-xs font-semibold text-clinic-ink/80">
-                <tr>
-                  <th className="px-2 py-1.5">Date</th>
-                  <th className="px-2 py-1.5">Description</th>
-                  <th className="px-2 py-1.5">Method</th>
-                  <th className="px-2 py-1.5 text-right">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {transactions.map((t, i) => (
-                  <tr key={i} className="border-t border-clinic-teal/10">
-                    <td className="px-2 py-2">
-                      {new Date(t.transaction_date).toLocaleDateString('en-GB')}
-                    </td>
-                    <td className="px-2 py-2 text-clinic-ink">{t.description ?? t.category ?? '—'}</td>
-                    <td className="px-2 py-2 capitalize">{t.payment_method ?? '—'}</td>
-                    <td className="px-2 py-2 text-right">Rs. {Number(t.amount).toLocaleString()}</td>
+            <p className="mt-6 text-sm font-semibold text-clinic-ink">Treatments &amp; Payments</p>
+            <div className="mt-2 overflow-x-auto">
+              <table className="w-full min-w-[560px] text-sm">
+                <thead className="bg-clinic-mint text-left text-xs font-semibold text-clinic-ink/80">
+                  <tr>
+                    <th className="px-2 py-1.5">Date</th>
+                    <th className="px-2 py-1.5">Treatment</th>
+                    <th className="px-2 py-1.5">Doctor</th>
+                    <th className="px-2 py-1.5 text-right">Rate</th>
+                    <th className="px-2 py-1.5 text-right">Discount</th>
+                    <th className="px-2 py-1.5">Method</th>
+                    <th className="px-2 py-1.5 text-right">Paid</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {transactions.map((t) => (
+                    <tr key={t.id} className="border-t border-clinic-teal/10">
+                      <td className="px-2 py-2 whitespace-nowrap">
+                        {new Date(t.transaction_date).toLocaleDateString('en-GB')}
+                      </td>
+                      <td className="px-2 py-2 text-clinic-ink">
+                        {t.treatment_name ?? t.description ?? t.category ?? '—'}
+                      </td>
+                      <td className="px-2 py-2 text-clinic-ink">{t.treating_doctor ?? '—'}</td>
+                      <td className="px-2 py-2 text-right">
+                        {t.rate ? `Rs. ${Number(t.rate).toLocaleString()}` : '—'}
+                      </td>
+                      <td className="px-2 py-2 text-right text-clinic-teal">
+                        {Number(t.discount_amount) > 0
+                          ? `Rs. ${Number(t.discount_amount).toLocaleString()}`
+                          : '—'}
+                      </td>
+                      <td className="px-2 py-2 capitalize">{t.payment_method ?? '—'}</td>
+                      <td className="px-2 py-2 text-right font-semibold text-clinic-ink">
+                        Rs. {Number(t.amount).toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </>
         )}
+
+        {/* Instalment schedule, orthodontics jaise lambe treatment ke liye */}
+        {plans.map((plan) => {
+          const rows = installments.filter((i) => i.plan_id === plan.id)
+          if (rows.length === 0) return null
+
+          const paidCount = rows.filter((r) => Number(r.paid_amount) > 0).length
+          const today = new Date().toISOString().slice(0, 10)
+
+          return (
+            <div key={plan.id} className="mt-6">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <p className="text-sm font-semibold text-clinic-ink">
+                  {plan.title} — Instalment Schedule
+                </p>
+                <p className="text-xs font-medium text-clinic-ink/70">
+                  {paidCount} / {rows.length} paid · Rs.{' '}
+                  {Number(plan.monthly_amount).toLocaleString()} per month
+                </p>
+              </div>
+
+              <div className="mt-2 overflow-x-auto">
+                <table className="w-full min-w-[480px] text-sm">
+                  <thead className="bg-clinic-mint text-left text-xs font-semibold text-clinic-ink/80">
+                    <tr>
+                      <th className="px-2 py-1.5">#</th>
+                      <th className="px-2 py-1.5">Month</th>
+                      <th className="px-2 py-1.5 text-right">Amount</th>
+                      <th className="px-2 py-1.5">Status</th>
+                      <th className="px-2 py-1.5">Paid On</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((r) => {
+                      const isPaid = Number(r.paid_amount) > 0
+                      const overdue = !isPaid && r.due_date < today
+                      return (
+                        <tr key={r.installment_no} className="border-t border-clinic-teal/10">
+                          <td className="px-2 py-2">{r.installment_no}</td>
+                          <td className="px-2 py-2 whitespace-nowrap">
+                            {new Date(r.due_date).toLocaleDateString('en-GB', {
+                              month: 'short',
+                              year: 'numeric',
+                            })}
+                          </td>
+                          <td className="px-2 py-2 text-right">
+                            Rs. {Number(r.amount).toLocaleString()}
+                          </td>
+                          <td className="px-2 py-2">
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                                isPaid
+                                  ? 'bg-emerald-50 text-emerald-700'
+                                  : overdue
+                                    ? 'bg-red-50 text-red-700'
+                                    : 'bg-clinic-mint text-clinic-ink/70'
+                              }`}
+                            >
+                              {isPaid ? 'Paid' : overdue ? 'Overdue' : 'Pending'}
+                            </span>
+                          </td>
+                          <td className="px-2 py-2 whitespace-nowrap text-clinic-ink/70">
+                            {r.paid_date
+                              ? `${new Date(r.paid_date).toLocaleDateString('en-GB')}${
+                                  r.payment_method ? ` (${r.payment_method})` : ''
+                                }`
+                              : '—'}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )
+        })}
 
         <div className="mt-6 border-t border-clinic-teal/20 pt-4">
           <div className="flex justify-between py-1 text-sm">
             <span className="text-clinic-ink">Total Treatment Value</span>
             <span className="font-medium">Rs. {grandTotal.toLocaleString()}</span>
           </div>
+          {totalDiscount > 0 && (
+            <div className="flex justify-between py-1 text-sm">
+              <span className="text-clinic-ink">Total Discount</span>
+              <span className="font-medium text-clinic-teal">
+                Rs. {totalDiscount.toLocaleString()}
+              </span>
+            </div>
+          )}
           <div className="flex justify-between py-1 text-sm">
             <span className="text-clinic-ink">Total Paid</span>
             <span className="font-medium text-emerald-700">Rs. {grandPaid.toLocaleString()}</span>

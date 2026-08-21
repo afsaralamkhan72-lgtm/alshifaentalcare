@@ -9,6 +9,7 @@ import VisitNotes, { type VisitNote } from '@/components/admin/VisitNotes'
 import DeletePatientButton from '@/components/admin/DeletePatientButton'
 import PatientRecalls, { type PatientRecall } from '@/components/admin/PatientRecalls'
 import PortalLinkButton from '@/components/admin/PortalLinkButton'
+import VisitTimeline, { type TimelineEntry } from '@/components/admin/VisitTimeline'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -85,7 +86,7 @@ export default async function PatientDetailPage({ params }: Props) {
       .order('prescribed_date', { ascending: false }),
     supabase
       .from('transactions')
-      .select('id, amount, category, payment_method, description, transaction_date')
+      .select('id, amount, category, payment_method, description, transaction_date, treatment_name, treating_doctor')
       .eq('patient_id', id)
       .eq('type', 'income')
       .order('transaction_date', { ascending: false }),
@@ -118,6 +119,36 @@ export default async function PatientDetailPage({ params }: Props) {
   const totalValue = planTotal + walkInPaid
   const totalPaid = planPaid + walkInPaid
   const balance = Math.max(0, totalValue - totalPaid)
+
+  // Visits, treatments aur prescriptions ko aik timeline mein mila dein
+  const timeline: TimelineEntry[] = [
+    ...visits.map((v) => ({
+      date: v.visit_date,
+      kind: 'visit' as const,
+      title: v.procedure ?? 'Visit',
+      detail: v.notes,
+      nextVisit: v.next_visit,
+    })),
+    ...payments
+      .filter((t) => t.treatment_name)
+      .map((t) => ({
+        date: t.transaction_date,
+        kind: 'treatment' as const,
+        title: t.treatment_name as string,
+        detail: null,
+        doctor: (t.treating_doctor as string | null) ?? null,
+        amount: Number(t.amount),
+      })),
+    ...prescriptions.map((rx) => {
+      const items = (rx.items ?? []) as { name_en?: string; name_ur?: string }[]
+      return {
+        date: rx.prescribed_date,
+        kind: 'prescription' as const,
+        title: 'Prescription',
+        detail: items.map((i) => i.name_en || i.name_ur).filter(Boolean).join(', ') || null,
+      }
+    }),
+  ].sort((a, b) => b.date.localeCompare(a.date))
 
   const lastVisit = visits[0]?.visit_date ?? null
   const nextVisit = visits.find((v) => v.next_visit && v.next_visit >= new Date().toISOString().slice(0, 10))?.next_visit ?? null
@@ -266,6 +297,10 @@ export default async function PatientDetailPage({ params }: Props) {
             {prescriptions.length}
           </p>
         </div>
+      </div>
+
+      <div className="mt-6">
+        <VisitTimeline entries={timeline} patientId={patient.id} />
       </div>
 
       {/* Treatment plans, orthodontics and any other multi-month course */}

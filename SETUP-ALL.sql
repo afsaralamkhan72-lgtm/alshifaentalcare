@@ -1014,6 +1014,57 @@ select distinct treating_doctor
  where treating_doctor is not null
 on conflict (name) do nothing;
 
+-- =====================================================================
+-- 12. BILL KI TAFSEEL (treatment, rate, discount)
+-- (source: phase10.sql)
+-- =====================================================================
+
+-- =====================================================================
+-- PHASE 10 — Bill ki tafseel (treatment, rate, discount)
+-- Run AFTER SETUP-ALL.sql
+-- =====================================================================
+
+-- Ab tak sirf amount mehfooz hoti thi. Bill par ye batane ke liye ke
+-- kaunsa treatment hua, uska rate kya tha aur kitna discount diya gaya,
+-- ye columns chahiye.
+alter table public.transactions
+  add column if not exists treatment_name  text,
+  add column if not exists rate            numeric(12,2),
+  add column if not exists discount_amount numeric(12,2) default 0,
+  add column if not exists discount_pct    numeric(5,2)  default 0;
+
+create index if not exists idx_transactions_treatment
+  on public.transactions (treatment_name);
+
+-- =====================================================================
+-- 13. BAQAYA RAQAM aur due date (har patient ke liye)
+-- (source: phase11.sql)
+-- =====================================================================
+
+-- =====================================================================
+-- PHASE 11 — Baqaya raqam aur due date (har patient ke liye)
+-- Run AFTER SETUP-ALL.sql
+-- =====================================================================
+
+-- Aksar patient poore paise aik baar mein nahi deta. Har treatment ke
+-- sath ye mehfooz hota hai ke kitna baqaya hai aur kab tak dena hai.
+alter table public.transactions
+  add column if not exists balance_due numeric(12,2) default 0,
+  add column if not exists due_date    date,
+  add column if not exists settled_at  timestamptz;
+
+-- Jo baqaya rehta hai us par due date se index, taake dues list tez chale
+create index if not exists idx_transactions_due
+  on public.transactions (due_date)
+  where balance_due > 0;
+
+-- Purani entries ka baqaya nikal lein (rate - discount - jitna mila)
+update public.transactions
+   set balance_due = greatest(0, coalesce(rate, 0) - coalesce(discount_amount, 0) - coalesce(amount, 0))
+ where rate is not null
+   and balance_due = 0
+   and settled_at is null;
+
 
 -- =====================================================================
 -- HO GAYA

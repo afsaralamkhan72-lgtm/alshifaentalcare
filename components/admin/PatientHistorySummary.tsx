@@ -43,7 +43,7 @@ export default function PatientHistorySummary({
   const finalized = Boolean(history?.is_finalized)
 
   return (
-    <div id="history-sheet" className="rounded-2xl border border-clinic-teal/10 bg-white p-8">
+    <div id="history-sheet" className="rounded-2xl border border-clinic-teal/10 bg-white p-4 sm:p-8">
       {/* Letterhead */}
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-clinic-teal/20 pb-4">
         <div className="flex items-start gap-4">

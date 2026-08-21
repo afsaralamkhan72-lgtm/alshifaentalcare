@@ -160,7 +160,7 @@ export default async function PortalRecordPage({
         <section className="mt-8">
           <h2 className="font-display font-semibold text-clinic-ink">Payment History</h2>
           <div className="mt-3 overflow-hidden rounded-2xl border border-clinic-teal/10 bg-white">
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto"><table className="w-full min-w-[420px] text-sm">
               <thead className="bg-clinic-mint text-left text-clinic-ink/60">
                 <tr>
                   <th className="px-4 py-2">Due</th>
@@ -192,7 +192,7 @@ export default async function PortalRecordPage({
                   )
                 })}
               </tbody>
-            </table>
+            </table></div>
           </div>
         </section>
       )}
@@ -269,7 +269,7 @@ function Shell({ children }: { children: React.ReactNode }) {
           <span className="text-xs text-clinic-ink/40">{CLINIC.phone.display}</span>
         </div>
       </header>
-      <main className="mx-auto max-w-2xl px-4 py-8">{children}</main>
+      <main className="mx-auto max-w-2xl px-4 py-6 sm:py-8">{children}</main>
     </div>
   )
 }
