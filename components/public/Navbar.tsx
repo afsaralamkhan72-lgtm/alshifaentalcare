@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import ClinicLogo from '@/components/ClinicLogo'
 import Link from 'next/link'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
 
@@ -17,14 +18,17 @@ const NAV_LINKS = [
   { href: '/contact', label: 'Contact' },
 ]
 
-export default function Navbar() {
+export default function Navbar({ logoUrl }: { logoUrl?: string | null }) {
   const [open, setOpen] = useState(false)
 
   return (
     <header className="sticky top-0 z-30 border-b border-clinic-teal/10 bg-clinic-sand/95 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
-        <Link href="/" className="font-display text-lg font-semibold text-clinic-teal">
-          Al Shifa <span className="text-clinic-ink">Health Care</span>
+        <Link href="/" className="flex items-center gap-2">
+          <ClinicLogo logoUrl={logoUrl} size={38} />
+          <span className="font-display text-lg font-semibold leading-tight text-clinic-teal">
+            Al Shifa <span className="text-clinic-ink">Health Care</span>
+          </span>
         </Link>
 
         <nav className="hidden items-center gap-6 lg:flex">

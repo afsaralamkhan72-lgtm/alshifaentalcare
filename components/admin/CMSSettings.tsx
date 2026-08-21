@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import ImageUploader from './ImageUploader'
 
 type SettingsMap = Record<string, Record<string, unknown>>
 
@@ -11,6 +12,7 @@ interface Props {
 
 export default function CMSSettings({ initial }: Props) {
   const [clinic, setClinic] = useState({
+    logo_url: '',
     name: '',
     doctor_name: '',
     address: '',
@@ -70,6 +72,19 @@ export default function CMSSettings({ initial }: Props) {
         <p className="mt-1 text-xs text-clinic-ink/50">
           Ye footer, contact page aur poori website par nazar aata hai.
         </p>
+
+        <div className="mt-4">
+          <ImageUploader
+            label="Clinic Logo"
+            bucket="media"
+            folder="branding"
+            value={clinic.logo_url || null}
+            onChange={(url) => setClinic((p) => ({ ...p, logo_url: url ?? '' }))}
+          />
+          <p className="mt-1 text-xs text-clinic-ink/40">
+            Website ke header, footer aur sab invoices par lag jayega.
+          </p>
+        </div>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           {[

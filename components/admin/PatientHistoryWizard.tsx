@@ -143,8 +143,8 @@ export default function PatientHistoryWizard({
 
     if (finalize) {
       setFinalized(true)
-      setStatus('History finalised — this is now the patient record.')
-      router.refresh()
+      // Show the doctor the complete record on one page
+      router.push(`/admin/patients/${patientId}/history?view=summary`)
       return
     }
 

@@ -6,6 +6,7 @@ interface Props {
   patientName: string
   patientPhone: string
   mrNumber: string
+  portalCode?: string | null
   total: number
   paid: number
   balance: number
@@ -15,12 +16,20 @@ export default function InvoiceActions({
   patientName,
   patientPhone,
   mrNumber,
+  portalCode,
   total,
   paid,
   balance,
 }: Props) {
   // Text summary for WhatsApp — the PDF itself stays on the device,
   // nothing is uploaded to Supabase.
+  // Portal link is appended so the patient can check the same figures
+  // themselves later, without calling the clinic.
+  const portalUrl =
+    typeof window !== 'undefined' && portalCode
+      ? `${window.location.origin}/portal/${portalCode}`
+      : ''
+
   const link = buildWhatsAppLink({
     phoneOverride: patientPhone,
     customMessage: [
@@ -30,8 +39,21 @@ export default function InvoiceActions({
       `Total: Rs. ${total.toLocaleString()}`,
       `Paid: Rs. ${paid.toLocaleString()}`,
       `Balance: Rs. ${balance.toLocaleString()}`,
+      ...(portalCode
+        ? [
+            '',
+            'Aap apna record khud bhi dekh sakte hain:',
+            portalUrl,
+            `Code: ${portalCode}`,
+            '',
+            'Link kholein aur ye code likhein — aap ko apni appointment,',
+            'baqaya raqam aur har payment ki tafseel nazar aa jayegi.',
+            'Ye link zaati hai, kisi aur ke sath share na karein.',
+          ]
+        : []),
       '',
       'Dr. Muhammad Khalid Mahmood',
+      'Al Shifa Health Care · 0342-2078639',
     ].join('\n'),
   })
 

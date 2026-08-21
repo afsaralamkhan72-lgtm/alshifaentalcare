@@ -1,7 +1,9 @@
 import Link from 'next/link'
+import ClinicLogo from '@/components/ClinicLogo'
 import { createClient } from '@/lib/supabase/server'
 
 interface ClinicInfo {
+  logo_url?: string | null
   name: string
   doctor_name: string
   address: string
@@ -37,7 +39,12 @@ export default async function Footer() {
     <footer className="border-t border-clinic-teal/10 bg-clinic-teal text-white/90">
       <div className="mx-auto grid max-w-6xl gap-8 px-4 py-12 sm:px-6 md:grid-cols-3">
         <div>
-          <p className="font-display text-lg font-semibold text-white">{info.name}</p>
+          <div className="flex items-center gap-3">
+            {info.logo_url && (
+              <ClinicLogo logoUrl={info.logo_url} size={40} />
+            )}
+            <p className="font-display text-lg font-semibold text-white">{info.name}</p>
+          </div>
           <p className="mt-2 text-sm text-white/70">{info.doctor_name}</p>
           <p className="mt-4 text-sm text-white/70">{info.address}</p>
           <p className="mt-1 text-sm text-white/70">Open Daily: {info.timings}</p>

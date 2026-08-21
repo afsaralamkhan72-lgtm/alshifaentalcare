@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import InvoiceActions from '@/components/admin/InvoiceActions'
+import ClinicLogo from '@/components/ClinicLogo'
 
 export default async function InvoicePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -9,7 +10,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
 
   const { data: patient } = await supabase
     .from('patients')
-    .select('id, mr_number, full_name, phone, department, age, address')
+    .select('id, mr_number, full_name, phone, department, age, address, portal_code')
     .eq('id', id)
     .single()
 
@@ -71,6 +72,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         patientName={patient.full_name}
         patientPhone={patient.phone}
         mrNumber={patient.mr_number ?? ''}
+        portalCode={patient.portal_code ?? null}
         total={grandTotal}
         paid={grandPaid}
         balance={balance}
@@ -78,7 +80,9 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
 
       {/* This block is what gets printed */}
       <div id="invoice-sheet" className="mx-auto max-w-2xl rounded-2xl border border-clinic-teal/10 bg-white p-8">
-        <div className="border-b border-clinic-teal/20 pb-4">
+        <div className="flex items-start gap-4 border-b border-clinic-teal/20 pb-4">
+          <ClinicLogo logoUrl={clinic.logo_url} size={56} />
+          <div>
           <p className="font-display text-2xl font-semibold text-clinic-teal">
             {clinic.name ?? 'Al Shifa Health Care'}
           </p>
@@ -88,6 +92,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           <p className="mt-1 text-xs text-clinic-ink/50">
             {clinic.address ?? 'Numaish, Nizami Road, Karachi'} · {clinic.phone ?? '0342-2078639'}
           </p>
+          </div>
         </div>
 
         <p className="mt-6 font-display text-lg font-semibold text-clinic-ink">Payment Statement</p>

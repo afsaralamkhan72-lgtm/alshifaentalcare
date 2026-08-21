@@ -31,9 +31,16 @@ interface Props {
   installments: Installment[]
   patientName: string
   patientPhone: string
+  portalCode?: string | null
 }
 
-export default function TreatmentPlanCard({ plan, installments, patientName, patientPhone }: Props) {
+export default function TreatmentPlanCard({
+  plan,
+  installments,
+  patientName,
+  patientPhone,
+  portalCode,
+}: Props) {
   const router = useRouter()
   const [busyId, setBusyId] = useState<string | null>(null)
   const [method, setMethod] = useState('cash')
@@ -105,11 +112,30 @@ export default function TreatmentPlanCard({ plan, installments, patientName, pat
     router.refresh()
   }
 
+  const portalUrl =
+    typeof window !== 'undefined' && portalCode
+      ? `${window.location.origin}/portal/${portalCode}`
+      : ''
+
   const reminderLink = buildWhatsAppLink({
-    customMessage: nextDue
-      ? `Assalam o Alaikum ${patientName}, aap ki ${plan.title} ki installment #${nextDue.installment_no} (Rs. ${Number(nextDue.amount).toLocaleString()}) ${nextDue.due_date} ko due hai. Shukriya — Al Shifa Health Care`
-      : `Assalam o Alaikum ${patientName}, aap ka ${plan.title} plan mukammal ho gaya hai. Shukriya — Al Shifa Health Care`,
     phoneOverride: patientPhone,
+    customMessage: [
+      `Assalam o Alaikum ${patientName},`,
+      '',
+      nextDue
+        ? `Aap ki ${plan.title} ki installment #${nextDue.installment_no} (Rs. ${Number(nextDue.amount).toLocaleString()}) ${new Date(nextDue.due_date).toLocaleDateString('en-GB')} ko due hai.`
+        : `Aap ka ${plan.title} plan mukammal ho gaya hai. Shukriya.`,
+      ...(portalCode
+        ? [
+            '',
+            'Apna poora record khud dekhein:',
+            portalUrl,
+            `Code: ${portalCode}`,
+          ]
+        : []),
+      '',
+      'Al Shifa Health Care · 0342-2078639',
+    ].join('\n'),
   })
 
   return (

@@ -294,6 +294,7 @@ export default async function PatientDetailPage({ params }: Props) {
                 installments={installments.filter((i) => i.plan_id === plan.id)}
                 patientName={patient.full_name}
                 patientPhone={patient.phone}
+                portalCode={patient.portal_code ?? null}
               />
             ))
           )}
