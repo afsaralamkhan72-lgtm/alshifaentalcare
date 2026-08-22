@@ -3,6 +3,7 @@ import { CLINIC } from '@/clinic.config'
 import SocialLinks from '@/components/public/SocialLinks'
 
 const MAP_EMBED_SRC =
+  CLINIC.mapEmbed ||
   `https://www.google.com/maps?q=${encodeURIComponent(CLINIC.mapQuery)}&output=embed`
 
 export const metadata = {
@@ -46,6 +47,14 @@ export default function ContactPage() {
                 Call: {CLINIC.phone.display}
               </a>
               <a
+                href={CLINIC.mapDirections}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-full bg-clinic-teal px-5 py-2.5 text-center text-sm font-semibold text-white transition-colors hover:bg-clinic-teal-light"
+              >
+                Get Directions
+              </a>
+              <a
                 href={`https://wa.me/${CLINIC.phone.whatsapp}`}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -57,7 +66,16 @@ export default function ContactPage() {
           </div>
         </div>
       </section>
-          <section className="mx-auto max-w-6xl px-4 pb-14 sm:px-6">
+          <section className="mx-auto max-w-6xl px-4 pb-6 sm:px-6">
+        <p className="text-sm font-semibold uppercase tracking-wide text-clinic-amber">
+          Areas We Serve
+        </p>
+        <p className="mt-2 text-clinic-ink/70">
+          Patients visit us from {CLINIC.serviceAreas}.
+        </p>
+      </section>
+
+      <section className="mx-auto max-w-6xl px-4 pb-14 sm:px-6">
         <p className="text-sm font-semibold uppercase tracking-wide text-clinic-amber">
           Follow Us
         </p>

@@ -1,7 +1,7 @@
 import PageHeader from '@/components/public/PageHeader'
 import ServiceCard from '@/components/public/ServiceCard'
 import { createClient } from '@/lib/supabase/server'
-import { CLINIC } from '@/clinic.config'
+import { CLINIC, serviceJsonLd } from '@/clinic.config'
 
 async function getHomeopathicServices() {
   try {
@@ -28,6 +28,18 @@ export default async function HomeopathicServicesPage() {
 
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(
+            serviceJsonLd(
+              'Homeopathic Consultation',
+              'Personalised homeopathic consultation and natural treatment for chronic and everyday conditions.'
+            )
+          ),
+        }}
+      />
+
       <PageHeader
         eyebrow="Homeopathic Services"
         title="Homeopathic Treatments"

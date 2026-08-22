@@ -5,6 +5,7 @@ import InvoiceActions from '@/components/admin/InvoiceActions'
 import ClinicLogo from '@/components/ClinicLogo'
 import InvoiceBuilder from '@/components/admin/InvoiceBuilder'
 import DeleteTransactionButton from '@/components/admin/DeleteTransactionButton'
+import EditTransactionButton from '@/components/admin/EditTransactionButton'
 import { CLINIC, timingsLine } from '@/clinic.config'
 
 export default async function InvoicePage({ params }: { params: Promise<{ id: string }> }) {
@@ -106,6 +107,8 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
     payment: number
     method: string | null
     id?: string
+    rate?: number | null
+    discountAmount?: number
   }
 
   const ledger: LedgerRow[] = []
@@ -132,6 +135,8 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
 
     ledger.push({
       id: t.id,
+      rate: t.rate != null ? Number(t.rate) : null,
+      discountAmount: Number(t.discount_amount ?? 0),
       date: t.transaction_date,
       label: cleanLabel,
       doctor: (t.treating_doctor as string | null) ?? null,
@@ -415,11 +420,22 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                       </td>
                       <td className="px-2 py-2 text-right print:hidden">
                         {row.id && (
-                          <DeleteTransactionButton
-                            id={row.id}
-                            label={row.label}
-                            amount={row.payment || row.charge}
-                          />
+                          <div className="flex items-center justify-end gap-1">
+                            <EditTransactionButton
+                              id={row.id}
+                              label={row.label}
+                              amount={row.payment}
+                              rate={row.rate ?? null}
+                              discountAmount={row.discountAmount ?? 0}
+                              paymentMethod={row.method}
+                              transactionDate={row.date}
+                            />
+                            <DeleteTransactionButton
+                              id={row.id}
+                              label={row.label}
+                              amount={row.payment || row.charge}
+                            />
+                          </div>
                         )}
                       </td>
                     </tr>

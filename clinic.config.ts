@@ -41,7 +41,7 @@ export const CLINIC = {
     /** Call button ke liye, sirf digits */
     dial: env('CLINIC_PHONE_DIAL', '03422078639'),
     /** WhatsApp ke liye international format: 92 + number (0 ke bagair) */
-    whatsapp: env('CLINIC_WHATSAPP', '923422078639'),
+    whatsapp: env('CLINIC_WHATSAPP', '923015888676'),
   },
 
   address: {
@@ -67,13 +67,29 @@ export const CLINIC = {
    *
    * Agar mapEmbed khali chhod dein to `mapQuery` se search hoga.
    */
+  /**
+   * Clinic ki asal jagah (Google Maps par pin par right-click karein,
+   * pehla number latitude, doosra longitude).
+   * Ye Google aur AI dono ko batata hai clinic kahan hai.
+   */
+  geo: {
+    lat: env('CLINIC_LAT', '24.8790'),
+    lng: env('CLINIC_LNG', '67.0300'),
+  },
+
+  /** Aas paas ke ilaqe jahan se mareez aate hain */
+  serviceAreas: env(
+    'CLINIC_SERVICE_AREAS',
+    'Numaish, Nizami Road, Soldier Bazar, Garden East, Saddar, Karachi'
+  ),
+
   mapEmbed: env('CLINIC_MAP_EMBED', ''),
   mapQuery: env('CLINIC_MAP_QUERY', 'Numaish Nizami Road Karachi'),
 
   /** Google Maps par directions ka link (Get Directions button) */
   mapDirections: env(
     'CLINIC_MAP_DIRECTIONS',
-    'https://www.google.com/maps/dir/?api=1&destination=Numaish+Nizami+Road+Karachi'
+    'https://maps.app.goo.gl/NPg5sp2XREE6odHL6'
   ),
 
   /**
@@ -142,8 +158,69 @@ export function clinicJsonLd(logoUrl?: string | null, closedDay?: string | null)
         closes: '17:00',
       },
     ],
+    geo: {
+      '@type': 'GeoCoordinates',
+      latitude: CLINIC.geo.lat,
+      longitude: CLINIC.geo.lng,
+    },
+    areaServed: CLINIC.serviceAreas.split(',').map((a) => ({
+      '@type': 'Place',
+      name: a.trim(),
+    })),
     medicalSpecialty: ['Dentistry', 'Homeopathic'],
+    availableService: [
+      'Scaling and Polishing',
+      'Root Canal Treatment',
+      'Teeth Whitening',
+      'Dental Implants',
+      'Crowns and Bridges',
+      'Tooth Extraction',
+      'Orthodontics (Braces)',
+      'Dentures',
+      'Homeopathic Consultation',
+    ].map((name) => ({ '@type': 'MedicalProcedure', name })),
     priceRange: 'PKR',
+  }
+}
+
+/**
+ * FAQ ka structured data.
+ *
+ * Ye wo cheez hai jo Google ke seedhe jawab (AEO) aur AI ke jawabon
+ * (GEO) dono mein sabse zyada kaam aati hai: saaf sawal, saaf jawab.
+ */
+export function faqJsonLd(faqs: { q: string; a: string }[]) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faqs
+      .filter((f) => f.a && f.a.trim())
+      .map((f) => ({
+        '@type': 'Question',
+        name: f.q,
+        acceptedAnswer: { '@type': 'Answer', text: f.a },
+      })),
+  }
+}
+
+/** Har treatment ke page ke liye */
+export function serviceJsonLd(name: string, description: string) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'MedicalProcedure',
+    name,
+    description,
+    provider: {
+      '@type': 'Dentist',
+      name: CLINIC.name,
+      address: {
+        '@type': 'PostalAddress',
+        streetAddress: CLINIC.address.area,
+        addressLocality: CLINIC.address.city,
+        addressCountry: 'PK',
+      },
+      telephone: CLINIC.phone.display,
+    },
   }
 }
 

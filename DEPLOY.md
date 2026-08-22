@@ -5,6 +5,29 @@ treatment plans, appointments, follow-ups, birthdays, reports aur voice assistan
 
 ---
 
+
+## Aapka .com Domain (SEO ke liye zaroori)
+
+Domain le liya hai to Vercel mein ye 2 kaam karein:
+
+1. **Vercel → Settings → Domains** → apna `.com` add karein, DNS records domain
+   provider (jahan se domain khareeda) mein daal dein jo Vercel dikhata hai.
+2. **Vercel → Settings → Environment Variables** mein:
+   ```
+   NEXT_PUBLIC_SITE_URL=https://aapka-domain.com
+   ```
+   Ye na kiya to sitemap, SEO tags aur schema purane `.vercel.app` URL ka
+   istemal karenge, naye domain ka nahi.
+
+Dono karne ke baad **Redeploy** karein.
+
+## Blog Articles (website lambi karne ke liye)
+
+`SETUP-ALL.sql` mein ab 6 tayyar articles bhi shamil hain — braces cost,
+root canal, teeth whitening, homeopathy, bachon ka pehla visit, scaling.
+Deploy hote hi Blog page par nazar aayenge, kuch type karne ki zaroorat
+nahi. Baad mein Edit Website → Blog se edit ya delete kiye ja sakte hain.
+
 ## STEP 1 — SUPABASE SQL (2 files)
 
 Supabase → **SQL Editor** → New query:

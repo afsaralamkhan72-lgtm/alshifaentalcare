@@ -1,7 +1,7 @@
 import PageHeader from '@/components/public/PageHeader'
 import ServiceCard from '@/components/public/ServiceCard'
 import { createClient } from '@/lib/supabase/server'
-import { CLINIC } from '@/clinic.config'
+import { CLINIC, serviceJsonLd } from '@/clinic.config'
 
 async function getDentalServices() {
   try {
@@ -28,6 +28,18 @@ export default async function DentalServicesPage() {
 
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(
+            serviceJsonLd(
+              'Dental Treatment',
+              'Scaling and polishing, root canal treatment, teeth whitening, dental implants, crowns, bridges, extractions, braces and dentures.'
+            )
+          ),
+        }}
+      />
+
       <PageHeader
         eyebrow="Dental Services"
         title="Dental Treatments"

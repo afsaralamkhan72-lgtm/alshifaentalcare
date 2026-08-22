@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { CLINIC, timingsLine } from '@/clinic.config'
+import { CLINIC, timingsLine, faqJsonLd } from '@/clinic.config'
 import { createClient } from '@/lib/supabase/server'
 
 const STEPS = [
@@ -66,8 +66,22 @@ export default async function ProcessAndFaq() {
     // koi chutti set nahi
   }
 
+  // Jawab yahan hal karein, taake Google ko bhi wahi mile jo user ko dikhta hai
+  const resolvedFaqs = FAQS.map((f) => ({
+    q: f.q,
+    a:
+      f.q === 'What are the clinic timings?'
+        ? `${timingsLine(closedDay)} at ${CLINIC.address.full}.`
+        : f.a,
+  }))
+
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd(resolvedFaqs)) }}
+      />
+
       {/* How it works */}
       <section className="mx-auto max-w-6xl px-4 py-14 sm:px-6">
         <p className="text-sm font-semibold uppercase tracking-wide text-clinic-amber">

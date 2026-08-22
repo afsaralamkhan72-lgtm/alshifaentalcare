@@ -230,12 +230,14 @@ export default async function HomeSections() {
             >
               Call: {CLINIC.phone.display}
             </a>
-            <Link
-              href="/contact"
+            <a
+              href={CLINIC.mapDirections}
+              target="_blank"
+              rel="noopener noreferrer"
               className="rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-clinic-teal"
             >
-              Find Us
-            </Link>
+              Get Directions
+            </a>
           </div>
         </div>
       </section>
