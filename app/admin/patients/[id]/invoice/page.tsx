@@ -43,19 +43,23 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
 
   const knownDoctors = (savedDoctors ?? []).map((d) => d.name)
 
-  const { data: serviceRows } = await supabase.from('services').select('title').order('title')
-  const knownTreatments = (serviceRows ?? []).map((r) => r.title)
+  // Services aur logged-in staff, dono aik saath
+  const [serviceRes, meRes] = await Promise.all([
+    supabase.from('services').select('title').order('title'),
+    auth?.user?.id
+      ? supabase
+          .from('staff_profiles')
+          .select('full_name, role')
+          .eq('id', auth.user.id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ])
 
-  // Agar login kiya hua staff khud doctor hai to uska naam pehle se bhar dein
+  const knownTreatments = (serviceRes.data ?? []).map((r) => r.title)
+
   let defaultDoctor: string | null = null
-  if (auth?.user?.id) {
-    const { data: me } = await supabase
-      .from('staff_profiles')
-      .select('full_name, role')
-      .eq('id', auth.user.id)
-      .maybeSingle()
-    if (me && (me.role === 'doctor' || me.role === 'admin')) defaultDoctor = me.full_name
-  }
+  const me = meRes.data as { full_name: string; role: string } | null
+  if (me && (me.role === 'doctor' || me.role === 'admin')) defaultDoctor = me.full_name
 
   // Patient ka apna doctor sabse pehle
   if (patient.primary_doctor) defaultDoctor = patient.primary_doctor

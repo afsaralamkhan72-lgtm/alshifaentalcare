@@ -44,46 +44,33 @@ export default async function PatientDetailPage({ params }: Props) {
     dentalRecords = data ?? []
   }
 
-  // Treatment plans (orthodontics etc) + their monthly installments
-  const { data: plansData } = await supabase
-    .from('treatment_plans')
-    .select('id, title, total_cost, advance_paid, duration_months, monthly_amount, start_date, status, doctor_id')
-    .eq('patient_id', id)
-    .order('created_at', { ascending: false })
-
-  const plans = (plansData ?? []) as Plan[]
-
-  let installments: (Installment & { plan_id: string })[] = []
-  if (plans.length > 0) {
-    const { data } = await supabase
-      .from('installments')
-      .select('id, plan_id, installment_no, due_date, amount, paid_amount, paid_date, payment_method')
-      .in(
-        'plan_id',
-        plans.map((p) => p.id)
-      )
-      .order('installment_no', { ascending: true })
-    installments = (data ?? []) as (Installment & { plan_id: string })[]
-  }
-
-  const { data: visitData } = await supabase
-    .from('visit_notes')
-    .select('id, visit_date, procedure, notes, next_visit')
-    .eq('patient_id', id)
-    .order('visit_date', { ascending: false })
-
-  const visits = (visitData ?? []) as VisitNote[]
-
-  const { data: recallData } = await supabase
-    .from('recalls')
-    .select('id, recall_type, interval_months, last_done, next_due, status')
-    .eq('patient_id', id)
-    .order('next_due', { ascending: true })
-
-  const recalls = (recallData ?? []) as PatientRecall[]
-
-  // Everything else that belongs to this patient's record
-  const [rxRes, payRes, apptRes] = await Promise.all([
+  // Sab queries aik saath, aik ke baad aik nahi — page bohat tez khulta hai
+  const [
+    plansRes,
+    visitRes,
+    recallRes,
+    rxRes,
+    payRes,
+    apptRes,
+    historyRes,
+    photoRes,
+    episodeRes,
+  ] = await Promise.all([
+    supabase
+      .from('treatment_plans')
+      .select('id, title, total_cost, advance_paid, duration_months, monthly_amount, start_date, status, doctor_id')
+      .eq('patient_id', id)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('visit_notes')
+      .select('id, visit_date, procedure, notes, next_visit')
+      .eq('patient_id', id)
+      .order('visit_date', { ascending: false }),
+    supabase
+      .from('recalls')
+      .select('id, recall_type, interval_months, last_done, next_due, status')
+      .eq('patient_id', id)
+      .order('next_due', { ascending: true }),
     supabase
       .from('prescriptions')
       .select('id, department, items, notes_en, prescribed_date')
@@ -101,29 +88,40 @@ export default async function PatientDetailPage({ params }: Props) {
       .select('id, treatment_name, preferred_date, preferred_time, status')
       .eq('phone', patient.phone)
       .order('preferred_date', { ascending: false }),
+    supabase
+      .from('patient_history')
+      .select('completed_step, is_finalized')
+      .eq('patient_id', id)
+      .maybeSingle(),
+    supabase
+      .from('patient_photos')
+      .select('id, storage_path, caption, taken_on')
+      .eq('patient_id', id)
+      .order('taken_on', { ascending: false }),
+    supabase
+      .from('treatment_episodes')
+      .select('*')
+      .eq('patient_id', id)
+      .order('completed_on', { ascending: false }),
   ])
 
-  const { data: history } = await supabase
-    .from('patient_history')
-    .select('completed_step, is_finalized')
-    .eq('patient_id', id)
-    .maybeSingle()
+  const plans = (plansRes.data ?? []) as Plan[]
+  const visits = (visitRes.data ?? []) as VisitNote[]
+  const recalls = (recallRes.data ?? []) as PatientRecall[]
+  const history = historyRes.data
+  const photos = (photoRes.error ? [] : photoRes.data ?? []) as PatientPhoto[]
+  const episodes = (episodeRes.error ? [] : episodeRes.data ?? []) as Episode[]
 
-  const { data: photoData, error: photoError } = await supabase
-    .from('patient_photos')
-    .select('id, storage_path, caption, taken_on')
-    .eq('patient_id', id)
-    .order('taken_on', { ascending: false })
-
-  const photos = (photoError ? [] : photoData ?? []) as PatientPhoto[]
-
-  const { data: episodeData, error: episodeError } = await supabase
-    .from('treatment_episodes')
-    .select('*')
-    .eq('patient_id', id)
-    .order('completed_on', { ascending: false })
-
-  const episodes = (episodeError ? [] : episodeData ?? []) as Episode[]
+  // Installments plans par depend karti hain, isliye ye alag chalti hai
+  let installments: (Installment & { plan_id: string })[] = []
+  if (plans.length > 0) {
+    const { data } = await supabase
+      .from('installments')
+      .select('id, plan_id, installment_no, due_date, amount, paid_amount, paid_date, payment_method')
+      .in('plan_id', plans.map((p) => p.id))
+      .order('installment_no', { ascending: true })
+    installments = (data ?? []) as (Installment & { plan_id: string })[]
+  }
 
   const prescriptions = rxRes.data ?? []
   const payments = payRes.data ?? []

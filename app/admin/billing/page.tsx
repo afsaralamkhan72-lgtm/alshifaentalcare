@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import StatCard from '@/components/admin/StatCard'
 import TransactionForm from '@/components/admin/TransactionForm'
+import EditTransactionButton from '@/components/admin/EditTransactionButton'
+import DeleteTransactionButton from '@/components/admin/DeleteTransactionButton'
 
 interface SearchParams {
   from?: string
@@ -20,7 +22,7 @@ async function getTransactions(from: string, to: string) {
   const supabase = await createClient()
   const { data } = await supabase
     .from('transactions')
-    .select('id, type, category, amount, payment_method, description, transaction_date')
+    .select('id, type, category, amount, payment_method, description, transaction_date, rate, discount_amount, treatment_name, treating_doctor')
     .gte('transaction_date', from)
     .lte('transaction_date', to)
     .order('transaction_date', { ascending: false })
@@ -124,6 +126,7 @@ export default async function BillingPage({
               <th className="px-4 py-3">Method</th>
               <th className="px-4 py-3">Description</th>
               <th className="px-4 py-3 text-right">Amount</th>
+              <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody>
@@ -149,11 +152,29 @@ export default async function BillingPage({
                 >
                   {t.type === 'income' ? '+' : '−'} Rs. {Number(t.amount).toLocaleString()}
                 </td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center justify-end gap-1">
+                    <EditTransactionButton
+                      id={t.id}
+                      label={t.treatment_name ?? t.description ?? t.category ?? 'Entry'}
+                      amount={Number(t.amount)}
+                      rate={t.rate != null ? Number(t.rate) : null}
+                      discountAmount={Number(t.discount_amount ?? 0)}
+                      paymentMethod={t.payment_method}
+                      transactionDate={t.transaction_date}
+                    />
+                    <DeleteTransactionButton
+                      id={t.id}
+                      label={t.treatment_name ?? t.description ?? t.category ?? 'Entry'}
+                      amount={Number(t.amount)}
+                    />
+                  </div>
+                </td>
               </tr>
             ))}
             {transactions.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-clinic-ink/50">
+                <td colSpan={7} className="px-4 py-8 text-center text-clinic-ink/50">
                   Is period mein koi transaction nahi hai.
                 </td>
               </tr>

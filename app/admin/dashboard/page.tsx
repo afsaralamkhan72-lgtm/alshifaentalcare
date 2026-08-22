@@ -29,7 +29,7 @@ async function getDashboardStats(month: string) {
     supabase.from('patients').select('*', { count: 'exact', head: true }).is('deleted_at', null).eq('department', 'homeopathic'),
     supabase
       .from('transactions')
-      .select('amount')
+      .select('amount, treatment_name, category, patient_id')
       .eq('type', 'income')
       .gte('transaction_date', monthStart)
       .lte('transaction_date', monthEnd),
@@ -63,7 +63,48 @@ async function getDashboardStats(month: string) {
   }[]
   const dueAmount = dues.reduce((sum, d) => sum + Number(d.balance_due), 0)
 
-  const income = incomeRes.data?.reduce((sum, t) => sum + Number(t.amount), 0) ?? 0
+  const incomeRows = incomeRes.data ?? []
+  const income = incomeRows.reduce((sum, t) => sum + Number(t.amount), 0)
+
+  // Kaunsa treatment kitna chala aur kitna kamaya
+  const byTreatment = new Map<string, { total: number; count: number }>()
+  for (const t of incomeRows) {
+    const raw = (t.treatment_name as string | null)?.trim()
+    if (!raw) continue
+    // "RCT (baqaya)" aur "RCT (advance)" ko aik hi ginein
+    const name = raw.replace(/\s*\((baqaya|advance|month \d+)\)\s*/i, '').trim()
+    if (!name) continue
+    const row = byTreatment.get(name) ?? { total: 0, count: 0 }
+    row.total += Number(t.amount)
+    row.count += 1
+    byTreatment.set(name, row)
+  }
+
+  const treatments = [...byTreatment.entries()]
+    .map(([name, v]) => ({ name, ...v }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 8)
+
+  // Dental vs Homeopathic income
+  const patientIds = [...new Set(incomeRows.map((t) => t.patient_id).filter(Boolean))]
+  let deptIncome = { dental: 0, homeopathic: 0, other: 0 }
+
+  if (patientIds.length > 0) {
+    const { data: pts } = await supabase
+      .from('patients')
+      .select('id, department')
+      .in('id', patientIds as string[])
+
+    const deptById = new Map((pts ?? []).map((p) => [p.id, p.department]))
+    for (const t of incomeRows) {
+      const dept = t.patient_id ? deptById.get(t.patient_id as string) : null
+      if (dept === 'dental') deptIncome.dental += Number(t.amount)
+      else if (dept === 'homeopathic') deptIncome.homeopathic += Number(t.amount)
+      else deptIncome.other += Number(t.amount)
+    }
+  } else {
+    deptIncome.other = income
+  }
   const expense = expenseRes.data?.reduce((sum, t) => sum + Number(t.amount), 0) ?? 0
 
   return {
@@ -75,6 +116,8 @@ async function getDashboardStats(month: string) {
     pendingAppointments: pendingRes.data ?? [],
     dues,
     dueAmount,
+    treatments,
+    deptIncome,
   }
 }
 
@@ -147,6 +190,91 @@ export default async function DashboardPage({
         <StatCard label="Homeopathic Patients" value={stats.homeoCount} accent="amber" />
         <StatCard label={`Income (${monthLabel})`} value={`Rs. ${stats.income.toLocaleString()}`} accent="green" />
         <StatCard label={`Expenses (${monthLabel})`} value={`Rs. ${stats.expense.toLocaleString()}`} accent="red" />
+      </div>
+
+      {/* Income kahan se aa rahi hai */}
+      <div className="mt-8 grid gap-6 lg:grid-cols-2">
+        <section className="rounded-2xl border border-clinic-teal/10 bg-white p-6">
+          <p className="font-display font-semibold text-clinic-ink">
+            Kaunsa Treatment Zyada Chal Raha Hai
+          </p>
+          <p className="mt-1 text-sm text-clinic-ink/60">{monthLabel}</p>
+
+          {stats.treatments.length === 0 ? (
+            <p className="mt-4 text-sm text-clinic-ink/50">
+              Is mahine treatment ke naam ke sath koi income record nahi hui.
+            </p>
+          ) : (
+            <div className="mt-4 grid gap-3">
+              {stats.treatments.map((t) => {
+                const max = stats.treatments[0].total || 1
+                return (
+                  <div key={t.name}>
+                    <div className="flex flex-wrap justify-between gap-2 text-sm">
+                      <span className="font-medium text-clinic-ink">{t.name}</span>
+                      <span className="text-clinic-ink">
+                        Rs. {t.total.toLocaleString()}
+                        <span className="ml-2 text-xs text-clinic-ink/60">
+                          {t.count} payments
+                        </span>
+                      </span>
+                    </div>
+                    <div className="mt-1 h-2 overflow-hidden rounded-full bg-clinic-mint">
+                      <div
+                        className="h-full rounded-full bg-clinic-teal"
+                        style={{ width: `${Math.max(4, (t.total / max) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </section>
+
+        <section className="rounded-2xl border border-clinic-teal/10 bg-white p-6">
+          <p className="font-display font-semibold text-clinic-ink">Income Kis Department Se</p>
+          <p className="mt-1 text-sm text-clinic-ink/60">{monthLabel}</p>
+
+          <div className="mt-4 grid gap-3">
+            {[
+              { label: 'Dental', value: stats.deptIncome.dental, color: 'bg-clinic-teal' },
+              {
+                label: 'Homeopathic',
+                value: stats.deptIncome.homeopathic,
+                color: 'bg-clinic-amber',
+              },
+              {
+                label: 'Patient ke bagair (walk-in / general)',
+                value: stats.deptIncome.other,
+                color: 'bg-clinic-ink/30',
+              },
+            ].map((d) => {
+              const total = stats.income || 1
+              return (
+                <div key={d.label}>
+                  <div className="flex flex-wrap justify-between gap-2 text-sm">
+                    <span className="font-medium text-clinic-ink">{d.label}</span>
+                    <span className="text-clinic-ink">Rs. {d.value.toLocaleString()}</span>
+                  </div>
+                  <div className="mt-1 h-2 overflow-hidden rounded-full bg-clinic-mint">
+                    <div
+                      className={`h-full rounded-full ${d.color}`}
+                      style={{ width: `${Math.max(2, (d.value / total) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          <Link
+            href={`/admin/reports?month=${month}`}
+            className="mt-4 inline-block text-sm font-semibold text-clinic-teal hover:underline"
+          >
+            Poori report dekhein →
+          </Link>
+        </section>
       </div>
 
       <div className="mt-8">
