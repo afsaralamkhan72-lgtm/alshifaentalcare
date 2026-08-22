@@ -10,6 +10,7 @@ import DeletePatientButton from '@/components/admin/DeletePatientButton'
 import PatientRecalls, { type PatientRecall } from '@/components/admin/PatientRecalls'
 import PortalLinkButton from '@/components/admin/PortalLinkButton'
 import VisitTimeline, { type TimelineEntry } from '@/components/admin/VisitTimeline'
+import PatientPhotoGallery, { type PatientPhoto } from '@/components/admin/PatientPhotoGallery'
 import PatientQuickActions from '@/components/admin/PatientQuickActions'
 
 interface Props {
@@ -104,6 +105,14 @@ export default async function PatientDetailPage({ params }: Props) {
     .select('completed_step, is_finalized')
     .eq('patient_id', id)
     .maybeSingle()
+
+  const { data: photoData, error: photoError } = await supabase
+    .from('patient_photos')
+    .select('id, storage_path, caption, taken_on')
+    .eq('patient_id', id)
+    .order('taken_on', { ascending: false })
+
+  const photos = (photoError ? [] : photoData ?? []) as PatientPhoto[]
 
   const prescriptions = rxRes.data ?? []
   const payments = payRes.data ?? []
@@ -364,6 +373,10 @@ export default async function PatientDetailPage({ params }: Props) {
 
       <div id="visit-notes" className="mt-8 scroll-mt-6">
         <VisitNotes patientId={patient.id} notes={visits} />
+      </div>
+
+      <div id="patient-photos" className="mt-8 scroll-mt-6">
+        <PatientPhotoGallery patientId={patient.id} photos={photos} />
       </div>
 
       {/* Prescription history */}

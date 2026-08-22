@@ -98,6 +98,13 @@ export default function PatientQuickActions({
         </a>
 
         <a
+          href="#patient-photos"
+          className="rounded-full border border-clinic-teal/30 px-4 py-2 text-sm font-semibold text-clinic-ink/80"
+        >
+          + Photo
+        </a>
+
+        <a
           href={statementLink}
           target="_blank"
           rel="noopener noreferrer"
