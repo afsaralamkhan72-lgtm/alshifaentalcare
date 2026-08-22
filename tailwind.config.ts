@@ -12,6 +12,8 @@ const config: Config = {
           sand: '#F7F3EC',      // page background, warmer than plain white
           ink: '#1F2A28',       // body text
           amber: '#E8873A',     // urgency accent (emergency popup) — not red
+          gold: '#C9A227',      // letterhead accent (invoice, certificates)
+          forest: '#0E3B2E',    // deep green from the clinic letterhead
         },
         whatsapp: '#25D366',    // kept as WhatsApp's own green — functional recognition, not decoration
       },

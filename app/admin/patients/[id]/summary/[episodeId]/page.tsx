@@ -52,19 +52,47 @@ export default async function TreatmentSummaryPage({
         className="mx-auto mt-4 max-w-2xl overflow-hidden rounded-2xl border border-clinic-teal/20 bg-white"
       >
         {/* Letterhead */}
-        <div className="flex items-start gap-4 bg-clinic-teal px-4 py-6 text-white sm:px-8">
-          <div className="rounded-lg bg-white p-1.5">
-            <ClinicLogo logoUrl={clinic.logo_url} size={48} />
+        <div className="bg-clinic-forest px-4 py-5 text-white sm:px-8">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="rounded-xl bg-white p-2">
+                <ClinicLogo logoUrl={clinic.logo_url} size={46} />
+              </div>
+              <div>
+                <p className="font-display text-2xl font-semibold leading-tight text-white">
+                  {clinic.name ?? CLINIC.name}
+                </p>
+                <p className="text-xs italic text-clinic-gold">&quot;{CLINIC.slogan}&quot;</p>
+                <p className="mt-2 text-sm font-medium text-white/90">
+                  {clinic.doctor_name ?? CLINIC.doctor.name}
+                </p>
+                <p className="text-xs text-white/70">{CLINIC.doctor.qualification}</p>
+              </div>
+            </div>
+
+            <div className="grid gap-1 text-xs sm:border-l sm:border-white/20 sm:pl-4">
+              <div>
+                <span className="text-clinic-gold">Rabita / WhatsApp: </span>
+                <span className="font-medium">{clinic.phone ?? CLINIC.phone.display}</span>
+              </div>
+              <div>
+                <span className="text-clinic-gold">WhatsApp: </span>
+                <span className="font-medium">{CLINIC.payments.easypaisa}</span>
+              </div>
+              <div>
+                <span className="text-clinic-gold">Easypaisa: </span>
+                <span className="font-medium">{CLINIC.payments.easypaisa}</span>
+              </div>
+              <div>
+                <span className="text-clinic-gold">JazzCash: </span>
+                <span className="font-medium">{CLINIC.payments.jazzcash}</span>
+              </div>
+            </div>
           </div>
-          <div>
-            <p className="font-display text-2xl font-semibold text-white">
-              {clinic.name ?? CLINIC.name}
-            </p>
-            <p className="text-sm text-white/90">{clinic.doctor_name ?? CLINIC.doctor.name}</p>
-            <p className="mt-1 text-xs text-white/80">
-              {clinic.address ?? CLINIC.address.full} · {clinic.phone ?? CLINIC.phone.display}
-            </p>
-          </div>
+
+          <p className="mt-3 border-t border-clinic-gold/40 pt-2 text-xs text-white/70">
+            {clinic.address ?? CLINIC.address.full}
+          </p>
         </div>
 
         <div className="px-4 py-6 sm:px-8">
@@ -180,9 +208,14 @@ export default async function TreatmentSummaryPage({
             <div className="border-t border-clinic-ink/20 pt-2">Patient Signature</div>
           </div>
 
-          <p className="mt-6 border-t border-clinic-teal/20 pt-4 text-center text-xs text-clinic-ink/70">
-            {clinic.timings || timingsLine(clinic.closed_day)}
-          </p>
+          <div className="mt-8 border-t-2 border-clinic-gold/50 pt-4 text-center">
+            <p className="text-xs font-medium text-clinic-ink">
+              {clinic.timings || timingsLine(clinic.closed_day)}
+            </p>
+            <p className="mt-1 font-display text-sm italic text-clinic-forest">
+              &quot;{CLINIC.slogan}&quot;
+            </p>
+          </div>
         </div>
       </div>
     </div>

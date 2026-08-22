@@ -44,6 +44,15 @@ export const CLINIC = {
     whatsapp: env('CLINIC_WHATSAPP', '923015888676'),
   },
 
+  /** Bill par dikhane ke liye payment ke numbers */
+  payments: {
+    easypaisa: env('CLINIC_EASYPAISA', '0301-5888676'),
+    jazzcash: env('CLINIC_JAZZCASH', '0301-5888676'),
+  },
+
+  /** Letterhead ka jumla */
+  slogan: env('CLINIC_SLOGAN', 'Aap ki Sehat, Hamari Zimmedari'),
+
   address: {
     /** Aik line mein poora pata */
     full: env('CLINIC_ADDRESS', 'Numaish, Nizami Road, Karachi'),
@@ -213,7 +222,16 @@ export function serviceJsonLd(name: string, description: string) {
     provider: {
       '@type': 'Dentist',
       name: CLINIC.name,
-      address: {
+      /** Bill par dikhane ke liye payment ke numbers */
+  payments: {
+    easypaisa: env('CLINIC_EASYPAISA', '0301-5888676'),
+    jazzcash: env('CLINIC_JAZZCASH', '0301-5888676'),
+  },
+
+  /** Letterhead ka jumla */
+  slogan: env('CLINIC_SLOGAN', 'Aap ki Sehat, Hamari Zimmedari'),
+
+  address: {
         '@type': 'PostalAddress',
         streetAddress: CLINIC.address.area,
         addressLocality: CLINIC.address.city,
