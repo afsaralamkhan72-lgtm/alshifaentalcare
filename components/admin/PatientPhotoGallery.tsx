@@ -14,6 +14,8 @@ export interface PatientPhoto {
 
 const BUCKET = 'patient-media'
 
+const MAX_PHOTOS = 3
+
 export default function PatientPhotoGallery({
   patientId,
   photos,
@@ -49,11 +51,19 @@ export default function PatientPhotoGallery({
     const file = e.target.files?.[0]
     if (!file) return
 
+    // Storage par bojh na pade, isliye har patient ke sirf 3 hi
+    // treatment photos rakhte hain. Nayi ke liye purani hatani hogi.
+    if (photos.length >= MAX_PHOTOS) {
+      setError(`Zyada se zyada ${MAX_PHOTOS} photos. Pehle koi purani photo delete karein.`)
+      e.target.value = ''
+      return
+    }
+
     setUploading(true)
     setError('')
 
     try {
-      const compressed = await compressImage(file)
+      const compressed = await compressImage(file, { maxWidth: 1200, maxHeight: 1200, quality: 0.82 })
       const supabase = createClient()
       const {
         data: { user },
@@ -100,6 +110,7 @@ export default function PatientPhotoGallery({
           <h2 className="font-display text-lg font-semibold text-clinic-ink">Photos</h2>
           <p className="text-sm text-clinic-ink/60">
             Sirf staff dekh sakta hai. Upload karte hi khud compress ho jati hai.
+            Zyada se zyada {MAX_PHOTOS} photos ({photos.length}/{MAX_PHOTOS}).
           </p>
         </div>
 
@@ -110,13 +121,19 @@ export default function PatientPhotoGallery({
             onChange={(e) => setCaption(e.target.value)}
             className="w-40 rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm"
           />
-          <label className="cursor-pointer rounded-full bg-clinic-teal px-4 py-2 text-sm font-semibold text-white">
+          <label
+            className={`cursor-pointer rounded-full px-4 py-2 text-sm font-semibold ${
+              photos.length >= MAX_PHOTOS
+                ? 'cursor-not-allowed bg-clinic-mint text-clinic-ink/40'
+                : 'bg-clinic-teal text-white'
+            }`}
+          >
             {uploading ? 'Uploading...' : '+ Photo'}
             <input
               type="file"
               accept="image/*"
               onChange={handleUpload}
-              disabled={uploading}
+              disabled={uploading || photos.length >= MAX_PHOTOS}
               className="hidden"
             />
           </label>

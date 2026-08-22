@@ -11,6 +11,9 @@ import PatientRecalls, { type PatientRecall } from '@/components/admin/PatientRe
 import PortalLinkButton from '@/components/admin/PortalLinkButton'
 import VisitTimeline, { type TimelineEntry } from '@/components/admin/VisitTimeline'
 import PatientPhotoGallery, { type PatientPhoto } from '@/components/admin/PatientPhotoGallery'
+import PatientProfilePhoto from '@/components/admin/PatientProfilePhoto'
+import PastTreatments, { type Episode } from '@/components/admin/PastTreatments'
+import CloseTreatmentButton from '@/components/admin/CloseTreatmentButton'
 import PatientQuickActions from '@/components/admin/PatientQuickActions'
 
 interface Props {
@@ -114,6 +117,14 @@ export default async function PatientDetailPage({ params }: Props) {
 
   const photos = (photoError ? [] : photoData ?? []) as PatientPhoto[]
 
+  const { data: episodeData, error: episodeError } = await supabase
+    .from('treatment_episodes')
+    .select('*')
+    .eq('patient_id', id)
+    .order('completed_on', { ascending: false })
+
+  const episodes = (episodeError ? [] : episodeData ?? []) as Episode[]
+
   const prescriptions = rxRes.data ?? []
   const payments = payRes.data ?? []
   const appointments = apptRes.data ?? []
@@ -179,10 +190,16 @@ export default async function PatientDetailPage({ params }: Props) {
 
       <div className="mt-3 rounded-2xl border border-clinic-teal/10 bg-white p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
+          <div className="flex items-start gap-4">
+            <PatientProfilePhoto
+              patientId={patient.id}
+              hasPhoto={Boolean(patient.profile_photo_path)}
+            />
+            <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-clinic-teal">{patient.mr_number}</p>
             <h1 className="mt-1 font-display text-2xl font-semibold text-clinic-ink">{patient.full_name}</h1>
             <p className="mt-1 text-sm text-clinic-ink/60">{patient.phone}</p>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <span
@@ -314,6 +331,23 @@ export default async function PatientDetailPage({ params }: Props) {
         </div>
       </div>
 
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <CloseTreatmentButton
+          patientId={patient.id}
+          patientName={patient.full_name}
+          suggested={{
+            title: plans[0]?.title ?? timeline.find((t) => t.kind === 'treatment')?.title ?? '',
+            charged: totalValue,
+            paid: totalPaid,
+            balance,
+            visits: visits.length,
+            startedOn: visits[visits.length - 1]?.visit_date ?? null,
+            doctor: patient.primary_doctor ?? null,
+            teeth: dentalRecords.map((d) => d.tooth_number),
+          }}
+        />
+      </div>
+
       <PatientQuickActions
         patientId={patient.id}
         patientName={patient.full_name}
@@ -374,6 +408,12 @@ export default async function PatientDetailPage({ params }: Props) {
       <div id="visit-notes" className="mt-8 scroll-mt-6">
         <VisitNotes patientId={patient.id} notes={visits} />
       </div>
+
+      {episodes.length > 0 && (
+        <div className="mt-8">
+          <PastTreatments patientId={patient.id} episodes={episodes} />
+        </div>
+      )}
 
       <div id="patient-photos" className="mt-8 scroll-mt-6">
         <PatientPhotoGallery patientId={patient.id} photos={photos} />
