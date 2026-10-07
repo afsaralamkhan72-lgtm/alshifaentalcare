@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ---------- Admin panel polish (Phase 9) ---------- */
+.admin-shell {
+  font-feature-settings: 'tnum' 1; /* raqam barabar chaurai ke, columns seedhe */
+  -webkit-font-smoothing: antialiased;
+}
+.admin-shell .rounded-2xl.border {
+  box-shadow: 0 1px 2px rgba(11, 79, 74, 0.05), 0 4px 14px -8px rgba(11, 79, 74, 0.12);
+}
+.admin-shell input:not([type='checkbox']):not([type='radio']),
+.admin-shell select,
+.admin-shell textarea {
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.admin-shell input:focus-visible,
+.admin-shell select:focus-visible,
+.admin-shell textarea:focus-visible {
+  box-shadow: 0 0 0 3px rgba(18, 114, 107, 0.15);
+}
+.admin-shell button,
+.admin-shell a[class*='rounded-full'] {
+  transition: transform 0.1s, background-color 0.15s, opacity 0.15s;
+}
+.admin-shell button:not(:disabled):active {
+  transform: scale(0.98);
+}
+.admin-shell button:disabled {
+  cursor: not-allowed;
+}
+.admin-shell tbody tr {
+  transition: background-color 0.12s;
+}
+.admin-shell tbody tr:hover {
+  background-color: rgba(234, 244, 241, 0.6);
+}
+.admin-shell :focus-visible {
+  outline: 2px solid #12726b;
+  outline-offset: 2px;
+}
+@media print {
+  .admin-shell aside,
+  .admin-shell header {
+    display: none !important;
+  }
+  .admin-shell {
+    background: #fff !important;
+  }
+}

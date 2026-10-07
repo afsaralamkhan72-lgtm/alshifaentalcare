@@ -1,0 +1,192 @@
+import { requireAdmin } from '@/lib/auth'
+import { createClient } from '@/lib/supabase/server'
+import CMSSettings from '@/components/admin/CMSSettings'
+import CMSContentManager, { type FieldDef } from '@/components/admin/CMSContentManager'
+
+const DEPARTMENT_OPTIONS = [
+  { value: 'dental', label: 'Dental' },
+  { value: 'homeopathic', label: 'Homeopathic' },
+]
+
+const SERVICE_FIELDS: FieldDef[] = [
+  { key: 'image_url', label: 'Treatment ki Picture', type: 'image', bucket: 'media', folder: 'services' },
+  { key: 'title', label: 'Treatment Name', type: 'text', required: true },
+  { key: 'department', label: 'Department', type: 'select', options: DEPARTMENT_OPTIONS, required: true },
+  {
+    key: 'short_description',
+    label: 'Short Description',
+    type: 'textarea',
+    placeholder: 'Website par card mein ye likha aayega',
+  },
+  { key: 'sort_order', label: 'Sort Order (chhota number pehle)', type: 'number' },
+  { key: 'is_active', label: 'Show on website', type: 'checkbox' },
+]
+
+const CLINIC_PHOTO_FIELDS: FieldDef[] = [
+  { key: 'image_url', label: 'Clinic ki Picture', type: 'image', bucket: 'media', folder: 'clinic' },
+  {
+    key: 'caption',
+    label: 'Caption (optional)',
+    type: 'text',
+    placeholder: 'Reception, Waiting Area, Dental Unit...',
+  },
+  { key: 'sort_order', label: 'Sort Order (chhota number pehle)', type: 'number' },
+  { key: 'is_active', label: 'Website par dikhayein', type: 'checkbox' },
+]
+
+const GALLERY_FIELDS: FieldDef[] = [
+  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'category', label: 'Category', type: 'select', options: DEPARTMENT_OPTIONS },
+  { key: 'before_image_url', label: 'Before Image', type: 'image', bucket: 'media', folder: 'gallery' },
+  { key: 'after_image_url', label: 'After Image', type: 'image', bucket: 'media', folder: 'gallery' },
+  { key: 'sort_order', label: 'Sort Order', type: 'number' },
+]
+
+const VIDEO_FIELDS: FieldDef[] = [
+  { key: 'title', label: 'Video Title', type: 'text', required: true },
+  { key: 'youtube_url', label: 'YouTube Link', type: 'text', required: true },
+  { key: 'sort_order', label: 'Sort Order', type: 'number' },
+]
+
+const DOCTOR_FIELDS: FieldDef[] = [
+  { key: 'image_url', label: 'Doctor ki Photo', type: 'image', bucket: 'media', folder: 'doctors' },
+  { key: 'full_name', label: 'Full Name', type: 'text', required: true },
+  {
+    key: 'qualification',
+    label: 'Qualification',
+    type: 'text',
+    placeholder: 'BDS, RDS / DHMS',
+  },
+  {
+    key: 'bio',
+    label: 'Bio / Tafseel',
+    type: 'textarea',
+    placeholder: 'Tajurba, specialization, aur mareezon ke liye paigham...',
+  },
+  {
+    key: 'sort_order',
+    label: 'Home page par tarteeb (1 = sabse pehle aur sabse bara)',
+    type: 'number',
+  },
+  { key: 'show_on_home', label: 'Home page par dikhayein', type: 'checkbox' },
+]
+
+const TESTIMONIAL_FIELDS: FieldDef[] = [
+  { key: 'patient_name', label: 'Patient Name', type: 'text', required: true },
+  { key: 'review_text', label: 'Review', type: 'textarea', required: true },
+  { key: 'rating', label: 'Rating (1-5)', type: 'number' },
+  { key: 'is_approved', label: 'Approve immediately', type: 'checkbox' },
+]
+
+const BLOG_FIELDS: FieldDef[] = [
+  { key: 'title', label: 'Post Title', type: 'text', required: true },
+  { key: 'slug', label: 'Slug (url-friendly)', type: 'text', required: true },
+  { key: 'content', label: 'Content', type: 'textarea', required: true },
+  { key: 'cover_image_url', label: 'Cover Image', type: 'image', bucket: 'media', folder: 'blog' },
+  { key: 'is_published', label: 'Publish immediately', type: 'checkbox' },
+]
+
+export default async function CMSPage() {
+  await requireAdmin()
+  const supabase = await createClient()
+
+  const [settingsRes, services, gallery, clinicPhotos, videos, doctors, testimonials, blog] =
+    await Promise.all([
+    supabase.from('site_settings').select('key, value'),
+    supabase.from('services').select('*').order('sort_order'),
+    supabase.from('gallery').select('*').order('sort_order'),
+    supabase.from('clinic_photos').select('*').order('sort_order'),
+    supabase.from('videos').select('*').order('sort_order'),
+    supabase.from('doctors').select('*').order('sort_order'),
+    supabase.from('testimonials').select('*').order('created_at', { ascending: false }),
+    supabase.from('blog_posts').select('*').order('created_at', { ascending: false }),
+  ])
+
+  const settingsMap: Record<string, Record<string, unknown>> = {}
+  for (const row of settingsRes.data ?? []) {
+    settingsMap[row.key] = row.value as Record<string, unknown>
+  }
+
+  return (
+    <div>
+      <h1 className="font-display text-2xl font-semibold text-clinic-ink">Edit Website</h1>
+      <p className="mt-1 text-sm text-clinic-ink/60">
+        Website ka content yahan se edit karein. Save karte hi live ho jata hai.
+      </p>
+
+      <div className="mt-6">
+        <CMSSettings initial={settingsMap} />
+      </div>
+
+      <div className="mt-8 grid gap-6">
+        <CMSContentManager
+          table="services"
+          title="Treatments / Services"
+          hint="Edit dabayein aur picture lagayein."
+          fields={SERVICE_FIELDS}
+          rows={services.data ?? []}
+          displayKey="title"
+          subtitleKey="department"
+        />
+
+        <CMSContentManager
+          table="clinic_photos"
+          title="Clinic Photos"
+          hint="Clinic ke andar aur bahar ki tasveerein, website par nazar aayengi."
+          fields={CLINIC_PHOTO_FIELDS}
+          rows={clinicPhotos.data ?? []}
+          displayKey="caption"
+          subtitleKey="image_url"
+        />
+
+        <CMSContentManager
+          table="gallery"
+          title="Before & After Gallery"
+          fields={GALLERY_FIELDS}
+          rows={gallery.data ?? []}
+          displayKey="title"
+          subtitleKey="category"
+        />
+
+        <CMSContentManager
+          table="videos"
+          title="Videos (YouTube)"
+          hint=""
+          fields={VIDEO_FIELDS}
+          rows={videos.data ?? []}
+          displayKey="title"
+          subtitleKey="youtube_url"
+        />
+
+        <CMSContentManager
+          table="doctors"
+          title="Doctors Panel"
+          hint="Tarteeb 1 wala doctor home page par bara dikhega, baaqi uske neeche chhote."
+          fields={DOCTOR_FIELDS}
+          rows={doctors.data ?? []}
+          displayKey="full_name"
+          subtitleKey="qualification"
+        />
+
+        <CMSContentManager
+          table="testimonials"
+          title="Testimonials / Reviews"
+          hint="Approve kiye bagair review website par nahi dikhega."
+          fields={TESTIMONIAL_FIELDS}
+          rows={testimonials.data ?? []}
+          displayKey="patient_name"
+          subtitleKey="review_text"
+        />
+
+        <CMSContentManager
+          table="blog_posts"
+          title="Blog & Health Tips"
+          fields={BLOG_FIELDS}
+          rows={blog.data ?? []}
+          displayKey="title"
+          subtitleKey="slug"
+        />
+      </div>
+    </div>
+  )
+}
