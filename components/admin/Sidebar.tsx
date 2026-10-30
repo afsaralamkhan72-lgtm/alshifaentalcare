@@ -137,6 +137,9 @@ export default function Sidebar({ role }: { role: Role }) {
             )
           })}
         </nav>
+        <p className="px-6 pb-6 text-[10px] text-white/30">
+          Version {process.env.NEXT_PUBLIC_BUILD_DATE} · {process.env.NEXT_PUBLIC_BUILD_ID}
+        </p>
       </aside>
     </>
   )

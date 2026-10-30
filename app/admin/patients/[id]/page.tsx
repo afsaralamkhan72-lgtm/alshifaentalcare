@@ -306,14 +306,6 @@ export default async function PatientDetailPage({ params }: Props) {
                   ? `Continue History (${history.completed_step}/8)`
                   : 'Start History'}
             </Link>
-            {canBill && (
-              <Link
-                href={`/admin/patients/${patient.id}/invoice`}
-                className="rounded-full border border-clinic-teal px-4 py-2 text-sm font-semibold text-clinic-teal"
-              >
-                Invoice
-              </Link>
-            )}
             <PortalLinkButton
               patientId={patient.id}
               patientName={patient.full_name}
@@ -377,29 +369,7 @@ export default async function PatientDetailPage({ params }: Props) {
       </div>
 
       {/* Record summary at a glance */}
-      <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-5">
-        {canBill && (
-        <>
-        <div className="rounded-2xl border border-clinic-teal/10 bg-white p-4">
-          <p className="text-xs text-clinic-ink/50">Total Value</p>
-          <p className="mt-1 font-display text-lg font-semibold text-clinic-ink">
-            Rs. {totalValue.toLocaleString()}
-          </p>
-        </div>
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-          <p className="text-xs text-emerald-700/70">Paid</p>
-          <p className="mt-1 font-display text-lg font-semibold text-emerald-700">
-            Rs. {totalPaid.toLocaleString()}
-          </p>
-        </div>
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-          <p className="text-xs text-amber-700/70">Balance</p>
-          <p className="mt-1 font-display text-lg font-semibold text-amber-700">
-            Rs. {balance.toLocaleString()}
-          </p>
-        </div>
-        </>
-        )}
+      <div className="mt-4 grid max-w-sm grid-cols-2 gap-4">
         <div className="rounded-2xl border border-clinic-teal/10 bg-white p-4">
           <p className="text-xs text-clinic-ink/50">Visits</p>
           <p className="mt-1 font-display text-lg font-semibold text-clinic-ink">
@@ -413,6 +383,141 @@ export default async function PatientDetailPage({ params }: Props) {
           </p>
         </div>
       </div>
+
+      {patient.department === 'dental' ? (
+        <div id="dental-chart" className="mt-6 scroll-mt-6">
+          <h2 className="font-display text-lg font-semibold text-clinic-ink">Interactive Dental Chart</h2>
+          <div className="mt-3">
+            <DentalChart patientId={patient.id} initialRecords={dentalRecords} />
+          </div>
+        </div>
+      ) : null}
+      {/* Treatment plans, orthodontics and any other multi-month course */}
+      {canBill && (
+      <div id="treatment-plans" className="mt-8 scroll-mt-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-display text-lg font-semibold text-clinic-ink">Treatment Plans</h2>
+            <p className="text-sm text-clinic-ink/60">
+              Monthly instalments, payment history and balance.
+            </p>
+          </div>
+          <TreatmentPlanForm patientId={patient.id} />
+        </div>
+
+        <div className="mt-4 grid gap-4">
+          {plans.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-clinic-teal/20 bg-clinic-mint/40 p-6 text-center text-sm text-clinic-ink/60">
+              Koi treatment plan nahi hai. Braces jaise long treatment ke liye plan banayein ·
+              har month ki installment khud ban jayegi.
+            </div>
+          ) : (
+            plans.map((plan) => (
+              <TreatmentPlanCard
+                key={plan.id}
+                plan={plan}
+                installments={installments.filter((i) => i.plan_id === plan.id)}
+                patientId={patient.id}
+                patientName={patient.full_name}
+                patientPhone={patient.phone}
+                portalCode={patient.portal_code ?? null}
+              />
+            ))
+          )}
+        </div>
+      </div>
+      )}
+
+      <div className="mt-6">
+        <VisitTimeline entries={timeline} patientId={patient.id} />
+      </div>
+
+      <div id="visit-notes" className="mt-8 scroll-mt-6">
+        <VisitNotes patientId={patient.id} notes={visits} />
+      </div>
+
+      {canBill && episodes.length > 0 && (
+        <div className="mt-8">
+          <PastTreatments patientId={patient.id} episodes={episodes} />
+        </div>
+      )}
+
+      <div id="patient-photos" className="mt-8 scroll-mt-6">
+        <PatientPhotoGallery patientId={patient.id} photos={photos} />
+      </div>
+
+      <div className="mt-8">
+        <PatientRecalls patientId={patient.id} recalls={recalls} />
+      </div>
+
+      {/* Prescription history */}
+      <div className="mt-8">
+        <h2 className="font-display text-lg font-semibold text-clinic-ink">Prescriptions</h2>
+        <div className="mt-3 divide-y divide-clinic-teal/10 rounded-2xl border border-clinic-teal/10 bg-white">
+          {prescriptions.length === 0 ? (
+            <p className="px-4 py-6 text-center text-sm text-clinic-ink/50">
+              No prescriptions recorded.
+            </p>
+          ) : (
+            prescriptions.map((rx) => {
+              const items = (rx.items ?? []) as { name_en?: string; name_ur?: string }[]
+              return (
+                <div key={rx.id} className="px-4 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm font-medium capitalize text-clinic-ink">
+                      {rx.department}
+                    </p>
+                    <p className="text-xs text-clinic-ink/40">
+                      {new Date(rx.prescribed_date).toLocaleDateString('en-GB')}
+                    </p>
+                  </div>
+                  <p className="mt-1 text-sm text-clinic-ink/60">
+                    {items.map((it) => it.name_en || it.name_ur).filter(Boolean).join(' · ')}
+                  </p>
+                  {rx.notes_en && (
+                    <p className="mt-1 text-xs text-clinic-ink/50">{rx.notes_en}</p>
+                  )}
+                </div>
+              )
+            })
+          )}
+        </div>
+      </div>
+
+      {/* Appointment history, matched on phone number */}
+      <div className="mt-8">
+        <h2 className="font-display text-lg font-semibold text-clinic-ink">Appointments</h2>
+        <div className="mt-3 divide-y divide-clinic-teal/10 rounded-2xl border border-clinic-teal/10 bg-white">
+          {appointments.length === 0 ? (
+            <p className="px-4 py-6 text-center text-sm text-clinic-ink/50">
+              No appointments found for this number.
+            </p>
+          ) : (
+            appointments.map((a) => (
+              <div key={a.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+                <div>
+                  <p className="text-sm text-clinic-ink">{a.treatment_name ?? 'Consultation'}</p>
+                  <p className="text-xs text-clinic-ink/50">
+                    {a.preferred_date
+                      ? new Date(a.preferred_date).toLocaleDateString('en-GB')
+                      : '—'}
+                    {a.preferred_time ? ` · ${a.preferred_time}` : ''}
+                  </p>
+                </div>
+                <span className="rounded-full bg-clinic-mint px-3 py-1 text-xs font-semibold capitalize text-clinic-ink/60">
+                  {a.status}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {canBill && (
+      <h2 className="mt-10 border-t border-clinic-teal/10 pt-6 font-display text-xl font-semibold text-clinic-ink">
+        Bill / Hisaab
+      </h2>
+      )}
 
       {canBill && (
       <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -464,10 +569,12 @@ export default async function PatientDetailPage({ params }: Props) {
       />
       )}
 
-      <div className="mt-6">
-        <VisitTimeline entries={timeline} patientId={patient.id} />
-      </div>
-
+      {canBill && (
+      <details className="mt-8 rounded-2xl border border-clinic-teal/10 bg-white p-4">
+        <summary className="cursor-pointer font-display text-lg font-semibold text-clinic-ink">
+          Hisaab ki Tafseel (Ledger · Invoices · Payments)
+        </summary>
+        <div className="mt-4">
       {canBill && ledgerBalance && (
         <div className="mt-8">
           <h2 className="font-display text-lg font-semibold text-clinic-ink">Patient Ledger</h2>
@@ -512,94 +619,6 @@ export default async function PatientDetailPage({ params }: Props) {
         </div>
       )}
 
-      {/* Treatment plans, orthodontics and any other multi-month course */}
-      {canBill && (
-      <div id="treatment-plans" className="mt-8 scroll-mt-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="font-display text-lg font-semibold text-clinic-ink">Treatment Plans</h2>
-            <p className="text-sm text-clinic-ink/60">
-              Monthly instalments, payment history and balance.
-            </p>
-          </div>
-          <TreatmentPlanForm patientId={patient.id} />
-        </div>
-
-        <div className="mt-4 grid gap-4">
-          {plans.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-clinic-teal/20 bg-clinic-mint/40 p-6 text-center text-sm text-clinic-ink/60">
-              Koi treatment plan nahi hai. Braces jaise long treatment ke liye plan banayein ·
-              har month ki installment khud ban jayegi.
-            </div>
-          ) : (
-            plans.map((plan) => (
-              <TreatmentPlanCard
-                key={plan.id}
-                plan={plan}
-                installments={installments.filter((i) => i.plan_id === plan.id)}
-                patientId={patient.id}
-                patientName={patient.full_name}
-                patientPhone={patient.phone}
-                portalCode={patient.portal_code ?? null}
-              />
-            ))
-          )}
-        </div>
-      </div>
-      )}
-
-      <div className="mt-8">
-        <PatientRecalls patientId={patient.id} recalls={recalls} />
-      </div>
-
-      <div id="visit-notes" className="mt-8 scroll-mt-6">
-        <VisitNotes patientId={patient.id} notes={visits} />
-      </div>
-
-      {canBill && episodes.length > 0 && (
-        <div className="mt-8">
-          <PastTreatments patientId={patient.id} episodes={episodes} />
-        </div>
-      )}
-
-      <div id="patient-photos" className="mt-8 scroll-mt-6">
-        <PatientPhotoGallery patientId={patient.id} photos={photos} />
-      </div>
-
-      {/* Prescription history */}
-      <div className="mt-8">
-        <h2 className="font-display text-lg font-semibold text-clinic-ink">Prescriptions</h2>
-        <div className="mt-3 divide-y divide-clinic-teal/10 rounded-2xl border border-clinic-teal/10 bg-white">
-          {prescriptions.length === 0 ? (
-            <p className="px-4 py-6 text-center text-sm text-clinic-ink/50">
-              No prescriptions recorded.
-            </p>
-          ) : (
-            prescriptions.map((rx) => {
-              const items = (rx.items ?? []) as { name_en?: string; name_ur?: string }[]
-              return (
-                <div key={rx.id} className="px-4 py-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm font-medium capitalize text-clinic-ink">
-                      {rx.department}
-                    </p>
-                    <p className="text-xs text-clinic-ink/40">
-                      {new Date(rx.prescribed_date).toLocaleDateString('en-GB')}
-                    </p>
-                  </div>
-                  <p className="mt-1 text-sm text-clinic-ink/60">
-                    {items.map((it) => it.name_en || it.name_ur).filter(Boolean).join(' · ')}
-                  </p>
-                  {rx.notes_en && (
-                    <p className="mt-1 text-xs text-clinic-ink/50">{rx.notes_en}</p>
-                  )}
-                </div>
-              )
-            })
-          )}
-        </div>
-      </div>
-
       {/* Payment history */}
       {canBill && (
       <div className="mt-8">
@@ -643,48 +662,10 @@ export default async function PatientDetailPage({ params }: Props) {
       </div>
       )}
 
-      {/* Appointment history, matched on phone number */}
-      <div className="mt-8">
-        <h2 className="font-display text-lg font-semibold text-clinic-ink">Appointments</h2>
-        <div className="mt-3 divide-y divide-clinic-teal/10 rounded-2xl border border-clinic-teal/10 bg-white">
-          {appointments.length === 0 ? (
-            <p className="px-4 py-6 text-center text-sm text-clinic-ink/50">
-              No appointments found for this number.
-            </p>
-          ) : (
-            appointments.map((a) => (
-              <div key={a.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
-                <div>
-                  <p className="text-sm text-clinic-ink">{a.treatment_name ?? 'Consultation'}</p>
-                  <p className="text-xs text-clinic-ink/50">
-                    {a.preferred_date
-                      ? new Date(a.preferred_date).toLocaleDateString('en-GB')
-                      : '—'}
-                    {a.preferred_time ? ` · ${a.preferred_time}` : ''}
-                  </p>
-                </div>
-                <span className="rounded-full bg-clinic-mint px-3 py-1 text-xs font-semibold capitalize text-clinic-ink/60">
-                  {a.status}
-                </span>
-              </div>
-            ))
-          )}
         </div>
-      </div>
-
-      {patient.department === 'dental' ? (
-        <div id="dental-chart" className="mt-8 scroll-mt-6">
-          <h2 className="font-display text-lg font-semibold text-clinic-ink">Interactive Dental Chart</h2>
-          <div className="mt-3">
-            <DentalChart patientId={patient.id} initialRecords={dentalRecords} />
-          </div>
-        </div>
-      ) : (
-        <div className="mt-6 rounded-2xl border border-dashed border-clinic-teal/20 bg-clinic-mint/40 p-6 text-center text-sm text-clinic-ink/60">
-          Homeopathic patients ke liye dental chart applicable nahi. Prescriptions module
-          agle phase mein aayega.
-        </div>
+      </details>
       )}
+
     </div>
   )
 }

@@ -81,14 +81,14 @@ export default function PatientQuickActions({
           >
             + Month Payment
           </a>
-        ) : (
+        ) : balance > 0 ? (
           <Link
             href={`/admin/patients/${patientId}/invoice`}
             className="rounded-full bg-clinic-teal px-4 py-2 text-sm font-semibold text-white"
           >
-            + Treatment / Payment
+            Payment Lo
           </Link>
-        )}
+        ) : null}
 
         <a
           href="#visit-notes"
@@ -112,13 +112,6 @@ export default function PatientQuickActions({
         >
           Statement WhatsApp
         </a>
-
-        <Link
-          href={`/admin/patients/${patientId}/invoice`}
-          className="rounded-full border border-clinic-teal/30 px-4 py-2 text-sm font-semibold text-clinic-ink/80"
-        >
-          PDF / Print
-        </Link>
 
         <a
           href={`tel:${patientPhone.replace(/[^0-9+]/g, '')}`}

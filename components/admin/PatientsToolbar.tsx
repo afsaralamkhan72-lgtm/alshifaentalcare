@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
@@ -34,7 +33,6 @@ export default function PatientsToolbar({
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState<FormState>(INITIAL)
   const [saving, setSaving] = useState(false)
-  const [created, setCreated] = useState<{ id: string; name: string } | null>(null)
   const [error, setError] = useState('')
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
@@ -73,8 +71,7 @@ export default function PatientsToolbar({
 
     setForm(INITIAL)
     setOpen(false)
-    setCreated({ id: created.id, name: form.full_name })
-    router.refresh()
+    router.push(`/admin/patients/${created.id}`)
   }
 
   return (
@@ -85,46 +82,6 @@ export default function PatientsToolbar({
       >
         + Add Patient
       </button>
-
-      {created && (
-        <div className="fixed inset-x-4 bottom-6 z-50 mx-auto max-w-md rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-lg sm:inset-x-auto sm:right-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="font-medium text-emerald-900">
-              {created.name} register ho gaya
-            </p>
-            <button
-              onClick={() => setCreated(null)}
-              className="text-emerald-800/50 hover:text-emerald-900"
-            >
-              ✕
-            </button>
-          </div>
-
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Link
-              href={`/admin/patients/${created.id}/invoice`}
-              className="rounded-full bg-clinic-teal px-4 py-2 text-sm font-semibold text-white"
-            >
-              Bill Banayein
-            </Link>
-            <Link
-              href={`/admin/patients/${created.id}`}
-              className="rounded-full border border-clinic-teal px-4 py-2 text-sm font-semibold text-clinic-teal"
-            >
-              Profile
-            </Link>
-            <button
-              onClick={() => {
-                setCreated(null)
-                setOpen(true)
-              }}
-              className="rounded-full px-4 py-2 text-sm font-medium text-emerald-800/70 hover:underline"
-            >
-              Agla patient
-            </button>
-          </div>
-        </div>
-      )}
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
