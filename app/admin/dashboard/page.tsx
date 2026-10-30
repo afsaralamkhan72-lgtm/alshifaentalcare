@@ -2,15 +2,15 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import StatCard from '@/components/admin/StatCard'
 import { toInternationalPKNumber } from '@/lib/whatsapp'
+import { getStaffProfile, isOwnerRole } from '@/lib/auth'
+import OwnerToday from '@/components/admin/OwnerToday'
+import { todayKarachi } from '@/lib/karachi'
 
 function monthBounds(month: string) {
   const [y, m] = month.split('-').map(Number)
-  const start = new Date(y, m - 1, 1)
-  const end = new Date(y, m, 0)
-  return {
-    start: start.toISOString().slice(0, 10),
-    end: end.toISOString().slice(0, 10),
-  }
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate()
+  return { start: `${y}-${pad(m)}-01`, end: `${y}-${pad(m)}-${pad(last)}` }
 }
 
 function shiftMonth(month: string, delta: number) {
@@ -19,7 +19,7 @@ function shiftMonth(month: string, delta: number) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
-async function getDashboardStats(month: string) {
+async function getDashboardStats(month: string, canSeeMoney: boolean) {
   const supabase = await createClient()
   const { start: monthStart, end: monthEnd } = monthBounds(month)
 
@@ -27,18 +27,22 @@ async function getDashboardStats(month: string) {
     supabase.from('patients').select('*', { count: 'exact', head: true }).is('deleted_at', null),
     supabase.from('patients').select('*', { count: 'exact', head: true }).is('deleted_at', null).eq('department', 'dental'),
     supabase.from('patients').select('*', { count: 'exact', head: true }).is('deleted_at', null).eq('department', 'homeopathic'),
-    supabase
-      .from('transactions')
-      .select('amount, treatment_name, category, patient_id')
-      .eq('type', 'income')
-      .gte('transaction_date', monthStart)
-      .lte('transaction_date', monthEnd),
-    supabase
-      .from('transactions')
-      .select('amount')
-      .eq('type', 'expense')
-      .gte('transaction_date', monthStart)
-      .lte('transaction_date', monthEnd),
+    canSeeMoney
+      ? supabase
+          .from('transactions')
+          .select('amount, treatment_name, category, patient_id')
+          .eq('type', 'income')
+          .gte('transaction_date', monthStart)
+          .lte('transaction_date', monthEnd)
+      : Promise.resolve({ data: [] as { amount: number; treatment_name: string | null; category: string | null; patient_id: string | null }[] }),
+    canSeeMoney
+      ? supabase
+          .from('transactions')
+          .select('amount')
+          .eq('type', 'expense')
+          .gte('transaction_date', monthStart)
+          .lte('transaction_date', monthEnd)
+      : Promise.resolve({ data: [] as { amount: number }[] }),
     supabase
       .from('appointments')
       .select('id, patient_name, phone, department, treatment_name, created_at')
@@ -48,14 +52,16 @@ async function getDashboardStats(month: string) {
   ])
 
   // Baqaya payments jo aaj ya us se pehle due hain
-  const todayStr = new Date().toISOString().slice(0, 10)
-  const { data: dueRows } = await supabase
-    .from('transactions')
-    .select('balance_due, due_date, patients(full_name)')
-    .gt('balance_due', 0)
-    .is('settled_at', null)
-    .lte('due_date', todayStr)
-    .order('due_date', { ascending: true })
+  const todayStr = todayKarachi()
+  const { data: dueRows } = canSeeMoney
+    ? await supabase
+        .from('transactions')
+        .select('balance_due, due_date, patients(full_name)')
+        .gt('balance_due', 0)
+        .is('settled_at', null)
+        .lte('due_date', todayStr)
+        .order('due_date', { ascending: true })
+    : { data: [] }
 
   const dues = (dueRows ?? []) as unknown as {
     balance_due: number
@@ -105,13 +111,22 @@ async function getDashboardStats(month: string) {
   } else {
     deptIncome.other = income
   }
-  const expense = expenseRes.data?.reduce((sum, t) => sum + Number(t.amount), 0) ?? 0
+  let expense = expenseRes.data?.reduce((sum, t) => sum + Number(t.amount), 0) ?? 0
+  let incomeTotal = income
+  // Phase 9: poore mahine ka total database se (select ki 1000 rows ki hadd se bachne ke liye)
+  if (canSeeMoney) {
+    const { data: rep } = await supabase.rpc('report_summary', { p_from: monthStart, p_to: monthEnd })
+    if (rep) {
+      incomeTotal = Number((rep as { income: number }).income)
+      expense = Number((rep as { expense: number }).expense)
+    }
+  }
 
   return {
     totalPatients: totalRes.count ?? 0,
     dentalCount: dentalRes.count ?? 0,
     homeoCount: homeoRes.count ?? 0,
-    income,
+    income: incomeTotal,
     expense,
     pendingAppointments: pendingRes.data ?? [],
     dues,
@@ -127,19 +142,32 @@ export default async function DashboardPage({
   searchParams: Promise<{ month?: string }>
 }) {
   const params = await searchParams
-  const now = new Date()
-  const month =
-    params.month || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const currentMonth = todayKarachi().slice(0, 7)
+  const month = /^\d{4}-\d{2}$/.test(params.month ?? '') ? (params.month as string) : currentMonth
 
-  const stats = await getDashboardStats(month)
+  const profile = await getStaffProfile()
+  const canSeeMoney = isOwnerRole(profile.role)
+  const stats = await getDashboardStats(month, canSeeMoney)
+
+  // Samaan ke alerts: kam stock aur 30 din mein expiry (sab staff ke liye, is mein paisa nahi)
+  const supabaseAlerts = await createClient()
+  const { data: stockRows } = await supabaseAlerts
+    .from('inventory')
+    .select('item_name, quantity, unit, reorder_level, expiry_date')
+  const { data: offRows } = await supabaseAlerts.from('inventory').select('item_name').eq('is_active', false)
+  const offNames = new Set((offRows ?? []).map((r) => r.item_name))
+  const liveStock = (stockRows ?? []).filter((r) => !offNames.has(r.item_name))
+  const lowStock = liveStock.filter((r) => Number(r.quantity) <= Number(r.reorder_level))
+  const expiring = liveStock.filter(
+    (r) => r.expiry_date && (new Date(r.expiry_date).getTime() - Date.now()) / 86_400_000 <= 30
+  )
   const { dues, dueAmount } = stats
 
   const monthLabel = new Date(`${month}-01`).toLocaleDateString('en-GB', {
     month: 'long',
     year: 'numeric',
   })
-  const isCurrentMonth =
-    month === `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const isCurrentMonth = month === currentMonth
 
   return (
     <div>
@@ -188,11 +216,38 @@ export default async function DashboardPage({
         <StatCard label="Total Patients" value={stats.totalPatients} />
         <StatCard label="Dental Patients" value={stats.dentalCount} accent="teal" />
         <StatCard label="Homeopathic Patients" value={stats.homeoCount} accent="amber" />
-        <StatCard label={`Income (${monthLabel})`} value={`Rs. ${stats.income.toLocaleString()}`} accent="green" />
-        <StatCard label={`Expenses (${monthLabel})`} value={`Rs. ${stats.expense.toLocaleString()}`} accent="red" />
+        {canSeeMoney && (
+          <>
+            <StatCard label={`Income (${monthLabel})`} value={`Rs. ${stats.income.toLocaleString()}`} accent="green" />
+            <StatCard label={`Expenses (${monthLabel})`} value={`Rs. ${stats.expense.toLocaleString()}`} accent="red" />
+          </>
+        )}
       </div>
 
+      {canSeeMoney && <OwnerToday />}
+
+      {(lowStock.length > 0 || expiring.length > 0) && (
+        <div className="mt-6 grid gap-3 sm:grid-cols-2">
+          {lowStock.length > 0 && (
+            <Link href="/admin/inventory" className="rounded-2xl border border-red-200 bg-red-50 p-4">
+              <p className="text-sm font-semibold text-red-700">{lowStock.length} samaan khatam hone wala hai</p>
+              <p className="mt-1 text-xs text-red-600">
+                {lowStock.slice(0, 6).map((i) => `${i.item_name} (${Number(i.quantity)})`).join(', ')}
+                {lowStock.length > 6 ? ' ...' : ''}
+              </p>
+            </Link>
+          )}
+          {expiring.length > 0 && (
+            <Link href="/admin/inventory" className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <p className="text-sm font-semibold text-amber-700">{expiring.length} samaan ki expiry qareeb hai</p>
+              <p className="mt-1 text-xs text-amber-600">{expiring.slice(0, 6).map((i) => i.item_name).join(', ')}</p>
+            </Link>
+          )}
+        </div>
+      )}
+
       {/* Income kahan se aa rahi hai */}
+      {canSeeMoney && (
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
         <section className="rounded-2xl border border-clinic-teal/10 bg-white p-6">
           <p className="font-display font-semibold text-clinic-ink">
@@ -276,6 +331,7 @@ export default async function DashboardPage({
           </Link>
         </section>
       </div>
+      )}
 
       <div className="mt-8">
         <h2 className="font-display text-lg font-semibold text-clinic-ink">Pending Appointment Requests</h2>

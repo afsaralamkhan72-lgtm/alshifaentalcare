@@ -1,8 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
+import { requireOwner } from '@/lib/auth'
 import StatCard from '@/components/admin/StatCard'
 import TransactionForm from '@/components/admin/TransactionForm'
 import EditTransactionButton from '@/components/admin/EditTransactionButton'
 import DeleteTransactionButton from '@/components/admin/DeleteTransactionButton'
+import { todayKarachi } from '@/lib/karachi'
 
 interface SearchParams {
   from?: string
@@ -10,12 +12,11 @@ interface SearchParams {
 }
 
 function todayStr() {
-  return new Date().toISOString().slice(0, 10)
+  return todayKarachi()
 }
 
 function firstOfMonth() {
-  const d = new Date()
-  return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10)
+  return `${todayKarachi().slice(0, 7)}-01`
 }
 
 async function getTransactions(from: string, to: string) {
@@ -26,7 +27,7 @@ async function getTransactions(from: string, to: string) {
     .gte('transaction_date', from)
     .lte('transaction_date', to)
     .order('transaction_date', { ascending: false })
-    .limit(300)
+    .limit(500)
   return data ?? []
 }
 
@@ -37,26 +38,40 @@ export default async function BillingPage({
 }: {
   searchParams: Promise<SearchParams>
 }) {
+  await requireOwner()
   const params = await searchParams
   const from = params.from || firstOfMonth()
   const to = params.to || todayStr()
 
   const transactions = await getTransactions(from, to)
+  const supabaseCat = await createClient()
+  const { data: catRows } = await supabaseCat
+    .from('expense_categories')
+    .select('name')
+    .eq('is_active', true)
+    .order('sort_order')
+  const expenseCategories = (catRows ?? []).map((c) => c.name as string)
 
-  const income = transactions
-    .filter((t) => t.type === 'income')
-    .reduce((s, t) => s + Number(t.amount), 0)
-  const expense = transactions
-    .filter((t) => t.type === 'expense')
-    .reduce((s, t) => s + Number(t.amount), 0)
+  // Phase 9: kul raqam database se (list sirf pehli 500 dikhati hai, total hamesha poora)
+  const supabaseTot = await createClient()
+  const { data: rep } = await supabaseTot.rpc('report_summary', { p_from: from, p_to: to })
+  const tooMany = transactions.length >= 500
+  const income = rep
+    ? Number((rep as { income: number }).income)
+    : transactions.filter((t) => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0)
+  const expense = rep
+    ? Number((rep as { expense: number }).expense)
+    : transactions.filter((t) => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0)
 
-  // Income split by payment method, shows how much came via cash vs bank
-  // vs mobile wallets in the selected period.
+  // Income split by payment method
+  const repMethods = rep ? ((rep as { income_by_method: Record<string, number> }).income_by_method ?? {}) : null
   const byMethod = METHODS.map((m) => ({
     method: m,
-    total: transactions
-      .filter((t) => t.type === 'income' && t.payment_method === m)
-      .reduce((s, t) => s + Number(t.amount), 0),
+    total: repMethods
+      ? Number(repMethods[m] ?? 0)
+      : transactions
+          .filter((t) => t.type === 'income' && t.payment_method === m)
+          .reduce((s, t) => s + Number(t.amount), 0),
   }))
 
   return (
@@ -68,7 +83,7 @@ export default async function BillingPage({
             {from} se {to} tak ka record
           </p>
         </div>
-        <TransactionForm />
+        <TransactionForm expenseCategories={expenseCategories} />
       </div>
 
       <form className="mt-6 flex flex-wrap items-end gap-3">
@@ -116,6 +131,11 @@ export default async function BillingPage({
         ))}
       </div>
 
+      {tooMany && (
+        <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-800">
+          Neeche list mein sirf sab se nayi 500 entries hain. Upar ke totals poori muddat ke hain. Poori list ke liye tareekh chhoti karein.
+        </p>
+      )}
       <div className="mt-8 overflow-x-auto rounded-2xl border border-clinic-teal/10 bg-white">
         <table className="w-full text-sm">
           <thead className="bg-clinic-mint text-left text-clinic-ink/60">

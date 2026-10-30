@@ -24,17 +24,17 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (!profile || !profile.is_active) redirect('/login')
 
   return (
-    <div className="flex min-h-screen bg-clinic-sand">
+    <div className="admin-shell flex min-h-screen bg-clinic-sand">
       <Sidebar role={profile.role as 'admin' | 'doctor' | 'receptionist'} />
 
       <div className="min-w-0 flex-1">
         <header className="flex items-center justify-between border-b border-clinic-teal/10 bg-white px-4 py-3 pl-20 sm:px-6 lg:pl-6">
           <div>
-            <p className="text-sm text-clinic-ink/50">Welcome back,</p>
+            <p className="text-sm text-clinic-ink/50">Assalam o Alaikum,</p>
             <p className="font-display font-semibold text-clinic-ink">{profile.full_name}</p>
           </div>
           <div className="flex items-center gap-3">
-            <AssistantBar />
+            {profile.role !== 'receptionist' && <AssistantBar />}
             <span className="hidden rounded-full bg-clinic-mint px-3 py-1 text-xs font-semibold capitalize text-clinic-teal sm:inline">
               {profile.role}
             </span>

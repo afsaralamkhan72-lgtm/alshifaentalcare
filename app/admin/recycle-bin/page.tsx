@@ -1,16 +1,12 @@
 import { createClient } from '@/lib/supabase/server'
+import { requireAdmin } from '@/lib/auth'
 import RecycleBinList, { type BinPatient, type BinAppointment } from '@/components/admin/RecycleBinList'
 
 export default async function RecycleBinPage() {
+  await requireAdmin()
   const supabase = await createClient()
 
-  // Auto-purge: anything sitting in the bin longer than 30 days is removed
-  // permanently. Runs whenever this page is opened.
-  const cutoff = new Date(Date.now() - 30 * 86_400_000).toISOString()
-  await Promise.all([
-    supabase.from('patients').delete().lt('deleted_at', cutoff),
-    supabase.from('appointments').delete().lt('deleted_at', cutoff),
-  ])
+  // Phase 0: auto-purge BAND. Recycle Bin se kuch khud nahi mitta.
 
   const [patientsRes, apptRes] = await Promise.all([
     supabase
@@ -45,11 +41,11 @@ export default async function RecycleBinPage() {
     <div>
       <h1 className="font-display text-2xl font-semibold text-clinic-ink">Recycle Bin</h1>
       <p className="mt-1 text-sm text-clinic-ink/60">
-        Delete kiye gaye records yahan mehfooz rehte hain. Wapas laa sakte hain ya hamesha ke
-        liye mita sakte hain.
+        Delete kiye gaye records yahan mehfooz rehte hain. Aap inhe kisi bhi waqt wapas la sakte
+        hain.
       </p>
       <p className="mt-2 rounded-xl bg-clinic-mint px-4 py-2 text-xs text-clinic-ink/60">
-        30 din ke baad ye records khud ba khud hamesha ke liye mit jate hain.
+        Yahan se kuch khud ba khud nahi mitta.
       </p>
 
       <RecycleBinList

@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import AppointmentBoard, { type Appointment } from '@/components/admin/AppointmentBoard'
+import { todayKarachi } from '@/lib/karachi'
 
 function shiftDate(dateStr: string, days: number) {
   const d = new Date(dateStr)
@@ -14,7 +15,7 @@ export default async function AppointmentsPage({
   searchParams: Promise<{ date?: string; status?: string }>
 }) {
   const params = await searchParams
-  const date = params.date || new Date().toISOString().slice(0, 10)
+  const date = params.date || todayKarachi()
   const status = params.status || 'all'
 
   const supabase = await createClient()
@@ -45,7 +46,7 @@ export default async function AppointmentsPage({
     completed: allDay?.filter((a) => a.status === 'completed').length ?? 0,
   }
 
-  const isToday = date === new Date().toISOString().slice(0, 10)
+  const isToday = date === todayKarachi()
 
   return (
     <div>

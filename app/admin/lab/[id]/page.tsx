@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import LabOrderActions from '@/components/admin/LabOrderActions'
+import LabMoney from '@/components/admin/LabMoney'
 import ClinicLogo from '@/components/ClinicLogo'
 import { toothLabel } from '@/lib/teeth'
 import { CLINIC } from '@/clinic.config'
@@ -21,6 +22,7 @@ interface LabCase {
   due_date: string | null
   status: string
   cost: number | null
+  lab_paid: number | null
   patients: { full_name: string; mr_number: string | null; age: number | null; gender: string | null } | null
 }
 
@@ -35,7 +37,7 @@ export default async function LabOrderPage({ params }: { params: Promise<{ id: s
   const { data, error } = await supabase
     .from('lab_cases')
     .select(
-      'id, case_number, lab_name, lab_whatsapp, work_type, tooth_numbers, shade, material, pontic_design, instructions, impression_date, due_date, status, cost, patients(full_name, mr_number, age, gender)'
+      'id, case_number, lab_name, lab_whatsapp, work_type, tooth_numbers, shade, material, pontic_design, instructions, impression_date, due_date, status, cost, lab_paid, patients(full_name, mr_number, age, gender)'
     )
     .eq('id', id)
     .single()
@@ -61,6 +63,7 @@ export default async function LabOrderPage({ params }: { params: Promise<{ id: s
       </Link>
 
       <div className="mt-3">
+        <LabMoney caseId={c.id} status={c.status} cost={Number(c.cost ?? 0)} labPaid={Number(c.lab_paid ?? 0)} />
         <LabOrderActions
           caseNumber={c.case_number ?? ''}
           labName={c.lab_name}

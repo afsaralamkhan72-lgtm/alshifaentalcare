@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+import { getStaffProfile, isOwnerRole } from '@/lib/auth'
 import PatientsToolbar from '@/components/admin/PatientsToolbar'
 import PatientsTable, { type PatientRow } from '@/components/admin/PatientsTable'
 
@@ -11,6 +12,18 @@ interface SearchParams {
 /** Har patient ka baqaya, taake list mein bina khole nazar aaye */
 async function getBalances() {
   const supabase = await createClient()
+
+  // Phase 4: aik hi formula (database view). Na ho to neeche purana tareeqa.
+  const { data: view, error: viewErr } = await supabase
+    .from('patient_balances')
+    .select('patient_id, balance')
+    .gt('balance', 0)
+  if (!viewErr) {
+    const out: Record<string, number> = {}
+    for (const r of view ?? []) out[r.patient_id] = Number(r.balance)
+    return out
+  }
+
   const { data } = await supabase
     .from('transactions')
     .select('patient_id, rate, discount_amount, amount')
@@ -81,10 +94,12 @@ export default async function PatientsPage({
   searchParams: Promise<SearchParams>
 }) {
   const params = await searchParams
+  const profile = await getStaffProfile()
+  const canBill = isOwnerRole(profile.role)
   const [patients, knownDoctors, balances] = await Promise.all([
     getPatients(params),
     getKnownDoctors(),
-    getBalances(),
+    canBill ? getBalances() : Promise.resolve({} as Record<string, number>),
   ])
 
   return (
@@ -123,6 +138,7 @@ export default async function PatientsPage({
           patients={patients as PatientRow[]}
           knownDoctors={knownDoctors}
           balances={balances}
+          canBill={canBill}
         />
       </div>
     </div>

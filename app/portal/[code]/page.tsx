@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
 import { CLINIC } from '@/clinic.config'
+import { todayKarachi } from '@/lib/karachi'
 
 function fmt(d: string | null) {
   return d ? new Date(d).toLocaleDateString('en-GB') : '—'
@@ -41,7 +42,7 @@ export default async function PortalRecordPage({
 
   if (!patient) notFound()
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayKarachi()
 
   const [plansRes, apptRes, visitRes] = await Promise.all([
     supabase
@@ -82,7 +83,22 @@ export default async function PortalRecordPage({
   const paid =
     plans.reduce((s, p) => s + Number(p.advance_paid), 0) +
     installments.reduce((s, i) => s + Number(i.paid_amount), 0)
-  const balance = Math.max(0, total - paid)
+  let balance = Math.max(0, total - paid)
+  let totalShown = total
+  let paidShown = paid
+  // Phase 4: aik hi formula (database view) taake patient ko wahi hisaab dikhe jo clinic ke paas hai
+  {
+    const { data: vb, error: vbErr } = await supabase
+      .from('patient_balances')
+      .select('total_charges, total_paid, balance')
+      .eq('patient_id', patient.id)
+      .maybeSingle()
+    if (!vbErr && vb) {
+      totalShown = Number(vb.total_charges)
+      paidShown = Number(vb.total_paid)
+      balance = Number(vb.balance)
+    }
+  }
   const nextDue = installments.find((i) => Number(i.paid_amount) === 0)
 
   const upcoming = appointments.find(
@@ -148,8 +164,19 @@ export default async function PortalRecordPage({
           </div>
 
           <div className="mt-4 grid grid-cols-3 gap-3 text-center">
-            <Box label="Total" value={`Rs. ${total.toLocaleString()}`} />
-            <Box label="Paid" value={`Rs. ${paid.toLocaleString()}`} tone="green" />
+            <Box label="Total" value={`Rs. ${totalShown.toLocaleString()}`} />
+            <Box label="Paid" value={`Rs. ${paidShown.toLocaleString()}`} tone="green" />
+            <Box label="Balance" value={`Rs. ${balance.toLocaleString()}`} tone="amber" />
+          </div>
+        </section>
+      )}
+
+      {plans.length === 0 && totalShown > 0 && (
+        <section className="mt-8">
+          <h2 className="font-display font-semibold text-clinic-ink">Hisaab</h2>
+          <div className="mt-4 grid grid-cols-3 gap-3 text-center">
+            <Box label="Total" value={`Rs. ${totalShown.toLocaleString()}`} />
+            <Box label="Paid" value={`Rs. ${paidShown.toLocaleString()}`} tone="green" />
             <Box label="Balance" value={`Rs. ${balance.toLocaleString()}`} tone="amber" />
           </div>
         </section>

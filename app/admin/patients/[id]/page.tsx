@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { getStaffProfile, isOwnerRole } from '@/lib/auth'
 import DentalChart from '@/components/admin/DentalChart'
 import PatientEditModal from '@/components/admin/PatientEditModal'
 import TreatmentPlanForm from '@/components/admin/TreatmentPlanForm'
@@ -15,6 +16,10 @@ import PatientProfilePhoto from '@/components/admin/PatientProfilePhoto'
 import PastTreatments, { type Episode } from '@/components/admin/PastTreatments'
 import CloseTreatmentButton from '@/components/admin/CloseTreatmentButton'
 import PatientQuickActions from '@/components/admin/PatientQuickActions'
+import ChargeBuilder, { type CatalogItem, type MaterialRef, type InventoryRef } from '@/components/admin/ChargeBuilder'
+import { todayKarachi, money, fmtDate } from '@/lib/karachi'
+import { toBalance, type LedgerRow, type PatientBalance } from '@/lib/ledger'
+import LedgerTimeline from '@/components/admin/LedgerTimeline'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -23,6 +28,9 @@ interface Props {
 export default async function PatientDetailPage({ params }: Props) {
   const { id } = await params
   const supabase = await createClient()
+  // Reception ko paisa, invoice, treatment plan aur payment history nahi dikhti
+  const staff = await getStaffProfile()
+  const canBill = isOwnerRole(staff.role)
 
   const { data: patient } = await supabase.from('patients').select('*').eq('id', id).single()
   if (!patient) notFound()
@@ -123,6 +131,55 @@ export default async function PatientDetailPage({ params }: Props) {
     installments = (data ?? []) as (Installment & { plan_id: string })[]
   }
 
+  // Phase 3: price list, doctors aur is patient ke naye invoices (sirf owner ke liye)
+  let catalog: CatalogItem[] = []
+  let doctorNames: string[] = []
+  let invoices: { id: string; invoice_number: string; invoice_date: string; total: number; paid_amount: number; balance: number; status: string }[] = []
+  let invoicesReady = false
+  let materials: Record<string, MaterialRef[]> = {}
+  let inventoryRefs: InventoryRef[] = []
+  if (canBill) {
+    const [catRes, invRes, docRes] = await Promise.all([
+      supabase.from('treatment_catalog').select('id, name, price, department').eq('is_active', true).order('name'),
+      supabase
+        .from('invoices')
+        .select('id, invoice_number, invoice_date, total, paid_amount, balance, status')
+        .eq('patient_id', id)
+        .order('invoice_date', { ascending: false })
+        .order('invoice_number', { ascending: false }),
+      supabase.from('treating_doctors').select('name').eq('is_active', true).order('name'),
+    ])
+    invoicesReady = !catRes.error && !invRes.error
+    catalog = (catRes.data ?? []).map((c) => ({ ...c, price: Number(c.price) })) as CatalogItem[]
+    invoices = (invRes.data ?? []).map((i) => ({
+      ...i,
+      total: Number(i.total),
+      paid_amount: Number(i.paid_amount),
+      balance: Number(i.balance),
+    }))
+    doctorNames = (docRes.data ?? []).map((d) => d.name)
+
+    // Phase 5: treatment ke saath aam samaan aur poori inventory (na ho to khali, kuch nahi bigarta)
+    const [matRes, stockRes] = await Promise.all([
+      supabase.from('treatment_materials').select('treatment_id, inventory_id, default_qty, inventory(item_name, unit)'),
+      supabase.from('inventory').select('id, item_name, unit').order('item_name'),
+    ])
+    if (!matRes.error) {
+      for (const m of (matRes.data ?? []) as unknown as { treatment_id: string; inventory_id: string; default_qty: number; inventory: { item_name: string; unit: string | null } | null }[]) {
+        ;(materials[m.treatment_id] ??= []).push({
+          inventory_id: m.inventory_id,
+          name: m.inventory?.item_name ?? '',
+          unit: m.inventory?.unit ?? null,
+          default_qty: Number(m.default_qty),
+        })
+      }
+    }
+    if (!stockRes.error) {
+      inventoryRefs = (stockRes.data ?? []).map((i) => ({ id: i.id, name: i.item_name, unit: i.unit }))
+    }
+  }
+  const todayK = todayKarachi()
+
   const prescriptions = rxRes.data ?? []
   const payments = payRes.data ?? []
   const appointments = apptRes.data ?? []
@@ -134,9 +191,29 @@ export default async function PatientDetailPage({ params }: Props) {
     .filter((t) => t.rate != null)
     .reduce((s2, t) => s2 + (Number(t.rate) - Number(t.discount_amount ?? 0)), 0)
 
-  const totalValue = planCharges + walkInCharges
-  const totalPaid = payments.reduce((s2, t) => s2 + Number(t.amount), 0)
-  const balance = Math.max(0, totalValue - totalPaid)
+  let totalValue = planCharges + walkInCharges
+  let totalPaid = payments.reduce((s2, t) => s2 + Number(t.amount), 0)
+  let balance = Math.max(0, totalValue - totalPaid)
+
+  // Phase 4: aik hi formula (database view). View na ho to purana hisaab hi chalta hai.
+  let ledgerBalance: PatientBalance | null = null
+  let ledgerRows: LedgerRow[] = []
+  if (canBill) {
+    const [balRes, ledRes] = await Promise.all([
+      supabase.from('patient_balances').select('*').eq('patient_id', id).maybeSingle(),
+      supabase
+        .from('patient_ledger')
+        .select('entry_date, sort_at, source, kind, label, charge, payment')
+        .eq('patient_id', id),
+    ])
+    if (!balRes.error && balRes.data && !ledRes.error) {
+      ledgerBalance = toBalance(balRes.data as Record<string, string | number | null>)
+      ledgerRows = (ledRes.data ?? []) as LedgerRow[]
+      totalValue = ledgerBalance.total_charges
+      totalPaid = ledgerBalance.total_paid
+      balance = ledgerBalance.balance
+    }
+  }
 
   // Visits, treatments aur prescriptions ko aik timeline mein mila dein
   const timeline: TimelineEntry[] = [
@@ -168,14 +245,14 @@ export default async function PatientDetailPage({ params }: Props) {
     }),
   ].sort((a, b) => b.date.localeCompare(a.date))
 
-  const todayStr = new Date().toISOString().slice(0, 10)
+  const todayStr = todayKarachi()
   const upcomingAppt =
     appointments.find(
       (a) => a.preferred_date && a.preferred_date >= todayStr && a.status !== 'cancelled'
     )?.preferred_date ?? null
 
   const lastVisit = visits[0]?.visit_date ?? null
-  const nextVisit = visits.find((v) => v.next_visit && v.next_visit >= new Date().toISOString().slice(0, 10))?.next_visit ?? null
+  const nextVisit = visits.find((v) => v.next_visit && v.next_visit >= todayKarachi())?.next_visit ?? null
 
   return (
     <div>
@@ -229,23 +306,27 @@ export default async function PatientDetailPage({ params }: Props) {
                   ? `Continue History (${history.completed_step}/8)`
                   : 'Start History'}
             </Link>
-            <Link
-              href={`/admin/patients/${patient.id}/invoice`}
-              className="rounded-full border border-clinic-teal px-4 py-2 text-sm font-semibold text-clinic-teal"
-            >
-              Invoice
-            </Link>
+            {canBill && (
+              <Link
+                href={`/admin/patients/${patient.id}/invoice`}
+                className="rounded-full border border-clinic-teal px-4 py-2 text-sm font-semibold text-clinic-teal"
+              >
+                Invoice
+              </Link>
+            )}
             <PortalLinkButton
               patientId={patient.id}
               patientName={patient.full_name}
               patientPhone={patient.phone}
               portalCode={patient.portal_code ?? null}
             />
-            <DeletePatientButton
-              patientId={patient.id}
-              patientName={patient.full_name}
-              mrNumber={patient.mr_number}
-            />
+            {canBill && (
+              <DeletePatientButton
+                patientId={patient.id}
+                patientName={patient.full_name}
+                mrNumber={patient.mr_number}
+              />
+            )}
           </div>
         </div>
 
@@ -297,6 +378,8 @@ export default async function PatientDetailPage({ params }: Props) {
 
       {/* Record summary at a glance */}
       <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-5">
+        {canBill && (
+        <>
         <div className="rounded-2xl border border-clinic-teal/10 bg-white p-4">
           <p className="text-xs text-clinic-ink/50">Total Value</p>
           <p className="mt-1 font-display text-lg font-semibold text-clinic-ink">
@@ -315,6 +398,8 @@ export default async function PatientDetailPage({ params }: Props) {
             Rs. {balance.toLocaleString()}
           </p>
         </div>
+        </>
+        )}
         <div className="rounded-2xl border border-clinic-teal/10 bg-white p-4">
           <p className="text-xs text-clinic-ink/50">Visits</p>
           <p className="mt-1 font-display text-lg font-semibold text-clinic-ink">
@@ -329,7 +414,22 @@ export default async function PatientDetailPage({ params }: Props) {
         </div>
       </div>
 
+      {canBill && (
       <div className="mt-4 flex flex-wrap items-center gap-2">
+        {invoicesReady && (
+          <ChargeBuilder
+            patientId={patient.id}
+            patientName={patient.full_name}
+            defaultDoctor={patient.primary_doctor ?? null}
+            doctors={doctorNames}
+            catalog={catalog}
+            materials={materials}
+            inventory={inventoryRefs}
+            todayInvoices={invoices
+              .filter((i) => i.invoice_date === todayK && i.status === 'active')
+              .map((i) => ({ id: i.id, invoice_number: i.invoice_number, total: i.total, status: i.status }))}
+          />
+        )}
         <CloseTreatmentButton
           patientId={patient.id}
           patientName={patient.full_name}
@@ -345,7 +445,9 @@ export default async function PatientDetailPage({ params }: Props) {
           }}
         />
       </div>
+      )}
 
+      {canBill && (
       <PatientQuickActions
         patientId={patient.id}
         patientName={patient.full_name}
@@ -360,12 +462,58 @@ export default async function PatientDetailPage({ params }: Props) {
         nextAppointment={upcomingAppt}
         nextVisit={nextVisit}
       />
+      )}
 
       <div className="mt-6">
         <VisitTimeline entries={timeline} patientId={patient.id} />
       </div>
 
+      {canBill && ledgerBalance && (
+        <div className="mt-8">
+          <h2 className="font-display text-lg font-semibold text-clinic-ink">Patient Ledger</h2>
+          <div className="mt-3">
+            <LedgerTimeline rows={ledgerRows} balance={ledgerBalance} />
+          </div>
+        </div>
+      )}
+
+      {canBill && invoicesReady && invoices.length > 0 && (
+        <div className="mt-8">
+          <h2 className="font-display text-lg font-semibold text-clinic-ink">Invoices</h2>
+          <div className="mt-3 overflow-x-auto rounded-2xl border border-clinic-teal/10 bg-white">
+            <table className="w-full text-sm">
+              <thead className="bg-clinic-mint text-left text-clinic-ink/60">
+                <tr>
+                  <th className="px-4 py-3">Invoice</th>
+                  <th className="px-4 py-3">Tareekh</th>
+                  <th className="px-4 py-3 text-right">Total</th>
+                  <th className="px-4 py-3 text-right">Mile</th>
+                  <th className="px-4 py-3 text-right">Baqaya</th>
+                </tr>
+              </thead>
+              <tbody>
+                {invoices.map((i) => (
+                  <tr key={i.id} className="border-t border-clinic-teal/10">
+                    <td className="px-4 py-3">
+                      <Link href={`/admin/invoices/${i.id}`} className="font-semibold text-clinic-teal hover:underline">
+                        {i.invoice_number}
+                      </Link>
+                      {i.status === 'void' && <span className="ml-2 rounded-full bg-red-50 px-2 py-0.5 text-xs text-red-700">Cancel</span>}
+                    </td>
+                    <td className="px-4 py-3">{fmtDate(i.invoice_date)}</td>
+                    <td className="px-4 py-3 text-right">{money(i.total)}</td>
+                    <td className="px-4 py-3 text-right text-emerald-700">{money(i.paid_amount)}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-amber-700">{money(i.balance)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* Treatment plans, orthodontics and any other multi-month course */}
+      {canBill && (
       <div id="treatment-plans" className="mt-8 scroll-mt-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -398,6 +546,7 @@ export default async function PatientDetailPage({ params }: Props) {
           )}
         </div>
       </div>
+      )}
 
       <div className="mt-8">
         <PatientRecalls patientId={patient.id} recalls={recalls} />
@@ -407,7 +556,7 @@ export default async function PatientDetailPage({ params }: Props) {
         <VisitNotes patientId={patient.id} notes={visits} />
       </div>
 
-      {episodes.length > 0 && (
+      {canBill && episodes.length > 0 && (
         <div className="mt-8">
           <PastTreatments patientId={patient.id} episodes={episodes} />
         </div>
@@ -452,6 +601,7 @@ export default async function PatientDetailPage({ params }: Props) {
       </div>
 
       {/* Payment history */}
+      {canBill && (
       <div className="mt-8">
         <h2 className="font-display text-lg font-semibold text-clinic-ink">Payment History</h2>
         <div className="mt-3 overflow-x-auto rounded-2xl border border-clinic-teal/10 bg-white">
@@ -491,6 +641,7 @@ export default async function PatientDetailPage({ params }: Props) {
           </table>
         </div>
       </div>
+      )}
 
       {/* Appointment history, matched on phone number */}
       <div className="mt-8">

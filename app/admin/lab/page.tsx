@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import LabCaseForm, { type LabOption, type PatientOption } from '@/components/admin/LabCaseForm'
+import { todayKarachi } from '@/lib/karachi'
 
 const STATUS_STYLES: Record<string, string> = {
   pending: 'bg-amber-50 text-amber-700',
@@ -25,7 +26,7 @@ export default async function LabPage({
 
   let query = supabase
     .from('lab_cases')
-    .select('id, case_number, lab_name, work_type, tooth_numbers, status, due_date, cost, patients(full_name, mr_number)')
+    .select('id, case_number, lab_name, work_type, tooth_numbers, status, due_date, cost, lab_paid, patients(full_name, mr_number)')
     .is('deleted_at', null)
     .order('created_at', { ascending: false })
 
@@ -58,7 +59,7 @@ export default async function LabPage({
   }
 
   const cases = casesRes.data ?? []
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayKarachi()
 
   const { data: allCases } = await supabase
     .from('lab_cases')
@@ -143,6 +144,11 @@ export default async function LabPage({
                     >
                       {c.status.replace('_', ' ')}
                     </span>
+                    {Number(c.cost ?? 0) - Number(c.lab_paid ?? 0) > 0 && ['received', 'fitted'].includes(c.status) && (
+                      <p className="mt-1 text-xs font-semibold text-red-600">
+                        Lab ka baqaya Rs. {(Number(c.cost) - Number(c.lab_paid)).toLocaleString()}
+                      </p>
+                    )}
                     {c.due_date && (
                       <p
                         className={`mt-1 text-xs ${

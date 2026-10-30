@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
+import Link from 'next/link'
 import InventoryManager from '@/components/admin/InventoryManager'
+import { getStaffProfile, isOwnerRole } from '@/lib/auth'
 
 async function getInventory() {
   const supabase = await createClient()
@@ -7,10 +9,15 @@ async function getInventory() {
     .from('inventory')
     .select('id, item_name, category, quantity, unit, reorder_level, expiry_date, supplier')
     .order('item_name', { ascending: true })
-  return data ?? []
+  // is_active column Phase 5 se aata hai; null/true dono dikhein
+  const { data: hidden } = await supabase.from('inventory').select('id').eq('is_active', false)
+  const off = new Set((hidden ?? []).map((h) => h.id))
+  return (data ?? []).filter((i) => !off.has(i.id))
 }
 
 export default async function InventoryPage() {
+  const profile = await getStaffProfile()
+  const canManage = isOwnerRole(profile.role)
   const items = await getInventory()
 
   const lowStock = items.filter((i) => Number(i.quantity) <= Number(i.reorder_level))
@@ -29,6 +36,11 @@ export default async function InventoryPage() {
             Dental materials aur homeopathic medicines ka stock.
           </p>
         </div>
+        {canManage && (
+          <Link href="/admin/inventory/count" className="rounded-full border border-clinic-teal px-5 py-2.5 text-sm font-semibold text-clinic-teal">
+            Stock Ginti
+          </Link>
+        )}
       </div>
 
       {(lowStock.length > 0 || expiringSoon.length > 0) && (
@@ -57,7 +69,7 @@ export default async function InventoryPage() {
       )}
 
       <div className="mt-6">
-        <InventoryManager items={items} />
+        <InventoryManager items={items} canManage={canManage} />
       </div>
     </div>
   )

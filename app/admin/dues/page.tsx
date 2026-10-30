@@ -1,13 +1,16 @@
 import { createClient } from '@/lib/supabase/server'
+import { requireOwner } from '@/lib/auth'
 import DuesList, { type DueRow } from '@/components/admin/DuesList'
+import { todayKarachi } from '@/lib/karachi'
 
 export default async function DuesPage() {
+  await requireOwner()
   const supabase = await createClient()
 
   const { data, error } = await supabase
     .from('transactions')
     .select(
-      'id, treatment_name, rate, discount_amount, amount, balance_due, due_date, transaction_date, treating_doctor, patients(id, full_name, phone, mr_number, portal_code, deleted_at)'
+      'id, treatment_name, rate, discount_amount, amount, balance_due, due_date, invoice_id, transaction_date, treating_doctor, patients(id, full_name, phone, mr_number, portal_code, deleted_at)'
     )
     .gt('balance_due', 0)
     .is('settled_at', null)
@@ -31,7 +34,7 @@ export default async function DuesPage() {
     (r) => r.patients && !r.patients.deleted_at
   )
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayKarachi()
   const overdue = rows.filter((r) => r.due_date && r.due_date < today)
   const dueToday = rows.filter((r) => r.due_date === today)
   const upcoming = rows.filter((r) => r.due_date && r.due_date > today)

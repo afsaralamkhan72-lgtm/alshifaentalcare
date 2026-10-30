@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import FollowUpActions from '@/components/admin/FollowUpActions'
+import { todayKarachi } from '@/lib/karachi'
 
 interface VisitRow {
   id: string
@@ -15,7 +16,7 @@ interface VisitRow {
 export default async function FollowUpsPage() {
   const supabase = await createClient()
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayKarachi()
   const in30 = new Date()
   in30.setDate(in30.getDate() + 30)
   const horizon = in30.toISOString().slice(0, 10)

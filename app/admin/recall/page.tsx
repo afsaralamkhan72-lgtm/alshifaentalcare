@@ -1,11 +1,12 @@
 import { createClient } from '@/lib/supabase/server'
 import RecallList, { type RecallRow } from '@/components/admin/RecallList'
 import DormantList, { type DormantPatient } from '@/components/admin/DormantList'
+import { todayKarachi } from '@/lib/karachi'
 
 export default async function RecallPage() {
   const supabase = await createClient()
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayKarachi()
   const in60 = new Date()
   in60.setDate(in60.getDate() + 60)
   const horizon = in60.toISOString().slice(0, 10)

@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { requireOwner } from '@/lib/auth'
 import { CLINIC, timingsLine } from '@/clinic.config'
 import ClinicLogo from '@/components/ClinicLogo'
 import HistoryPrintButton from '@/components/admin/HistoryPrintButton'
@@ -15,6 +16,7 @@ export default async function TreatmentSummaryPage({
 }: {
   params: Promise<{ id: string; episodeId: string }>
 }) {
+  await requireOwner()
   const { id, episodeId } = await params
   const supabase = await createClient()
 

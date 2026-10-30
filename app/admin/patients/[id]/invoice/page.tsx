@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { requireOwner } from '@/lib/auth'
 import InvoiceActions from '@/components/admin/InvoiceActions'
 import ClinicLogo from '@/components/ClinicLogo'
 import InvoiceBuilder from '@/components/admin/InvoiceBuilder'
@@ -8,8 +9,10 @@ import DeleteTransactionButton from '@/components/admin/DeleteTransactionButton'
 import EditTransactionButton from '@/components/admin/EditTransactionButton'
 import { CLINIC, timingsLine } from '@/clinic.config'
 import { mergeTreatments } from '@/lib/treatments'
+import { todayKarachi } from '@/lib/karachi'
 
 export default async function InvoicePage({ params }: { params: Promise<{ id: string }> }) {
+  await requireOwner()
   const { id } = await params
   const supabase = await createClient()
 
@@ -121,7 +124,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
 
   for (const p2 of plans) {
     ledger.push({
-      date: p2.start_date ?? new Date().toISOString().slice(0, 10),
+      date: p2.start_date ?? todayKarachi(),
       label: `${p2.title} (plan)`,
       doctor: null,
       charge: Number(p2.total_cost),
@@ -167,7 +170,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   })
 
   // Aaj ka hisaab alag, taake patient ko saaf nazar aaye
-  const todayStr = new Date().toISOString().slice(0, 10)
+  const todayStr = todayKarachi()
   const todayCharge = ledgerRows
     .filter((r) => r.date === todayStr)
     .reduce((sum, r) => sum + r.charge, 0)
@@ -196,7 +199,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
     .sort((a, b) => (a.dueDate ?? '9999').localeCompare(b.dueDate ?? '9999'))
 
   const overdueTotal = openDues
-    .filter((d) => d.dueDate && d.dueDate < new Date().toISOString().slice(0, 10))
+    .filter((d) => d.dueDate && d.dueDate < todayKarachi())
     .reduce((sum, d) => sum + d.due, 0)
 
   const grandTotal = planCharges + walkInCharges
@@ -370,7 +373,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                 <tbody>
                   {openDues.map((d) => {
                     const isOverdue =
-                      d.dueDate && d.dueDate < new Date().toISOString().slice(0, 10)
+                      d.dueDate && d.dueDate < todayKarachi()
                     return (
                       <tr key={d.id} className="border-t border-clinic-teal/10">
                         <td className="px-2 py-2 text-clinic-ink">{d.name}</td>
@@ -485,7 +488,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           if (rows.length === 0) return null
 
           const paidCount = rows.filter((r) => Number(r.paid_amount) > 0).length
-          const today = new Date().toISOString().slice(0, 10)
+          const today = todayKarachi()
 
           // Ab tak kitna aana chahiye tha vs kitna aaya
           const dueSoFar =
