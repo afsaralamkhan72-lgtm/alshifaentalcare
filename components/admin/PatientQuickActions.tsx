@@ -74,36 +74,6 @@ export default function PatientQuickActions({
   return (
     <div className="mt-4 rounded-2xl border border-clinic-teal/20 bg-white p-4">
       <div className="flex flex-wrap items-center gap-2">
-        {hasPlan ? (
-          <a
-            href="#treatment-plans"
-            className="rounded-full bg-clinic-teal px-4 py-2 text-sm font-semibold text-white"
-          >
-            + Month Payment
-          </a>
-        ) : balance > 0 ? (
-          <Link
-            href={`/admin/patients/${patientId}/invoice`}
-            className="rounded-full bg-clinic-teal px-4 py-2 text-sm font-semibold text-white"
-          >
-            Payment Lo
-          </Link>
-        ) : null}
-
-        <a
-          href="#visit-notes"
-          className="rounded-full border border-clinic-teal px-4 py-2 text-sm font-semibold text-clinic-teal"
-        >
-          + Add Visit
-        </a>
-
-        <a
-          href="#patient-photos"
-          className="rounded-full border border-clinic-teal/30 px-4 py-2 text-sm font-semibold text-clinic-ink/80"
-        >
-          + Photo
-        </a>
-
         <a
           href={statementLink}
           target="_blank"
@@ -119,32 +89,6 @@ export default function PatientQuickActions({
         >
           Call
         </a>
-      </div>
-
-      {/* Message mein jo jayega, wahi yahan dikh raha hai */}
-      <div className="mt-3 grid grid-cols-2 gap-3 border-t border-clinic-teal/10 pt-3 text-sm sm:grid-cols-4">
-        <div>
-          <p className="text-xs text-clinic-ink/60">Total Bill</p>
-          <p className="font-display font-semibold text-clinic-ink">
-            Rs. {total.toLocaleString()}
-          </p>
-        </div>
-        <div>
-          <p className="text-xs text-clinic-ink/60">Diya</p>
-          <p className="font-display font-semibold text-emerald-700">
-            Rs. {paid.toLocaleString()}
-          </p>
-        </div>
-        <div>
-          <p className="text-xs text-clinic-ink/60">Baqaya</p>
-          <p className="font-display font-semibold text-amber-700">
-            Rs. {balance.toLocaleString()}
-          </p>
-        </div>
-        <div>
-          <p className="text-xs text-clinic-ink/60">Agli Appointment</p>
-          <p className="font-display font-semibold text-clinic-teal">{nextDate ?? '—'}</p>
-        </div>
       </div>
 
       {!portalCode && (

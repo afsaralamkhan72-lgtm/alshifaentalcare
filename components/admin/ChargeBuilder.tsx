@@ -228,7 +228,7 @@ export default function ChargeBuilder({
         onClick={openIt}
         className="rounded-full bg-clinic-teal px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-clinic-teal-light"
       >
-        Complete + Charge
+        + Aur bill (alag naam)
       </button>
 
       {open && (

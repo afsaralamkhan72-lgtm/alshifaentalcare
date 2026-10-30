@@ -4,7 +4,9 @@ import { localNumber, toothLabel, isWisdom } from '@/lib/teeth'
 import ToothShape from './ToothShape'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { addDays, todayKarachi } from '@/lib/karachi'
 
 interface DentalRecord {
   id: string
@@ -17,7 +19,14 @@ interface DentalRecord {
 interface DentalChartProps {
   patientId: string
   initialRecords: DentalRecord[]
+  /** Sirf owner ke liye: treatment chunte hi qeemat likh kar bill ban jaye */
+  canBill?: boolean
+  defaultDoctor?: string | null
+  catalog?: { id: string; name: string; price: number }[]
 }
+
+/** Jin conditions par paisa lagta hai (baaqi sirf chart ka nishan hain) */
+const BILLABLE = ['filling', 'rct', 'crown', 'bridge', 'implant', 'scaling', 'extraction', 'denture', 'other']
 
 const CONDITIONS = [
   { value: 'healthy', label: 'Healthy', dot: 'bg-white border border-clinic-ink/30' },
@@ -101,7 +110,18 @@ function getLatestForTooth(records: DentalRecord[], tooth: string) {
   )[0]
 }
 
-export default function DentalChart({ patientId, initialRecords }: DentalChartProps) {
+export default function DentalChart({
+  patientId,
+  initialRecords,
+  canBill = false,
+  defaultDoctor = null,
+  catalog = [],
+}: DentalChartProps) {
+  const router = useRouter()
+  const [price, setPrice] = useState('')
+  const [paidNow, setPaidNow] = useState('')
+  const [method, setMethod] = useState('cash')
+  const [billError, setBillError] = useState('')
   const [records, setRecords] = useState<DentalRecord[]>(initialRecords)
   const [selectedTooth, setSelectedTooth] = useState<string | null>(null)
   const [condition, setCondition] = useState('healthy')
@@ -113,6 +133,20 @@ export default function DentalChart({ patientId, initialRecords }: DentalChartPr
     const latest = getLatestForTooth(records, tooth)
     setCondition(latest?.condition ?? 'healthy')
     setNotes('')
+    setPrice('')
+    setPaidNow('')
+    setBillError('')
+  }
+
+  function labelOf(c: string) {
+    return CONDITIONS.find((x) => x.value === c)?.label ?? c
+  }
+
+  function pickCondition(c: string) {
+    setCondition(c)
+    // List price mil jaye to khud bhar do, doctor badal sakta hai
+    const hit = catalog.find((x) => x.name.toLowerCase().includes(labelOf(c).toLowerCase()))
+    setPrice(hit && BILLABLE.includes(c) ? String(hit.price) : '')
   }
 
   async function handleSave() {
@@ -136,11 +170,47 @@ export default function DentalChart({ patientId, initialRecords }: DentalChartPr
       .select()
       .single()
 
-    setSaving(false)
-    if (!error && data) {
-      setRecords((prev) => [...prev, data as DentalRecord])
-      setNotes('')
+    if (error || !data) {
+      setSaving(false)
+      return
     }
+    setRecords((prev) => [...prev, data as DentalRecord])
+    setNotes('')
+
+    // Qeemat likhi ho to isi treatment ka apna bill khud ban jaye
+    const priceNum = Number(price) || 0
+    if (canBill && BILLABLE.includes(condition) && priceNum > 0) {
+      const paidNum = Math.min(priceNum, Math.max(0, Number(paidNow) || 0))
+      const hit = catalog.find((x) => x.name.toLowerCase().includes(labelOf(condition).toLowerCase()))
+      const { error: invErr } = await supabase.rpc('create_invoice', {
+        p_patient_id: patientId,
+        p_items: [
+          {
+            treatment_id: hit?.id ?? null,
+            name: labelOf(condition),
+            tooth: toothLabel(selectedTooth),
+            qty: 1,
+            unit_price: priceNum,
+          },
+        ],
+        p_discount_percent: 0,
+        p_paid: paidNum,
+        p_method: method,
+        p_doctor: defaultDoctor,
+        p_due_date: priceNum - paidNum > 0 ? addDays(todayKarachi(), 7) : null,
+        p_notes: null,
+        p_idempotency_key: crypto.randomUUID(),
+      })
+      if (invErr) {
+        setSaving(false)
+        setBillError(`Chart save ho gaya, magar bill nahi bana: ${invErr.message}`)
+        return
+      }
+      setPrice('')
+      setPaidNow('')
+      router.refresh()
+    }
+    setSaving(false)
   }
 
   function renderRow(teeth: string[], upper = true) {
@@ -232,7 +302,7 @@ export default function DentalChart({ patientId, initialRecords }: DentalChartPr
           <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto]">
             <select
               value={condition}
-              onChange={(e) => setCondition(e.target.value)}
+              onChange={(e) => pickCondition(e.target.value)}
               className="rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm"
             >
               {CONDITIONS.map((c) => (
@@ -249,6 +319,49 @@ export default function DentalChart({ patientId, initialRecords }: DentalChartPr
               {saving ? 'Saving...' : 'Save Record'}
             </button>
           </div>
+
+          {canBill && BILLABLE.includes(condition) && (
+            <div className="mt-3 grid grid-cols-2 gap-3 rounded-xl border border-clinic-teal/20 bg-white p-3 sm:grid-cols-3">
+              <div>
+                <label className="text-xs text-clinic-ink/60">Qeemat (Rs.)</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  placeholder="Qeemat likhein"
+                  className="mt-1 w-full rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-clinic-ink/60">Abhi mile (Rs.)</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={paidNow}
+                  onChange={(e) => setPaidNow(e.target.value)}
+                  placeholder="0"
+                  className="mt-1 w-full rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm"
+                />
+              </div>
+              {Number(paidNow) > 0 && (
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="text-xs text-clinic-ink/60">Tareeqa</label>
+                  <select
+                    value={method}
+                    onChange={(e) => setMethod(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm"
+                  >
+                    <option value="cash">Cash</option>
+                    <option value="bank">Bank</option>
+                    <option value="easypaisa">EasyPaisa</option>
+                    <option value="jazzcash">JazzCash</option>
+                  </select>
+                </div>
+              )}
+            </div>
+          )}
+          {billError && <p className="mt-2 text-sm text-red-600">{billError}</p>}
 
           <textarea
             value={notes}
