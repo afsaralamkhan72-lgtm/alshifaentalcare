@@ -42,7 +42,7 @@ const GROUPS: NavGroup[] = [
       { href: '/admin/prescriptions', label: 'Prescriptions', roles: ALL, perm: 'prescriptions.view' },
       { href: '/admin/recall', label: 'Recall (checkup yaad)', roles: ALL, perm: 'clinical.view' },
       { href: '/admin/inventory', label: 'Stock', roles: ALL, perm: 'inventory.view' },
-      { href: '/admin/prices', label: 'Treatment Prices', roles: OWNER },
+      { href: '/admin/settings', label: 'Settings (dawaiyan, qeematein)', roles: ALL, perm: 'settings.manage' },
     ],
   },
   {

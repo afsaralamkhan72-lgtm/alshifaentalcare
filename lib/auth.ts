@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 
@@ -9,29 +10,42 @@ export interface StaffProfile {
   is_active: boolean
 }
 
+interface Me extends StaffProfile {
+  perms: string[]
+}
+
 /**
- * Fetches the logged-in staff profile. Redirects to /login if not
- * authenticated or not a recognized/active staff member.
- * middleware.ts already blocks unauthenticated access to /admin/*,
- * this is the second layer that also confirms a valid staff_profiles row.
+ * Login wala staff + us ki permissions: AIK database call, aur aik request (page render) mein
+ * sirf aik dafa (React cache). Pehle har page par layout + page milkar 6-10 calls karte the.
+ * middleware.ts pehle hi login check kar chuka hota hai; database (RLS) phir bhi har cheez khud check karta hai.
  */
-export async function getStaffProfile(): Promise<StaffProfile> {
+const getMe = cache(async (): Promise<Me | null> => {
   const supabase = await createClient()
+  const { data, error } = await supabase.rpc('my_staff')
+  if (!error) return (data as Me | null) ?? null
+
+  // Purana database (my_staff abhi nahi bana): purana tareeqa
   const {
     data: { user },
   } = await supabase.auth.getUser()
+  if (!user) return null
+  const [{ data: profile }, { data: perms }] = await Promise.all([
+    supabase.from('staff_profiles').select('id, full_name, role, phone, is_active').eq('id', user.id).maybeSingle(),
+    supabase.rpc('my_permissions'),
+  ])
+  if (!profile) return null
+  return { ...(profile as StaffProfile), perms: Array.isArray(perms) ? (perms as string[]) : [] }
+})
 
-  if (!user) redirect('/login')
-
-  const { data: profile } = await supabase
-    .from('staff_profiles')
-    .select('id, full_name, role, phone, is_active')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile || !profile.is_active) redirect('/login')
-
-  return profile as StaffProfile
+/**
+ * Login wala active staff. Na ho (ya band ho) to /login.
+ */
+export async function getStaffProfile(): Promise<StaffProfile> {
+  const me = await getMe()
+  if (!me || !me.is_active) redirect('/login')
+  const { perms: _p, ...profile } = me
+  void _p
+  return profile
 }
 
 /** Owner = admin ya doctor. Paison wale pages sirf inhi ke liye (reception ko nahi). */
@@ -54,14 +68,12 @@ export async function requireAdmin(): Promise<StaffProfile> {
 }
 
 /**
- * Is staff member ki saari permissions (DB function my_permissions()). Admin/doctor ko sab milti hain,
- * receptionist ko sirf wo jo Staff page par tick ki gayi hon. DB ke RLS rules yehi check karte hain,
- * is liye ye sirf screen dikhane ke liye hai, asli hifazat database mein hai.
+ * Is staff member ki saari permissions. Admin/doctor ko sab milti hain, receptionist ko sirf
+ * jo Staff page par tick ki gayi hon. DB ke RLS rules yehi check karte hain; ye sirf screen ke liye hai.
  */
 export async function getPermissions(): Promise<string[]> {
-  const supabase = await createClient()
-  const { data } = await supabase.rpc('my_permissions')
-  return Array.isArray(data) ? (data as string[]) : []
+  const me = await getMe()
+  return me?.is_active ? me.perms : []
 }
 
 export async function can(code: string): Promise<boolean> {

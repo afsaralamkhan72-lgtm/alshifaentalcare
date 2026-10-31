@@ -37,7 +37,7 @@ export default async function PrescriptionPrintPage({ params }: { params: Promis
   return (
     <div className="mx-auto max-w-3xl">
       <div className="mb-4 flex items-center justify-between print:hidden">
-        <Link href={`/admin/patients/${rx.patient_id}?tab=rx`} className="text-sm text-clinic-ink/50 hover:text-clinic-teal">
+        <Link href={`/admin/patients/${rx.patient_id}`} className="text-sm text-clinic-ink/50 hover:text-clinic-teal">
           ← Patient
         </Link>
         <SheetPrintButton />

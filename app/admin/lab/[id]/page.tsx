@@ -74,7 +74,7 @@ export default async function LabOrderPage({ params }: { params: Promise<{ id: s
           ← Sab Lab Cases
         </Link>
         {c.patient_id && (
-          <Link href={`/admin/patients/${c.patient_id}?tab=lab`} className="text-sm text-clinic-ink/50 hover:text-clinic-teal">
+          <Link href={`/admin/patients/${c.patient_id}`} className="text-sm text-clinic-ink/50 hover:text-clinic-teal">
             Patient profile →
           </Link>
         )}

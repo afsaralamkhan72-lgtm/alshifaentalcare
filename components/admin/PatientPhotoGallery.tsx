@@ -190,7 +190,7 @@ export default function PatientPhotoGallery({
             <div key={p.id} className="group relative overflow-hidden rounded-xl bg-clinic-mint">
               {urls[p.id] ? (
                 <a href={urls[p.id]} target="_blank" rel="noopener noreferrer">
-                // eslint-disable-next-line @next/next/no-img-element
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={urls[p.id]}
                   alt={p.caption ?? 'Patient photo'}

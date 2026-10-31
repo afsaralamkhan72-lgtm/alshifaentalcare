@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import StatCard from '@/components/admin/StatCard'
 import { toInternationalPKNumber } from '@/lib/whatsapp'
@@ -27,7 +28,8 @@ async function getDashboardStats(month: string, canSeeMoney: boolean) {
   const supabase = await createClient()
   const { start: monthStart, end: monthEnd } = monthBounds(month)
 
-  const [totalRes, dentalRes, homeoRes, incomeRes, expenseRes, pendingRes] = await Promise.all([
+  const todayStr = todayKarachi()
+  const [totalRes, dentalRes, homeoRes, incomeRes, expenseRes, pendingRes, duesRes, repRes] = await Promise.all([
     supabase.from('patients').select('*', { count: 'exact', head: true }).is('deleted_at', null),
     supabase.from('patients').select('*', { count: 'exact', head: true }).is('deleted_at', null).eq('department', 'dental'),
     supabase.from('patients').select('*', { count: 'exact', head: true }).is('deleted_at', null).eq('department', 'homeopathic'),
@@ -53,19 +55,20 @@ async function getDashboardStats(month: string, canSeeMoney: boolean) {
       .eq('status', 'pending')
       .order('created_at', { ascending: false })
       .limit(5),
+    // Baqaya payments jo aaj ya us se pehle due hain
+    canSeeMoney
+      ? supabase
+          .from('transactions')
+          .select('balance_due, due_date, patients(full_name)')
+          .gt('balance_due', 0)
+          .is('settled_at', null)
+          .lte('due_date', todayStr)
+          .order('due_date', { ascending: true })
+      : Promise.resolve({ data: [] }),
+    canSeeMoney ? supabase.rpc('report_summary', { p_from: monthStart, p_to: monthEnd }) : Promise.resolve({ data: null }),
   ])
 
-  // Baqaya payments jo aaj ya us se pehle due hain
-  const todayStr = todayKarachi()
-  const { data: dueRows } = canSeeMoney
-    ? await supabase
-        .from('transactions')
-        .select('balance_due, due_date, patients(full_name)')
-        .gt('balance_due', 0)
-        .is('settled_at', null)
-        .lte('due_date', todayStr)
-        .order('due_date', { ascending: true })
-    : { data: [] }
+  const dueRows = duesRes.data
 
   const dues = (dueRows ?? []) as unknown as {
     balance_due: number
@@ -119,7 +122,7 @@ async function getDashboardStats(month: string, canSeeMoney: boolean) {
   let incomeTotal = income
   // Phase 9: poore mahine ka total database se (select ki 1000 rows ki hadd se bachne ke liye)
   if (canSeeMoney) {
-    const { data: rep } = await supabase.rpc('report_summary', { p_from: monthStart, p_to: monthEnd })
+    const rep = repRes.data
     if (rep) {
       incomeTotal = Number((rep as { income: number }).income)
       expense = Number((rep as { expense: number }).expense)
@@ -149,19 +152,46 @@ export default async function DashboardPage({
   const currentMonth = todayKarachi().slice(0, 7)
   const month = /^\d{4}-\d{2}$/.test(params.month ?? '') ? (params.month as string) : currentMonth
 
-  const profile = await getStaffProfile()
+  const [profile, perms] = await Promise.all([getStaffProfile(), getPermissions()])
   const canSeeMoney = isOwnerRole(profile.role)
-  const perms = await getPermissions()
-  const stats = await getDashboardStats(month, canSeeMoney)
 
-  // Samaan ke alerts: kam stock aur 30 din mein expiry (sab staff ke liye, is mein paisa nahi)
+  // Har hissa alag se aata hai (Suspense): upar ka "Aaj" foran dikhta hai, baqi peeche se bhar jata hai
+  return (
+    <div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="font-display text-2xl font-semibold text-clinic-ink">Aaj</h1>
+          <p className="mt-1 text-sm text-clinic-ink/60">{fmtDate(todayKarachi())}</p>
+        </div>
+      </div>
+
+      <Suspense fallback={<SectionLoading />}>
+        <TodayBoard perms={perms} />
+      </Suspense>
+      {canSeeMoney && (
+        <Suspense fallback={<SectionLoading />}>
+          <OwnerToday />
+        </Suspense>
+      )}
+      <Suspense fallback={<SectionLoading label="Mahine ka jaiza load ho raha hai..." />}>
+        <MonthSection month={month} currentMonth={currentMonth} canSeeMoney={canSeeMoney} />
+      </Suspense>
+    </div>
+  )
+}
+
+function SectionLoading({ label = 'Load ho raha hai...' }: { label?: string }) {
+  return <div className="mt-6 animate-pulse rounded-2xl border border-clinic-teal/10 bg-white p-6 text-sm text-clinic-ink/40">{label}</div>
+}
+
+async function MonthSection({ month, currentMonth, canSeeMoney }: { month: string; currentMonth: string; canSeeMoney: boolean }) {
+  // Samaan ke alerts (kam stock / expiry) aur mahine ka hisaab: sab aik saath
   const supabaseAlerts = await createClient()
-  const { data: stockRows } = await supabaseAlerts
-    .from('inventory')
-    .select('item_name, quantity, unit, reorder_level, expiry_date')
-  const { data: offRows } = await supabaseAlerts.from('inventory').select('item_name').eq('is_active', false)
-  const offNames = new Set((offRows ?? []).map((r) => r.item_name))
-  const liveStock = (stockRows ?? []).filter((r) => !offNames.has(r.item_name))
+  const [stats, { data: stockRows }] = await Promise.all([
+    getDashboardStats(month, canSeeMoney),
+    supabaseAlerts.from('inventory').select('item_name, quantity, unit, reorder_level, expiry_date, is_active'),
+  ])
+  const liveStock = (stockRows ?? []).filter((r) => r.is_active !== false)
   const lowStock = liveStock.filter((r) => Number(r.quantity) <= Number(r.reorder_level))
   const expiring = liveStock.filter(
     (r) => r.expiry_date && (new Date(r.expiry_date).getTime() - Date.now()) / 86_400_000 <= 30
@@ -175,17 +205,7 @@ export default async function DashboardPage({
   const isCurrentMonth = month === currentMonth
 
   return (
-    <div>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-display text-2xl font-semibold text-clinic-ink">Aaj</h1>
-          <p className="mt-1 text-sm text-clinic-ink/60">{fmtDate(todayKarachi())}</p>
-        </div>
-      </div>
-
-      <TodayBoard perms={perms} />
-      {canSeeMoney && <OwnerToday />}
-
+    <>
       <div className="mt-10 flex flex-wrap items-center justify-between gap-3 border-t border-clinic-teal/10 pt-6">
         <div>
           <h2 className="font-display text-lg font-semibold text-clinic-ink">Mahine ka jaiza</h2>
@@ -387,7 +407,7 @@ export default async function DashboardPage({
           <p className="mt-3 text-sm text-clinic-ink/50">No pending appointment requests.</p>
         )}
       </div>
-    </div>
+    </>
   )
 }
 

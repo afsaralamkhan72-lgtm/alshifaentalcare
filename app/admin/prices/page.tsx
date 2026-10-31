@@ -1,9 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
-import { requireOwner } from '@/lib/auth'
+import { requireAnyPerm } from '@/lib/auth'
 import PriceListManager, { type CatalogRow } from '@/components/admin/PriceListManager'
 
 export default async function PricesPage() {
-  await requireOwner()
+  await requireAnyPerm('settings.manage')
   const supabase = await createClient()
 
   const [catRes, counterRes, invRes] = await Promise.all([

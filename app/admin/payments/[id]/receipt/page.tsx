@@ -35,7 +35,7 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
   return (
     <div className="mx-auto max-w-md">
       <div className="mb-4 flex items-center justify-between print:hidden">
-        <Link href={`/admin/patients/${pay.patient_id}?tab=billing`} className="text-sm text-clinic-ink/50 hover:text-clinic-teal">
+        <Link href={`/admin/patients/${pay.patient_id}`} className="text-sm text-clinic-ink/50 hover:text-clinic-teal">
           ← Patient
         </Link>
         <SheetPrintButton />

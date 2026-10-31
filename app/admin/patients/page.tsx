@@ -1,4 +1,6 @@
 import Link from 'next/link'
+import { Suspense } from 'react'
+import LiveSearch from '@/components/admin/LiveSearch'
 import { createClient } from '@/lib/supabase/server'
 import { getStaffProfile, isOwnerRole, requirePerm } from '@/lib/auth'
 import PatientsToolbar from '@/components/admin/PatientsToolbar'
@@ -9,51 +11,14 @@ interface SearchParams {
   q?: string
 }
 
-/** Har patient ka baqaya, taake list mein bina khole nazar aaye */
-async function getBalances() {
+/** Sirf list mein dikhne wale patients ka baqaya (pehle saare patients ka hisaab aata tha) */
+async function getBalances(ids: string[]) {
+  if (ids.length === 0) return {}
   const supabase = await createClient()
-
-  // Phase 4: aik hi formula (database view). Na ho to neeche purana tareeqa.
-  const { data: view, error: viewErr } = await supabase
-    .from('patient_balances')
-    .select('patient_id, balance')
-    .gt('balance', 0)
-  if (!viewErr) {
-    const out: Record<string, number> = {}
-    for (const r of view ?? []) out[r.patient_id] = Number(r.balance)
-    return out
-  }
-
-  const { data } = await supabase
-    .from('transactions')
-    .select('patient_id, rate, discount_amount, amount')
-    .eq('type', 'income')
-
-  const { data: plans } = await supabase
-    .from('treatment_plans')
-    .select('patient_id, total_cost')
-    .eq('status', 'active')
-
-  const map = new Map<string, { charges: number; paid: number }>()
-
-  for (const p of plans ?? []) {
-    if (!p.patient_id) continue
-    const row = map.get(p.patient_id) ?? { charges: 0, paid: 0 }
-    row.charges += Number(p.total_cost)
-    map.set(p.patient_id, row)
-  }
-
-  for (const t of data ?? []) {
-    if (!t.patient_id) continue
-    const row = map.get(t.patient_id) ?? { charges: 0, paid: 0 }
-    if (t.rate != null) row.charges += Number(t.rate) - Number(t.discount_amount ?? 0)
-    row.paid += Number(t.amount)
-    map.set(t.patient_id, row)
-  }
-
-  const balances: Record<string, number> = {}
-  for (const [id, v] of map) balances[id] = Math.max(0, v.charges - v.paid)
-  return balances
+  const { data } = await supabase.from('patient_balances').select('patient_id, balance').in('patient_id', ids).gt('balance', 0)
+  const out: Record<string, number> = {}
+  for (const r of data ?? []) out[r.patient_id] = Number(r.balance)
+  return out
 }
 
 async function getKnownDoctors() {
@@ -80,8 +45,8 @@ async function getPatients(params: SearchParams) {
   }
 
   if (params.q) {
-    const safeQ = params.q.replace(/[,%]/g, '')
-    query = query.or(`full_name.ilike.%${safeQ}%,phone.ilike.%${safeQ}%`)
+    const safeQ = params.q.replace(/[,%()*\\"']/g, ' ').trim()
+    query = query.or(`full_name.ilike.%${safeQ}%,phone.ilike.%${safeQ}%,mr_number.ilike.%${safeQ}%`)
   }
 
   const { data } = await query.limit(100)
@@ -97,11 +62,8 @@ export default async function PatientsPage({
   const params = await searchParams
   const profile = await getStaffProfile()
   const canBill = isOwnerRole(profile.role)
-  const [patients, knownDoctors, balances] = await Promise.all([
-    getPatients(params),
-    getKnownDoctors(),
-    canBill ? getBalances() : Promise.resolve({} as Record<string, number>),
-  ])
+  const [patients, knownDoctors] = await Promise.all([getPatients(params), getKnownDoctors()])
+  const balances = canBill ? await getBalances(patients.map((p) => p.id as string)) : {}
 
   return (
     <div>
@@ -123,12 +85,9 @@ export default async function PatientsPage({
           <option value="dental">Dental</option>
           <option value="homeopathic">Homeopathic</option>
         </select>
-        <input
-          name="q"
-          defaultValue={params.q ?? ''}
-          placeholder="Search by name or phone..."
-          className="min-w-[200px] flex-1 rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm"
-        />
+        <Suspense>
+          <LiveSearch />
+        </Suspense>
         <button type="submit" className="rounded-lg bg-clinic-teal px-4 py-2 text-sm font-semibold text-white">
           Search
         </button>

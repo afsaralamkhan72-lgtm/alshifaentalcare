@@ -724,12 +724,12 @@ function TreatmentCard({
             </button>
           )}
           {active && (
-            <a href={`/admin/patients/${patientId}?tab=rx`} className="rounded-full border border-clinic-teal/30 px-4 py-1.5 text-xs font-semibold text-clinic-ink/70">
+            <a href="#s8" className="rounded-full border border-clinic-teal/30 px-4 py-1.5 text-xs font-semibold text-clinic-ink/70">
               Prescription
             </a>
           )}
           {active && canLab && (
-            <a href={`/admin/patients/${patientId}?tab=lab&treatment=${t.id}`} className="rounded-full border border-clinic-teal/30 px-4 py-1.5 text-xs font-semibold text-clinic-ink/70">
+            <a href={`/admin/patients/${patientId}?treatment=${t.id}#lab`} className="rounded-full border border-clinic-teal/30 px-4 py-1.5 text-xs font-semibold text-clinic-ink/70">
               Lab case
             </a>
           )}

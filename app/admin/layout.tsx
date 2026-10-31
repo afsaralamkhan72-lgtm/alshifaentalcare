@@ -1,30 +1,11 @@
-import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
 import Sidebar from '@/components/admin/Sidebar'
 import LogoutButton from '@/components/admin/LogoutButton'
 import AssistantBar from '@/components/admin/AssistantBar'
-import { getPermissions } from '@/lib/auth'
+import { getPermissions, getStaffProfile } from '@/lib/auth'
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) redirect('/login')
-
-  const { data: profile } = await supabase
-    .from('staff_profiles')
-    .select('full_name, role, is_active')
-    .eq('id', user.id)
-    .single()
-
-  // Defense-in-depth: middleware already blocks unauthenticated users,
-  // this also blocks authenticated users who aren't (or are no longer) active staff.
-  if (!profile || !profile.is_active) redirect('/login')
-
-  const perms = await getPermissions()
+  // Staff + permissions: aik call (page bhi yahi cached natija istemal karta hai)
+  const [profile, perms] = await Promise.all([getStaffProfile(), getPermissions()])
 
   return (
     <div className="admin-shell flex min-h-screen bg-clinic-sand">

@@ -13,7 +13,23 @@ interface DentalRecord {
   notes: string | null
   treatment_date: string
   created_at?: string | null
+  surfaces?: string[] | null
+  state?: string | null
 }
+
+const SURFACES = [
+  { k: 'M', l: 'Mesial' },
+  { k: 'O', l: 'Occlusal / Incisal' },
+  { k: 'D', l: 'Distal' },
+  { k: 'B', l: 'Buccal / Labial' },
+  { k: 'L', l: 'Lingual / Palatal' },
+]
+const STATES = [
+  { k: 'existing', l: 'Pehle se hai' },
+  { k: 'planned', l: 'Plan (karna hai)' },
+  { k: 'completed', l: 'Ho gaya (aaj kiya)' },
+]
+const stateLabel = (s?: string | null) => STATES.find((x) => x.k === s)?.l ?? 'Pehle se hai'
 
 interface DentalChartProps {
   patientId: string
@@ -110,6 +126,8 @@ export default function DentalChart({
   useEffect(() => setRecords(initialRecords), [initialRecords])
   const [selectedTooth, setSelectedTooth] = useState<string | null>(null)
   const [condition, setCondition] = useState('caries')
+  const [surf, setSurf] = useState<string[]>([])
+  const [mstate, setMstate] = useState('existing')
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -118,6 +136,8 @@ export default function DentalChart({
     setSelectedTooth(tooth)
     const latest = getLatestForTooth(records, tooth)
     setCondition(latest?.condition ?? 'caries')
+    setSurf([])
+    setMstate('existing')
     setNotes('')
     setError('')
   }
@@ -138,8 +158,10 @@ export default function DentalChart({
         condition,
         notes: notes || null,
         recorded_by: user?.id ?? null,
+        surfaces: surf,
+        state: mstate,
       })
-      .select('id, tooth_number, condition, notes, treatment_date, created_at')
+      .select('id, tooth_number, condition, notes, treatment_date, created_at, surfaces, state')
       .single()
     setSaving(false)
     if (err || !data) {
@@ -157,12 +179,12 @@ export default function DentalChart({
           const latest = getLatestForTooth(records, tooth)
           const cond = latest?.condition ?? 'healthy'
           const active = selectedTooth === tooth
-          const planned = plannedTeeth.includes(tooth)
+          const planned = plannedTeeth.includes(tooth) || latest?.state === 'planned'
           return (
             <button
               key={tooth}
               onClick={() => openTooth(tooth)}
-              title={`${toothLabel(tooth)}${cond !== 'healthy' ? ` — ${cond}` : ''}${planned ? ' — plan' : ''}`}
+              title={`${toothLabel(tooth)}${cond !== 'healthy' ? ` — ${cond}` : ''}${latest?.surfaces?.length ? ` (${latest.surfaces.join('')})` : ''}${planned ? ' — plan' : ''}`}
               className={`flex shrink-0 flex-col items-center rounded-lg px-0.5 py-1 transition-transform hover:scale-105 ${
                 active ? 'bg-clinic-teal/15 ring-2 ring-clinic-teal' : planned ? 'outline-dashed outline-2 outline-clinic-teal/60' : ''
               }`}
@@ -290,6 +312,32 @@ export default function DentalChart({
                   {saving ? 'Save...' : 'Nishan save'}
                 </button>
               </div>
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <span className="text-xs text-clinic-ink/60">Hissa (surface):</span>
+                {SURFACES.map((x) => (
+                  <button
+                    key={x.k}
+                    type="button"
+                    title={x.l}
+                    onClick={() => setSurf((v) => (v.includes(x.k) ? v.filter((y) => y !== x.k) : [...v, x.k]))}
+                    className={`h-8 w-8 rounded-md border text-xs font-bold ${surf.includes(x.k) ? 'border-clinic-teal bg-clinic-teal text-white' : 'border-clinic-teal/30 text-clinic-ink/70'}`}
+                  >
+                    {x.k}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {STATES.map((x) => (
+                  <button
+                    key={x.k}
+                    type="button"
+                    onClick={() => setMstate(x.k)}
+                    className={`rounded-full px-3 py-1 text-xs font-semibold ${mstate === x.k ? 'bg-clinic-teal text-white' : 'bg-clinic-mint text-clinic-teal'}`}
+                  >
+                    {x.l}
+                  </button>
+                ))}
+              </div>
               <input
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
@@ -307,6 +355,10 @@ export default function DentalChart({
                 {history.map((h) => (
                   <div key={h.id} className="rounded-lg bg-white px-3 py-2 text-xs">
                     <span className="font-semibold capitalize text-clinic-teal">{h.condition}</span>
+                    {h.surfaces && h.surfaces.length > 0 && <span className="ml-1 font-semibold text-clinic-ink">({h.surfaces.join('')})</span>}
+                    <span className={`ml-2 rounded px-1.5 text-[10px] ${h.state === 'planned' ? 'bg-amber-50 text-amber-700' : h.state === 'completed' ? 'bg-emerald-50 text-emerald-700' : 'bg-clinic-mint text-clinic-ink/60'}`}>
+                      {stateLabel(h.state)}
+                    </span>
                     <span className="ml-2 text-clinic-ink/40">{new Date(h.treatment_date).toLocaleDateString('en-GB')}</span>
                     {h.notes && <p className="mt-1 text-clinic-ink/60">{h.notes}</p>}
                   </div>
