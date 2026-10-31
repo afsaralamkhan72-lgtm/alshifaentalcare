@@ -7,13 +7,12 @@ import PatientEditModal from '@/components/admin/PatientEditModal'
 import PatientProfilePhoto from '@/components/admin/PatientProfilePhoto'
 import PortalLinkButton from '@/components/admin/PortalLinkButton'
 import DeletePatientButton from '@/components/admin/DeletePatientButton'
-import VisitWorkspace, { type VisitRow, type MedOpt, type TodayBill } from '@/components/admin/visit/VisitWorkspace'
+import VisitWorkspace, { type VisitRow, type MedOpt } from '@/components/admin/visit/VisitWorkspace'
 import type { CatalogOpt, MaterialOpt, TItem, TVisit } from '@/components/admin/TreatmentsPanel'
 import PatientPhotoGallery, { type PatientPhoto } from '@/components/admin/PatientPhotoGallery'
 import TreatmentPlanCard, { type Installment, type Plan } from '@/components/admin/TreatmentPlanCard'
 import { todayKarachi, money, fmtDate } from '@/lib/karachi'
 import { toBalance, type PatientBalance } from '@/lib/ledger'
-import HistoryForm from '@/components/admin/HistoryForm'
 import WhatsAppMenu from '@/components/admin/WhatsAppMenu'
 import { apptReminderLink, generalLink, paymentReminderLink } from '@/lib/messages'
 
@@ -245,20 +244,16 @@ export default async function PatientDetailPage({ params, searchParams }: Props)
         <p className="text-sm text-clinic-ink/60">Aap ko is patient ka record dekhne ki permission nahi.</p>
       )}
 
-      {/* ================= 2. HISTORY ================= */}
-      {(canClinical || canMoney) && (
-        <section id="s2" className="rounded-2xl border border-clinic-teal/10 bg-white p-4 sm:p-5">
-          <SectionHead n={2} title="Medical / Dental History (pichla record)" />
-          <Suspense fallback={<Loading />}>
-            <HistorySection patient={patient} history={history} canClinical={canClinical} canEdit={can('clinical.edit')} />
-          </Suspense>
-        </section>
-      )}
-
-      {/* ================= 3 - 11. AAJ KA VISIT ================= */}
+      {/* ================= 2 - 12. AAJ KA VISIT (aik hi page) ================= */}
       {(canClinical || canMoney) && (
         <Suspense fallback={<Loading h="h-64" />}>
-          <WorkspaceSection patient={patient} perms={perms} isOwner={isOwner} balance={balance?.balance ?? 0} isDental={isDental} />
+          <WorkspaceSection patient={patient} perms={perms} isOwner={isOwner} balance={balance?.balance ?? 0} isDental={isDental} history={history} />
+        </Suspense>
+      )}
+
+      {canClinical && (
+        <Suspense fallback={null}>
+          <HistorySection patient={patient} history={history} canClinical={canClinical} />
         </Suspense>
       )}
 
@@ -273,6 +268,8 @@ export default async function PatientDetailPage({ params, searchParams }: Props)
 
 /* ------------------------------------------------------------ */
 type PatientRow = {
+  age?: number | null
+  date_of_birth?: string | null
   id: string
   full_name: string
   phone: string
@@ -282,9 +279,7 @@ type PatientRow = {
   portal_code?: string | null
 }
 
-const show = (v: unknown) => (Array.isArray(v) ? v.filter((x) => x !== 'None').join(', ') : typeof v === 'string' ? v : v == null ? '' : String(v))
-
-async function HistorySection({ patient, history, canClinical, canEdit }: { patient: PatientRow; history: Record<string, unknown> | null; canClinical: boolean; canEdit: boolean }) {
+async function HistorySection({ patient, history, canClinical }: { patient: PatientRow; history: Record<string, unknown> | null; canClinical: boolean }) {
   const supabase = await createClient()
   const { data } = canClinical
     ? await supabase
@@ -298,34 +293,10 @@ async function HistorySection({ patient, history, canClinical, canEdit }: { pati
     : { data: [] }
   type CV = { id: string; visit_date: string; complaint: { items?: string[]; other?: string; duration?: string }; diagnoses: { text: string; teeth?: string[] }[]; doctor: string | null }
   const visits = (data ?? []) as CV[]
-  const mh = (history?.medical_history ?? {}) as Record<string, unknown>
-  const dh = (history?.dental_history ?? {}) as Record<string, unknown>
-  const lines: [string, string][] = (
-    [
-      ['Bimari', show(mh.conditions)],
-      ['Allergy', show(mh.allergies)],
-      ['Dawaiyan', show(mh.current_medications)],
-      ['Habits', show(mh.habits)],
-      ['Pehle ka dental ilaaj', show(dh.previous_treatments)],
-      ['Aakhri dental visit', show(dh.last_dental_visit)],
-    ] as [string, string][]
-  ).filter(([, v]) => v.trim() !== '')
-  const isNew = lines.length === 0 && visits.length === 0
+  if (visits.length === 0 && !history) return null
 
   return (
     <div className="grid gap-3">
-      {isNew && <p className="rounded-xl bg-clinic-sand/60 px-4 py-3 text-sm font-semibold text-clinic-ink/60">No Previous History: naya patient.</p>}
-      {lines.length > 0 && (
-        <dl className="grid gap-x-4 gap-y-1 text-sm sm:grid-cols-2">
-          {lines.map(([k, v]) => (
-            <div key={k} className="flex gap-2">
-              <dt className="shrink-0 text-clinic-ink/50">{k}:</dt>
-              <dd className="text-clinic-ink">{v}</dd>
-            </div>
-          ))}
-        </dl>
-      )}
-      {canClinical && <HistoryForm patientId={patient.id} initial={history} canEdit={canEdit} startOpen={false} />}
       {canClinical && history && (
         <Link href={`/admin/patients/${patient.id}/history?view=summary`} className="justify-self-start text-xs font-semibold text-clinic-teal hover:underline">
           Poori purani history (print / PDF)
@@ -368,12 +339,14 @@ async function WorkspaceSection({
   isOwner,
   balance,
   isDental,
+  history,
 }: {
   patient: PatientRow
   perms: string[]
   isOwner: boolean
   balance: number
   isDental: boolean
+  history: Record<string, unknown> | null
 }) {
   const supabase = await createClient()
   const can = (p: string) => perms.includes(p)
@@ -384,7 +357,7 @@ async function WorkspaceSection({
     isDental && can('clinical.view')
       ? supabase
           .from('dental_chart')
-          .select('id, tooth_number, condition, notes, treatment_date, created_at, surfaces, state')
+          .select('tooth_number, condition, treatment_date, created_at, clinical_visit_id, treatment_id, surfaces, state')
           .eq('patient_id', patient.id)
           .order('treatment_date', { ascending: false })
       : Promise.resolve({ data: [] }),
@@ -408,13 +381,7 @@ async function WorkspaceSection({
           .order('name')
       : Promise.resolve({ data: [] }),
     canMoney
-      ? supabase
-          .from('invoices')
-          .select('id, invoice_number, total, paid_amount, invoice_items(name)')
-          .eq('patient_id', patient.id)
-          .eq('invoice_date', today)
-          .neq('status', 'void')
-          .order('created_at')
+      ? supabase.from('invoices').select('id, clinical_visit_id').eq('patient_id', patient.id).eq('invoice_date', today).neq('status', 'void')
       : Promise.resolve({ data: [] }),
     can('prescriptions.view')
       ? supabase.from('prescriptions').select('id, items, prescribed_date').eq('patient_id', patient.id).order('prescribed_date', { ascending: false }).order('created_at', { ascending: false }).limit(30)
@@ -437,29 +404,31 @@ async function WorkspaceSection({
   const draft = visitsToday.find((v) => v.status === 'draft') ?? null
   const fin = visitsToday.find((v) => v.status === 'finished') ?? null
   const finRx = fin ? ((fin as unknown as { prescriptions?: { id: string }[] }).prescriptions ?? [])[0] : undefined
-  const finishedToday = fin ? { id: fin.id, invoice_id: fin.invoice_id, prescription_id: finRx?.id ?? null } : null
-  const todayBills: TodayBill[] = ((billRes.data ?? []) as unknown as { id: string; invoice_number: string; total: number; paid_amount: number; invoice_items: { name: string }[] | null }[]).map((b) => ({
-    id: b.id,
-    invoice_number: b.invoice_number,
-    total: num(b.total),
-    paid_amount: num(b.paid_amount),
-    items: (b.invoice_items ?? []).map((i) => i.name).join(', '),
-  }))
+  const invToday = (billRes.data ?? []) as { id: string; clinical_visit_id: string | null }[]
+  const finishedToday = fin ? { id: fin.id, hasInvoice: invToday.some((i) => i.clinical_visit_id === fin.id), prescription_id: finRx?.id ?? null } : null
+  const chartAll = (chartRes.data ?? []) as { tooth_number: string; condition: string; treatment_date: string; created_at: string | null; clinical_visit_id: string | null; treatment_id: string | null; surfaces: string[] | null; state: string | null }[]
+  const startedMarks = draft
+    ? chartAll
+        .filter((c) => c.clinical_visit_id === draft.id && !c.treatment_id)
+        .map((c) => ({ tooth: c.tooth_number, condition: c.condition, surfaces: c.surfaces ?? [], state: (c.state ?? 'existing') as 'existing' | 'planned' | 'completed' }))
+    : []
+  const ageNum = patient.age != null ? Number(patient.age) : patient.date_of_birth ? Math.floor((Date.now() - new Date(patient.date_of_birth).getTime()) / 31557600000) : null
+  const hist = (key: string) => ((history?.[key] ?? {}) as Record<string, unknown>)
 
   return (
     <VisitWorkspace
-      key={draft?.id ?? 'none'}
-      patient={{ id: patient.id, full_name: patient.full_name, phone: patient.phone, department: patient.department }}
+      patient={{ id: patient.id, full_name: patient.full_name, phone: patient.phone, department: patient.department, age: ageNum }}
       visit={draft}
       finishedToday={finishedToday}
-      chartRecords={(chartRes.data ?? []) as never[]}
+      startedMarks={startedMarks}
+      history={{ medical_history: hist('medical_history'), dental_history: hist('dental_history') }}
+      chartRecords={chartAll}
       treatments={treatments}
       catalog={catalog}
       materials={materials}
       doctors={(docRes.data ?? []).map((d) => d.name as string)}
       defaultDoctor={patient.primary_doctor ?? null}
       medicines={((medRes.data ?? []) as MedOpt[]).map((m) => ({ ...m, price: num(m.price), stock_qty: m.stock_qty == null ? null : num(m.stock_qty) }))}
-      todayBills={todayBills}
       pastRx={pastRx}
       xraySlot={can('clinical.view') ? <PatientPhotoGallery patientId={patient.id} photos={(('error' in photoRes && photoRes.error ? [] : photoRes.data ?? []) as PatientPhoto[])} canDelete={isOwner} /> : null}
       plansSlot={canMoney ? <Suspense fallback={null}><PlansSlot patient={patient} /></Suspense> : null}
@@ -472,7 +441,6 @@ async function WorkspaceSection({
         money: canMoney,
         owner: isOwner,
         rx: can('prescriptions.write'),
-        lab: can('lab.manage'),
       }}
     />
   )

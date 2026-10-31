@@ -42,7 +42,7 @@ interface DentalChartProps {
   plannedTeeth?: string[]
 }
 
-const CONDITIONS = [
+export const CONDITIONS = [
   { value: 'healthy', label: 'Healthy', dot: 'bg-white border border-clinic-ink/30' },
   { value: 'missing', label: 'Missing', dot: 'bg-clinic-ink/30' },
   { value: 'caries', label: 'Caries', dot: 'bg-red-500' },
@@ -69,7 +69,7 @@ const CONDITIONS = [
 ] as const
 
 /** Daant ke andar bharne ka rang, har condition ke liye */
-const TOOTH_FILL: Record<string, string> = {
+export const TOOTH_FILL: Record<string, string> = {
   healthy: '#FFFFFF',
   missing: '#E5E3DF',
   caries: '#FCA5A5',

@@ -1,11 +1,13 @@
 'use client'
 
-import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { fmtDate, money, todayKarachi, addDays } from '@/lib/karachi'
-import DentalChart from '../DentalChart'
-import TreatmentsPanel, { type CatalogOpt, type MaterialOpt, type TItem } from '../TreatmentsPanel'
+import { toothLabel } from '@/lib/teeth'
+import type { CatalogOpt, MaterialOpt, TItem } from '../TreatmentsPanel'
+import ToothChart, { type Mark } from './ToothChart'
+import HistoryFields from './HistoryFields'
 
 /* ------------------------------------------------------------------ */
 export interface VisitRow {
@@ -64,28 +66,36 @@ interface RxLine {
   price: number
   available: boolean
 }
-export interface TodayBill {
-  id: string
-  invoice_number: string
-  total: number
-  paid_amount: number
-  items: string
-}
 interface ChartRecord {
-  id: string
   tooth_number: string
   condition: string
-  notes: string | null
   treatment_date: string
   created_at?: string | null
-  surfaces?: string[] | null
-  state?: string | null
+}
+/** Naye treatment ki qatar */
+interface TRow {
+  key: string
+  name: string
+  catalog_id: string | null
+  teeth: string[]
+  price: string
+  planned: boolean
+  notes: string
+  mats: Record<string, string>
+}
+/** Pehle se chalti / plan wali treatment: aaj ka visit */
+interface OldRow {
+  tick: boolean
+  notes: string
+  price: string
 }
 
 interface Props {
-  patient: { id: string; full_name: string; phone: string; department: string }
+  patient: { id: string; full_name: string; phone: string; department: string; age: number | null }
   visit: VisitRow | null
-  finishedToday: { id: string; invoice_id: string | null; prescription_id: string | null } | null
+  finishedToday: { id: string; hasInvoice: boolean; prescription_id: string | null } | null
+  startedMarks: Mark[]
+  history: { medical_history: Record<string, unknown>; dental_history: Record<string, unknown> }
   chartRecords: ChartRecord[]
   treatments: TItem[]
   catalog: CatalogOpt[]
@@ -93,13 +103,11 @@ interface Props {
   doctors: string[]
   defaultDoctor: string | null
   medicines: MedOpt[]
-  todayBills: TodayBill[]
   balance: number
   xraySlot?: ReactNode
-  apptSlot?: ReactNode
   plansSlot?: ReactNode
   pastRx?: { id: string; date: string; names: string }[]
-  perms: { clinicalView: boolean; clinicalEdit: boolean; bill: boolean; collect: boolean; money: boolean; owner: boolean; rx: boolean; lab: boolean }
+  perms: { clinicalView: boolean; clinicalEdit: boolean; bill: boolean; collect: boolean; money: boolean; owner: boolean; rx: boolean }
 }
 
 const COMPLAINTS = ['Toothache', 'Sensitivity', 'Swelling', 'Bleeding gums', 'Missing tooth', 'Broken tooth', 'Difficulty chewing', 'Cosmetic concern', 'Follow-up', 'Other']
@@ -128,27 +136,33 @@ const SLOTS = (() => {
 const input = 'mt-1 w-full rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm outline-none focus:border-clinic-teal'
 const newKey = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : String(Date.now() + Math.random()))
 
-function Section({ n, title, children, right }: { n: number; title: string; children: React.ReactNode; right?: React.ReactNode }) {
+function Section({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
   return (
     <section id={`s${n}`} className="scroll-mt-20 rounded-2xl border border-clinic-teal/10 bg-white p-4 sm:p-5">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="font-display text-lg font-semibold text-clinic-ink">
-          <span className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-clinic-teal text-sm text-white">{n}</span>
-          {title}
-        </h2>
-        {right}
-      </div>
+      <h2 className="mb-3 font-display text-lg font-semibold text-clinic-ink">
+        <span className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-clinic-teal text-sm text-white">{n}</span>
+        {title}
+      </h2>
       {children}
     </section>
   )
 }
 
-function Locked({ n, title }: { n: number; title: string }) {
+/** Chune hue daanton ki tick-chips (diagnosis / treatment ki qatar mein) */
+function TeethChips({ all, picked, onChange }: { all: string[]; picked: string[]; onChange: (t: string[]) => void }) {
+  if (all.length === 0) return <span className="text-xs text-clinic-ink/40">chart se daant chunein</span>
   return (
-    <div id={`s${n}`} className="flex items-center gap-2 rounded-2xl border border-dashed border-clinic-teal/20 px-4 py-3 text-sm text-clinic-ink/40">
-      <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-clinic-teal/20 text-sm text-white">{n}</span>
-      {title} <span className="text-xs">(visit shuru karne ke baad)</span>
-    </div>
+    <span className="flex flex-wrap gap-1">
+      {[...all].sort().map((t) => {
+        const on = picked.includes(t)
+        return (
+          <button key={t} type="button" onClick={() => onChange(on ? picked.filter((x) => x !== t) : [...picked, t])} className={`rounded-full px-2 py-0.5 text-xs font-semibold ${on ? 'bg-sky-600 text-white' : 'border border-clinic-ink/20 text-clinic-ink/50'}`}>
+            {on ? '✓ ' : ''}
+            {toothLabel(t)}
+          </button>
+        )
+      })}
+    </span>
   )
 }
 
@@ -157,43 +171,92 @@ export default function VisitWorkspace(p: Props) {
   const router = useRouter()
   const v = p.visit
   const homeo = p.patient.department === 'homeopathic'
+  const canEdit = p.perms.clinicalEdit
   const finishKey = useRef(newKey())
-  const [busy, setBusy] = useState<'' | 'open' | 'draft' | 'finish'>('')
+  const visitId = useRef<string | null>(v?.id ?? null)
+  const [busy, setBusy] = useState<'' | 'save' | 'finish'>('')
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null)
+  const [showForm, setShowForm] = useState(!p.finishedToday)
+  const [done, setDone] = useState<{ visit_id: string; prescription_id: string | null; hasInvoice: boolean } | null>(null)
 
-  // clinical (draft mein save hota hai)
+  // 2, 3 history
+  const [medical, setMedical] = useState<Record<string, unknown>>(p.history.medical_history)
+  const [dental, setDental] = useState<Record<string, unknown>>(p.history.dental_history)
+  // 4, 5
   const [cItems, setCItems] = useState<string[]>(v?.complaint?.items ?? [])
   const [cOther, setCOther] = useState(v?.complaint?.other ?? '')
   const [cDur, setCDur] = useState(v?.complaint?.duration ?? '')
   const [cSev, setCSev] = useState(v?.complaint?.severity ?? '')
   const [cLoc, setCLoc] = useState(v?.complaint?.location ?? '')
   const [findings, setFindings] = useState<Record<string, string>>(v?.findings ?? {})
-    const [diags, setDiags] = useState<Diagnosis[]>(v?.diagnoses?.length ? v.diagnoses : [])
-  const [nextDate, setNextDate] = useState(v?.next_date ?? '')
-  const [nextTime, setNextTime] = useState(v?.next_time ?? '')
-  const [nextT, setNextT] = useState(v?.next_treatment_id ?? '')
-
-  // prescription + bill (Finish par save)
+  // 6 chart
+  const [sel, setSel] = useState<string[]>([])
+  const [marks, setMarks] = useState<Mark[]>(p.startedMarks)
+  // 8 diagnosis
+  const [diags, setDiags] = useState<Diagnosis[]>(v?.diagnoses?.length ? v.diagnoses : [])
+  // 9 treatment
+  const [rows, setRows] = useState<TRow[]>([])
+  const live = p.treatments.filter((t) => t.status === 'active' || t.status === 'planned')
+  const [old, setOld] = useState<Record<string, OldRow>>({})
+  // 10 prescription
   const [rxCat, setRxCat] = useState<'dental' | 'homeopathic'>(homeo ? 'homeopathic' : 'dental')
   const [rxQ, setRxQ] = useState('')
   const [lines, setLines] = useState<RxLine[]>([])
   const [rxNotes, setRxNotes] = useState('')
+  // 11 bill
   const [extra, setExtra] = useState<{ label: string; amount: string }[]>([])
   const [discount, setDiscount] = useState('')
   const [paid, setPaid] = useState('')
   const [method, setMethod] = useState('cash')
+  // 12 next
+  const [nextDate, setNextDate] = useState(v?.next_date ?? '')
+  const [nextTime, setNextTime] = useState(v?.next_time ?? '')
+  const [nextT, setNextT] = useState(v?.next_treatment_id ?? '')
 
-  const [startTeeth, setStartTeeth] = useState<string[] | null>(null)
-  const consumed = useCallback(() => setStartTeeth(null), [])
+  // Browser mein baqi form ki nakal (Save ke baad bhi treatment / dawa / bill ki qataren wapas aa jayen). Finish par saaf.
+  const draftKey = `alshifa-visit:${p.patient.id}:${todayKarachi()}`
+  const [restored, setRestored] = useState(false)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(draftKey)
+      if (raw) {
+        const d = JSON.parse(raw)
+        if (Array.isArray(d.rows)) setRows(d.rows)
+        if (d.old && typeof d.old === 'object') setOld(d.old)
+        if (Array.isArray(d.lines)) setLines(d.lines)
+        if (typeof d.rxNotes === 'string') setRxNotes(d.rxNotes)
+        if (Array.isArray(d.extra)) setExtra(d.extra)
+        if (Array.isArray(d.sel)) setSel(d.sel)
+        if (typeof d.paid === 'string') setPaid(d.paid)
+      }
+    } catch {}
+    setRestored(true)
+  }, [draftKey])
+  useEffect(() => {
+    if (!restored || done) return
+    try {
+      localStorage.setItem(draftKey, JSON.stringify({ rows, old, lines, rxNotes, extra, sel, paid }))
+    } catch {}
+  }, [restored, done, draftKey, rows, old, lines, rxNotes, extra, sel, paid])
 
-  const complaintPayload = () => ({ items: cItems, other: cOther, duration: cDur, severity: cSev, location: cLoc })
-  const dataPayload = () => ({
-    complaint: complaintPayload(),
+  /** Daant aik baar chunne par diagnosis / treatment ki qataron mein khud aa jaate hain */
+  function pickTeeth(next: string[]) {
+    const added = next.filter((t) => !sel.includes(t))
+    const fix = (teeth: string[] | undefined) => [...(teeth ?? []).filter((t) => next.includes(t)), ...added]
+    setSel(next)
+    setDiags((ds) => ds.map((d) => ({ ...d, teeth: fix(d.teeth) })))
+    setRows((rs) => rs.map((r) => ({ ...r, teeth: fix(r.teeth) })))
+  }
+
+  const data = () => ({
+    complaint: { items: cItems, other: cOther, duration: cDur, severity: cSev, location: cLoc },
     findings,
     diagnoses: diags.filter((d) => d.text.trim()),
     next_date: nextDate || '',
     next_time: nextDate ? nextTime : '',
     next_treatment_id: nextDate ? nextT : '',
+    history: { medical_history: medical, dental_history: dental },
+    chart: homeo ? [] : marks,
   })
 
   const meds = useMemo(() => {
@@ -223,39 +286,57 @@ export default function VisitWorkspace(p: Props) {
     setRxQ('')
   }
   const upd = (key: string, patch: Partial<RxLine>) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)))
+  const updRow = (key: string, patch: Partial<TRow>) => setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)))
+  const updOld = (id: string, patch: Partial<OldRow>) => setOld((o) => ({ ...o, [id]: { ...{ tick: false, notes: '', price: '' }, ...o[id], ...patch } }))
+
+  function pickCatalog(r: TRow, name: string) {
+    const c = p.catalog.find((x) => x.name.toLowerCase() === name.trim().toLowerCase())
+    const mats: Record<string, string> = {}
+    if (c) for (const m of p.materials[c.id] ?? []) mats[m.inventory_id] = String(m.default_qty)
+    updRow(r.key, { name, catalog_id: c?.id ?? null, price: c ? String(c.price) : r.price, mats: c ? mats : {} })
+  }
 
   const medTotal = lines.filter((l) => l.mode === 'dispense').reduce((s, l) => s + (Number(l.qty) || 0) * (Number(l.price) || 0), 0)
   const extraTotal = extra.reduce((s, e) => s + (Number(e.amount) || 0), 0)
+  const treatTotal =
+    rows.filter((r) => !r.planned && r.name.trim()).reduce((s, r) => s + (Number(r.price) || 0), 0) +
+    live.filter((t) => t.status === 'planned' && old[t.id]?.tick).reduce((s, t) => s + (Number(old[t.id]?.price) || 0), 0)
   const disc = Math.min(Number(discount) || 0, medTotal + extraTotal)
-  const newCharges = medTotal + extraTotal - disc
+  const newCharges = treatTotal + medTotal + extraTotal - disc
   const dueNow = p.balance + newCharges
   const paidNum = Number(paid) || 0
 
-  async function openVisit() {
-    setBusy('open')
-    setMsg(null)
-    const { error } = await createClient().rpc('open_clinical_visit', { p_patient_id: p.patient.id })
-    setBusy('')
-    if (error) return setMsg({ ok: false, t: error.message })
-    router.refresh()
+  async function ensureVisit(): Promise<string | null> {
+    if (visitId.current) return visitId.current
+    const { data: id, error } = await createClient().rpc('open_clinical_visit', { p_patient_id: p.patient.id })
+    if (error || !id) {
+      setMsg({ ok: false, t: error?.message ?? 'Visit nahi khul saka' })
+      return null
+    }
+    visitId.current = id as string
+    return visitId.current
   }
 
-  async function saveDraft() {
-    if (!v) return
-    setBusy('draft')
+  async function save() {
+    if (busy) return
+    setBusy('save')
     setMsg(null)
-    const { error } = await createClient().rpc('save_clinical_visit', { p_id: v.id, p_data: dataPayload() })
+    const id = await ensureVisit()
+    if (!id) return setBusy('')
+    const { error } = await createClient().rpc('save_clinical_visit', { p_id: id, p_data: data() })
     setBusy('')
-    setMsg(error ? { ok: false, t: error.message } : { ok: true, t: 'Draft save ho gaya. Baad mein yahin se jari rakhein.' })
-    if (!error) router.refresh()
+    setMsg(error ? { ok: false, t: error.message } : { ok: true, t: 'Save ho gaya (history, takleef, muaina, chart, diagnosis, agli appointment). Treatment, dawa aur bill "Finish Visit" par.' })
   }
 
   async function finish() {
-    if (!v || busy) return
+    if (busy) return
     if (paidNum > dueNow + 0.001) return setMsg({ ok: false, t: `Mili raqam kul baqaya (${money(dueNow)}) se zyada hai` })
     if (lines.some((l) => !l.name.trim())) return setMsg({ ok: false, t: 'Har dawa ka naam likhein' })
+    if (rows.some((r) => !r.name.trim())) return setMsg({ ok: false, t: 'Har treatment ka naam likhein (ya qatar hata dein)' })
     setBusy('finish')
     setMsg(null)
+    const id = await ensureVisit()
+    if (!id) return setBusy('')
     const rx = lines.length
       ? {
           category: rxCat,
@@ -275,214 +356,303 @@ export default function VisitWorkspace(p: Props) {
           })),
         }
       : null
-    const { error } = await createClient().rpc('finish_clinical_visit', {
-      p_id: v.id,
-      p_data: dataPayload(),
+    const treatments = [
+      ...rows.map((r) => ({
+        name: r.name.trim(),
+        catalog_id: r.catalog_id,
+        teeth: r.teeth,
+        price: p.perms.bill ? Number(r.price) || 0 : 0,
+        planned: r.planned,
+        notes: r.notes,
+        condition: null as string | null,
+      })),
+      ...live
+        .filter((t) => old[t.id]?.tick)
+        .map((t) => ({
+          treatment_id: t.id,
+          notes: old[t.id].notes,
+          price: p.perms.bill ? Number(old[t.id].price) || 0 : 0,
+          condition: null as string | null,
+        })),
+    ]
+    const { data: res, error } = await createClient().rpc('finish_clinical_visit', {
+      p_id: id,
+      p_data: data(),
       p_rx: rx,
       p_extra: extra.filter((e) => Number(e.amount) > 0),
+      p_treatments: treatments,
       p_discount: p.perms.owner ? disc : 0,
       p_paid: p.perms.collect ? paidNum : 0,
       p_method: method,
       p_key: finishKey.current,
     })
+    if (error) {
+      setBusy('')
+      return setMsg({ ok: false, t: error.message })
+    }
+    // Samaan stock se kaatein (visit mukammal ho chuka; stock kam ho to sirf warning)
+    const usage = rows
+      .filter((r) => !r.planned)
+      .flatMap((r) => Object.entries(r.mats).map(([inventory_id, q]) => ({ inventory_id, qty: Number(q) || 0, treatment_id: r.catalog_id })))
+      .filter((u) => u.qty > 0)
+    let warn = ''
+    if (usage.length > 0) {
+      const { error: sErr } = await createClient().rpc('record_usage', { p_items: usage, p_patient_id: p.patient.id, p_invoice_id: null, p_note: 'Visit', p_key: finishKey.current + ':stk' })
+      if (sErr) warn = 'Visit mukammal, magar samaan stock se nahi kata: ' + sErr.message
+    }
+    try {
+      localStorage.removeItem(draftKey)
+    } catch {}
     setBusy('')
-    if (error) return setMsg({ ok: false, t: error.message })
+    const r = res as { visit_id: string; prescription_id: string | null }
+    setDone({ visit_id: r.visit_id, prescription_id: r.prescription_id, hasInvoice: newCharges > 0 || paidNum > 0 || Boolean((res as { invoice_id?: string }).invoice_id) })
+    if (warn) setMsg({ ok: false, t: warn })
     router.refresh()
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  const planned = p.treatments.filter((t) => t.status === 'planned').flatMap((t) => t.teeth)
-  const activeTreatments = p.treatments.filter((t) => t.status === 'active' || t.status === 'planned')
   const complaintList = homeo ? HOMEO_COMPLAINTS : COMPLAINTS
+  const fin = done ? { id: done.visit_id, prescription_id: done.prescription_id, hasInvoice: done.hasInvoice } : p.finishedToday
+
+  /* ---------- sirf bill dekhne wale (reception) ---------- */
+  if (!p.perms.clinicalView) {
+    return (
+      <div className="grid gap-4">
+        {p.perms.money && <BillSummary patientId={p.patient.id} balance={p.balance} plansSlot={p.plansSlot} />}
+      </div>
+    )
+  }
 
   return (
     <div className="grid min-w-0 grid-cols-1 gap-4">
-      {/* Aaj ka visit mukammal: print */}
-      {p.finishedToday && !v && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-4">
+      {fin && (
+        <div className="rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-4">
           <p className="font-semibold text-emerald-800">✓ Aaj ka visit mukammal ho gaya</p>
-          <div className="flex flex-wrap gap-2 text-sm">
-            <a href={`/admin/visits/${p.finishedToday.id}/print`} target="_blank" className="rounded-full bg-white px-4 py-1.5 font-semibold text-clinic-teal">
-              Visit record (PDF)
-            </a>
-            {p.finishedToday.prescription_id && (
-              <a href={`/admin/prescriptions/${p.finishedToday.prescription_id}/print`} target="_blank" className="rounded-full bg-white px-4 py-1.5 font-semibold text-clinic-teal">
-                Prescription (PDF)
+          {msg && <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">{msg.t}</p>}
+          <div className="mt-3 flex flex-wrap gap-2 text-sm">
+            {fin.prescription_id && (
+              <a href={`/admin/prescriptions/${fin.prescription_id}/print`} target="_blank" className="rounded-full bg-clinic-teal px-5 py-2.5 font-semibold text-white">
+                Prescription PDF
               </a>
             )}
-            {p.finishedToday.invoice_id && (
-              <a href={`/admin/invoices/${p.finishedToday.invoice_id}`} target="_blank" className="rounded-full bg-white px-4 py-1.5 font-semibold text-clinic-teal">
-                Bill (PDF)
+            {fin.hasInvoice && p.perms.money && (
+              <a href={`/admin/visits/${fin.id}/invoice`} target="_blank" className="rounded-full bg-clinic-teal px-5 py-2.5 font-semibold text-white">
+                Invoice PDF
               </a>
             )}
           </div>
+          {!showForm && !done && (
+            <button type="button" onClick={() => setShowForm(true)} className="mt-3 text-xs font-semibold text-clinic-teal underline">
+              Aaj dobara naya visit shuru karein
+            </button>
+          )}
+          {done && (
+            <button type="button" onClick={() => window.location.reload()} className="mt-3 text-xs font-semibold text-clinic-teal underline">
+              Aaj dobara naya visit shuru karein
+            </button>
+          )}
         </div>
       )}
 
-      {/* 3. CHIEF COMPLAINT */}
-      <Section n={3} title="Chief Complaint (takleef)">
-        {!v ? (
-          p.perms.clinicalEdit ? (
-            <div className="rounded-xl bg-clinic-mint/60 p-4 text-center">
-              <p className="text-sm text-clinic-ink/70">Aaj patient aaya hai? Visit shuru karein: takleef, muaina, diagnosis, prescription, bill aur agli appointment aik hi jagah.</p>
-              <button onClick={openVisit} disabled={busy === 'open'} className="mt-3 rounded-full bg-clinic-teal px-6 py-3 text-base font-semibold text-white disabled:opacity-60">
-                {busy === 'open' ? 'Khul raha hai...' : '+ Aaj ka visit shuru karein'}
-              </button>
-              <p className="mt-2 text-xs text-clinic-ink/50">Sirf purani treatment ka agla visit ya payment ho to neeche Treatments mein seedha bhi kar sakte hain.</p>
-            </div>
-          ) : (
-            <p className="text-sm text-clinic-ink/50">Aaj ka koi visit khula nahi.</p>
-          )
-        ) : (
-          <div className="grid gap-3">
-            <div className="flex flex-wrap gap-2">
-              {complaintList.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setCItems((x) => (x.includes(c) ? x.filter((y) => y !== c) : [...x, c]))}
-                  className={`rounded-full px-4 py-2 text-sm font-semibold ${cItems.includes(c) ? 'bg-clinic-teal text-white' : 'border border-clinic-teal/25 bg-white text-clinic-ink/75'}`}
-                >
-                  {cItems.includes(c) ? '✓ ' : ''}
-                  {c}
-                </button>
-              ))}
-            </div>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div>
-                <label className="text-xs font-medium text-clinic-ink/70">Kab se</label>
-                <select value={cDur} onChange={(e) => setCDur(e.target.value)} className={input}>
-                  <option value="">—</option>
-                  {DURATIONS.map((d) => (
-                    <option key={d}>{d}</option>
-                  ))}
-                </select>
+      {showForm && !done && (
+        <>
+          {/* 2. MEDICAL HISTORY */}
+          <Section n={2} title="Medical History">
+            <HistoryFields column="medical_history" data={medical} onChange={setMedical} canEdit={canEdit} />
+          </Section>
+
+          {/* 3. DENTAL HISTORY */}
+          {!homeo && (
+            <Section n={3} title="Dental History">
+              <HistoryFields column="dental_history" data={dental} onChange={setDental} canEdit={canEdit} />
+            </Section>
+          )}
+
+          {/* 4. CHIEF COMPLAINT */}
+          <Section n={4} title="Chief Complaint (takleef)">
+            <fieldset disabled={!canEdit} className="grid gap-3">
+              <div className="flex flex-wrap gap-2">
+                {complaintList.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setCItems((x) => (x.includes(c) ? x.filter((y) => y !== c) : [...x, c]))}
+                    className={`rounded-full px-4 py-2 text-sm font-semibold ${cItems.includes(c) ? 'bg-clinic-teal text-white' : 'border border-clinic-teal/25 bg-white text-clinic-ink/75'}`}
+                  >
+                    {cItems.includes(c) ? '✓ ' : ''}
+                    {c}
+                  </button>
+                ))}
               </div>
-              <div>
-                <label className="text-xs font-medium text-clinic-ink/70">Kitna (shiddat)</label>
-                <div className="mt-1 flex gap-1.5">
-                  {SEVERITY.map((s) => (
-                    <button key={s} type="button" onClick={() => setCSev(cSev === s ? '' : s)} className={`flex-1 rounded-lg px-2 py-2 text-sm font-semibold ${cSev === s ? 'bg-clinic-teal text-white' : 'border border-clinic-teal/25 text-clinic-ink/70'}`}>
-                      {s}
-                    </button>
-                  ))}
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div>
+                  <label className="text-xs font-medium text-clinic-ink/70">Kab se</label>
+                  <select value={cDur} onChange={(e) => setCDur(e.target.value)} className={input}>
+                    <option value="">—</option>
+                    {DURATIONS.map((d) => (
+                      <option key={d}>{d}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-clinic-ink/70">Kitna (shiddat)</label>
+                  <div className="mt-1 flex gap-1.5">
+                    {SEVERITY.map((s) => (
+                      <button key={s} type="button" onClick={() => setCSev(cSev === s ? '' : s)} className={`flex-1 rounded-lg px-2 py-2 text-sm font-semibold ${cSev === s ? 'bg-clinic-teal text-white' : 'border border-clinic-teal/25 text-clinic-ink/70'}`}>
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-clinic-ink/70">{homeo ? 'Kahan' : 'Kahan (daant / jagah)'}</label>
+                  <input value={cLoc} onChange={(e) => setCLoc(e.target.value)} placeholder={homeo ? '' : 'Neeche dayen ...'} className={input} />
                 </div>
               </div>
               <div>
-                <label className="text-xs font-medium text-clinic-ink/70">{homeo ? 'Kahan' : 'Kahan (daant / jagah)'}</label>
-                <input value={cLoc} onChange={(e) => setCLoc(e.target.value)} placeholder={homeo ? '' : 'Neeche dayen, UR 6 ...'} className={input} />
+                <label className="text-xs font-medium text-clinic-ink/70">Apne alfaz mein (optional)</label>
+                <input value={cOther} onChange={(e) => setCOther(e.target.value)} className={input} />
               </div>
-            </div>
-            <div>
-              <label className="text-xs font-medium text-clinic-ink/70">Apne alfaz mein (optional)</label>
-              <input value={cOther} onChange={(e) => setCOther(e.target.value)} className={input} />
-            </div>
-          </div>
-        )}
-      </Section>
+            </fieldset>
+          </Section>
 
-      {/* 4. CLINICAL EXAMINATION */}
-      {v ? (
-        <Section n={4} title="Clinical Examination (muaina)">
-          <div className="grid gap-3 sm:grid-cols-3">
-            {FINDINGS.map((f) => (
-              <div key={f.k}>
-                <label className="text-xs font-medium text-clinic-ink/70">{f.l}</label>
-                <textarea rows={2} value={findings[f.k] ?? ''} onChange={(e) => setFindings({ ...findings, [f.k]: e.target.value })} className={input} />
-              </div>
-            ))}
-          </div>
-        </Section>
-      ) : (
-        <Locked n={4} title="Clinical Examination" />
-      )}
+          {/* 5. CLINICAL EXAMINATION */}
+          <Section n={5} title="Clinical Examination (muaina)">
+            <fieldset disabled={!canEdit} className="grid gap-3 sm:grid-cols-3">
+              {FINDINGS.map((f) => (
+                <div key={f.k}>
+                  <label className="text-xs font-medium text-clinic-ink/70">{f.l}</label>
+                  <textarea rows={2} value={findings[f.k] ?? ''} onChange={(e) => setFindings({ ...findings, [f.k]: e.target.value })} className={input} />
+                </div>
+              ))}
+            </fieldset>
+          </Section>
 
-      {/* 5. DENTAL CHART */}
-      {p.perms.clinicalView && !homeo && (
-        <div id="s5" className="relative scroll-mt-20">
-          <span className="absolute -left-2 -top-2 z-[1] inline-flex h-7 w-7 items-center justify-center rounded-full bg-clinic-teal text-sm font-semibold text-white">5</span>
-          <DentalChart
-            patientId={p.patient.id}
-            initialRecords={p.chartRecords}
-            canEdit={p.perms.clinicalEdit}
-            onStartTreatment={(tooth) => setStartTeeth([tooth])}
-            plannedTeeth={planned}
-          />
-        </div>
-      )}
+          {/* 6. DENTAL CHART */}
+          {!homeo && (
+            <Section n={6} title="Dental Chart">
+              <ToothChart age={p.patient.age} selected={sel} onSelect={pickTeeth} marks={marks} onMarks={setMarks} old={p.chartRecords} canEdit={canEdit} />
+            </Section>
+          )}
 
-      {/* 6. X-RAY / INVESTIGATION */}
-      {p.perms.clinicalView && (
-        <Section n={6} title="X-ray / Investigation">
-          {v && (
+          {/* 7. X-RAY */}
+          <Section n={7} title="X-ray / Investigation">
             <div className="mb-3">
               <label className="text-xs font-medium text-clinic-ink/70">X-ray / report mein kya nazar aaya</label>
-              <textarea rows={2} value={findings.radiographic ?? ''} onChange={(e) => setFindings({ ...findings, radiographic: e.target.value })} placeholder="Caries, bone loss, periapical ..." className={input} />
+              <textarea rows={2} disabled={!canEdit} value={findings.radiographic ?? ''} onChange={(e) => setFindings({ ...findings, radiographic: e.target.value })} placeholder="Caries, bone loss, periapical ..." className={input} />
             </div>
-          )}
-          {p.xraySlot}
-        </Section>
-      )}
+            {p.xraySlot}
+          </Section>
 
-      {/* 6. DIAGNOSIS */}
-      {v ? (
-        <Section n={7} title="Diagnosis">
-          <datalist id="diag-list">
-            {DIAG_SUGGEST.map((d) => (
-              <option key={d} value={d} />
-            ))}
-          </datalist>
-          <div className="grid gap-2">
-            {diags.map((d, i) => (
-              <div key={i} className="grid gap-2 sm:grid-cols-[1fr_10rem_auto]">
-                <input list={homeo ? undefined : 'diag-list'} value={d.text} onChange={(e) => setDiags(diags.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)))} placeholder="Diagnosis" className={input} />
-                {!homeo && (
-                  <input
-                    value={(d.teeth ?? []).join(' ')}
-                    onChange={(e) => setDiags(diags.map((x, j) => (j === i ? { ...x, teeth: e.target.value.split(/[\s,]+/).filter(Boolean) } : x)))}
-                    placeholder="Daant (16 17)"
-                    className={input}
-                  />
-                )}
-                <button type="button" onClick={() => setDiags(diags.filter((_, j) => j !== i))} className="text-sm text-red-600">
-                  hatao
+          {/* 8. DIAGNOSIS */}
+          <Section n={8} title="Diagnosis">
+            <datalist id="diag-list">
+              {DIAG_SUGGEST.map((d) => (
+                <option key={d} value={d} />
+              ))}
+            </datalist>
+            <div className="grid gap-3">
+              {diags.map((d, i) => (
+                <div key={i} className="grid gap-1.5 rounded-xl border border-clinic-teal/10 p-2.5">
+                  <div className="flex gap-2">
+                    <input list={homeo ? undefined : 'diag-list'} value={d.text} disabled={!canEdit} onChange={(e) => setDiags(diags.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)))} placeholder="Diagnosis" className="w-full rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm outline-none focus:border-clinic-teal" />
+                    <button type="button" onClick={() => setDiags(diags.filter((_, j) => j !== i))} className="shrink-0 text-sm text-red-600">
+                      hatao
+                    </button>
+                  </div>
+                  {!homeo && <TeethChips all={sel} picked={d.teeth ?? []} onChange={(t) => setDiags(diags.map((x, j) => (j === i ? { ...x, teeth: t } : x)))} />}
+                </div>
+              ))}
+              {canEdit && (
+                <button type="button" onClick={() => setDiags([...diags, { text: '', teeth: [...sel] }])} className="justify-self-start rounded-full border border-clinic-teal/30 px-4 py-1.5 text-sm font-semibold text-clinic-teal">
+                  + Diagnosis
                 </button>
-              </div>
-            ))}
-            <button type="button" onClick={() => setDiags([...diags, { text: '', teeth: [] }])} className="justify-self-start rounded-full border border-clinic-teal/30 px-4 py-1.5 text-sm font-semibold text-clinic-teal">
-              + Diagnosis
-            </button>
-          </div>
-        </Section>
-      ) : (
-        <Locked n={7} title="Diagnosis" />
-      )}
+              )}
+            </div>
+          </Section>
 
-      {/* 7. TREATMENT PLAN / TREATMENTS */}
-      {(p.perms.clinicalView || p.perms.money) && (
-        <Section n={8} title="Treatment (plan aur visit)">
-          <TreatmentsPanel
-            patientId={p.patient.id}
-            department={p.patient.department}
-            treatments={p.treatments}
-            catalog={p.catalog}
-            materials={p.materials}
-            doctors={p.doctors}
-            defaultDoctor={p.defaultDoctor}
-            canEdit={p.perms.clinicalEdit}
-            canBill={p.perms.bill}
-            canCollect={p.perms.collect}
-            canSeeMoney={p.perms.money}
-            isOwner={p.perms.owner}
-            canLab={p.perms.lab && !homeo}
-            startTeeth={startTeeth}
-            onStartConsumed={consumed}
-          />
-        </Section>
-      )}
+          {/* 9. TREATMENT */}
+          <Section n={9} title="Treatment">
+            <datalist id="cat-list">
+              {p.catalog
+                .filter((c) => (homeo ? c.department !== 'dental' : c.department !== 'homeopathic'))
+                .map((c) => (
+                  <option key={c.id} value={c.name} />
+                ))}
+            </datalist>
+            <div className="grid gap-3">
+              {live.length > 0 && (
+                <div className="grid gap-2">
+                  <p className="text-xs font-semibold text-clinic-ink/60">Pehle se chalti / plan wali treatments</p>
+                  {live.map((t) => {
+                    const o = old[t.id]
+                    return (
+                      <div key={t.id} className={`rounded-xl border p-3 ${o?.tick ? 'border-clinic-teal bg-clinic-mint/40' : 'border-clinic-teal/15'}`}>
+                        <label className="flex flex-wrap items-center gap-2 text-sm">
+                          <input type="checkbox" disabled={!canEdit} checked={Boolean(o?.tick)} onChange={(e) => updOld(t.id, { tick: e.target.checked, price: o?.price || (t.status === 'planned' ? String(t.list_price || t.price || '') : '') })} className="h-5 w-5" />
+                          <span className="font-semibold text-clinic-ink">{t.name}</span>
+                          {t.teeth.length > 0 && <span className="text-xs text-clinic-ink/60">({t.teeth.map(toothLabel).join(', ')})</span>}
+                          <span className={`rounded-full px-2 py-0.5 text-[11px] ${t.status === 'planned' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{t.status === 'planned' ? 'sirf plan' : `visit ${t.visits.length}`}</span>
+                          {p.perms.money && t.status === 'active' && t.balance > 0 && <span className="text-xs text-red-600">baqaya {money(t.balance)}</span>}
+                          <span className="text-xs text-clinic-ink/50">— {t.status === 'planned' ? 'aaj shuru karein' : 'aaj ka visit'}</span>
+                        </label>
+                        {o?.tick && (
+                          <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_9rem]">
+                            <input value={o.notes} onChange={(e) => updOld(t.id, { notes: e.target.value })} placeholder="Aaj kya kiya (note)" className="rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm" />
+                            {t.status === 'planned' && p.perms.bill && <input type="number" min={0} value={o.price} onChange={(e) => updOld(t.id, { price: e.target.value })} placeholder="Qeemat Rs." className="rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm" />}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
 
-      {/* 9. PRESCRIPTION */}
-      {v && p.perms.rx && (
-        <Section n={9} title="Prescription (optional)">
+              {rows.map((r) => (
+                <div key={r.key} className="grid gap-2 rounded-xl border border-clinic-teal/20 p-3">
+                  <div className="grid gap-2 sm:grid-cols-[1fr_9rem_auto]">
+                    <input list="cat-list" value={r.name} onChange={(e) => pickCatalog(r, e.target.value)} placeholder="Treatment (list se chunein ya likhein)" className="rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm" />
+                    {p.perms.bill ? <input type="number" min={0} value={r.price} onChange={(e) => updRow(r.key, { price: e.target.value })} placeholder="Qeemat Rs." className="rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm" /> : <span />}
+                    <button type="button" onClick={() => setRows(rows.filter((x) => x.key !== r.key))} className="text-sm text-red-600">
+                      hatao
+                    </button>
+                  </div>
+                  {!homeo && <TeethChips all={sel} picked={r.teeth} onChange={(t) => updRow(r.key, { teeth: t })} />}
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
+                    <button type="button" onClick={() => updRow(r.key, { planned: false })} className={`rounded-full px-3 py-1 text-xs font-semibold ${!r.planned ? 'bg-emerald-600 text-white' : 'border border-clinic-ink/20 text-clinic-ink/60'}`}>
+                      Aaj ho gayi
+                    </button>
+                    <button type="button" onClick={() => updRow(r.key, { planned: true })} className={`rounded-full px-3 py-1 text-xs font-semibold ${r.planned ? 'bg-amber-500 text-white' : 'border border-clinic-ink/20 text-clinic-ink/60'}`}>
+                      Sirf plan (baad mein)
+                    </button>
+                    <input value={r.notes} onChange={(e) => updRow(r.key, { notes: e.target.value })} placeholder="Note (optional)" className="min-w-0 flex-1 rounded-lg border border-clinic-teal/20 px-3 py-1.5 text-sm" />
+                  </div>
+                  {!r.planned && r.catalog_id && (p.materials[r.catalog_id] ?? []).length > 0 && (
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-clinic-ink/70">
+                      <span>Samaan:</span>
+                      {(p.materials[r.catalog_id] ?? []).map((m) => (
+                        <label key={m.inventory_id} className="flex items-center gap-1">
+                          {m.name}
+                          <input type="number" min={0} value={r.mats[m.inventory_id] ?? ''} onChange={(e) => updRow(r.key, { mats: { ...r.mats, [m.inventory_id]: e.target.value } })} className="w-14 rounded border border-clinic-teal/20 px-1.5 py-1" />
+                          {m.unit}
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+              {canEdit && (
+                <button type="button" onClick={() => setRows([...rows, { key: newKey(), name: '', catalog_id: null, teeth: [...sel], price: '', planned: false, notes: '', mats: {} }])} className="justify-self-start rounded-full border border-clinic-teal/30 px-4 py-1.5 text-sm font-semibold text-clinic-teal">
+                  + Treatment
+                </button>
+              )}
+              {live.length === 0 && rows.length === 0 && <p className="text-xs text-clinic-ink/50">Abhi koi treatment nahi. Zaroorat ho to &quot;+ Treatment&quot; dabayein.</p>}
+            </div>
+          </Section>
+
+          {/* 10. PRESCRIPTION */}
+          {p.perms.rx && (
+            <Section n={10} title="Prescription (optional)">
           <div className="flex flex-wrap items-center gap-2">
             {(['dental', 'homeopathic'] as const).map((c) => (
               <button key={c} type="button" onClick={() => setRxCat(c)} className={`rounded-full px-4 py-1.5 text-sm font-semibold ${rxCat === c ? 'bg-clinic-teal text-white' : 'border border-clinic-teal/25 text-clinic-ink/70'}`}>
@@ -576,31 +746,19 @@ export default function VisitWorkspace(p: Props) {
               </ul>
             </details>
           )}
-        </Section>
-      )}
-      {!v && p.perms.rx && <Locked n={9} title="Prescription" />}
+            </Section>
+          )}
 
-      {/* 9. BILL */}
-      {p.perms.money && (
-        <Section n={10} title="Bill / Paisa">
-          <div className="grid gap-2 text-sm">
-            {p.todayBills.length > 0 && (
-              <div className="rounded-xl bg-clinic-sand/60 p-3">
-                <p className="text-xs font-semibold text-clinic-ink/60">Aaj ke bill</p>
-                {p.todayBills.map((b) => (
-                  <p key={b.id} className="flex justify-between">
-                    <span>
-                      <a href={`/admin/invoices/${b.id}`} className="text-clinic-teal hover:underline">{b.invoice_number}</a> · {b.items}
-                    </span>
-                    <span>
-                      {money(b.total)} <span className="text-xs text-emerald-700">(mile {money(b.paid_amount)})</span>
-                    </span>
+          {/* 11. BILL */}
+          {p.perms.money && (
+            <Section n={11} title="Bill / Paisa">
+              <div className="grid gap-2 text-sm">
+                {treatTotal > 0 && (
+                  <p className="flex justify-between">
+                    <span>Aaj ki treatments</span>
+                    <span>{money(treatTotal)}</span>
                   </p>
-                ))}
-              </div>
-            )}
-            {v && (
-              <>
+                )}
                 {medTotal > 0 && (
                   <p className="flex justify-between">
                     <span>Clinic se di gayi dawaiyan</span>
@@ -628,115 +786,126 @@ export default function VisitWorkspace(p: Props) {
                     <input type="number" min={0} value={discount} onChange={(e) => setDiscount(e.target.value)} className="w-28 rounded-lg border border-clinic-teal/20 px-2 py-1.5 text-right" />
                   </p>
                 )}
-              </>
-            )}
-            <div className="mt-1 grid gap-1 rounded-xl border border-clinic-teal/15 p-3">
-              <p className="flex justify-between">
-                <span>Pichla + aaj ka baqaya (ab tak)</span>
-                <span>{money(p.balance)}</span>
-              </p>
-              {v && newCharges > 0 && (
-                <p className="flex justify-between">
-                  <span>Is visit ka naya (dawa + extra − riyayat)</span>
-                  <span>{money(newCharges)}</span>
-                </p>
-              )}
-              <p className="flex justify-between font-semibold">
-                <span>Kul baqaya</span>
-                <span className={dueNow > 0 ? 'text-red-600' : ''}>{money(dueNow)}</span>
-              </p>
-              {v && p.perms.collect && dueNow > 0 && (
-                <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
-                  <span>Aaj mile</span>
-                  <span className="flex items-center gap-2">
-                    <select value={method} onChange={(e) => setMethod(e.target.value)} className="rounded-lg border border-clinic-teal/20 px-2 py-1.5">
-                      <option value="cash">Cash</option>
-                      <option value="bank">Bank</option>
-                      <option value="easypaisa">EasyPaisa</option>
-                      <option value="jazzcash">JazzCash</option>
-                    </select>
-                    <input type="number" min={0} max={dueNow} value={paid} onChange={(e) => setPaid(e.target.value)} className="w-28 rounded-lg border border-clinic-teal/20 px-2 py-1.5 text-right" />
-                    <button type="button" onClick={() => setPaid(String(dueNow))} className="text-xs text-clinic-teal">
-                      poora
-                    </button>
-                  </span>
+                <div className="mt-1 grid gap-1 rounded-xl border border-clinic-teal/15 p-3">
+                  <p className="flex justify-between">
+                    <span>Purana baqaya</span>
+                    <span>{money(p.balance)}</span>
+                  </p>
+                  <p className="flex justify-between">
+                    <span>Aaj ka naya</span>
+                    <span>{money(newCharges)}</span>
+                  </p>
+                  <p className="flex justify-between font-semibold">
+                    <span>Kul baqaya</span>
+                    <span className={dueNow > 0 ? 'text-red-600' : ''}>{money(dueNow)}</span>
+                  </p>
+                  {p.perms.collect && dueNow > 0 && (
+                    <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-semibold">Aaj kitne mile</span>
+                      <span className="flex items-center gap-2">
+                        <select value={method} onChange={(e) => setMethod(e.target.value)} className="rounded-lg border border-clinic-teal/20 px-2 py-1.5">
+                          <option value="cash">Cash</option>
+                          <option value="bank">Bank</option>
+                          <option value="easypaisa">EasyPaisa</option>
+                          <option value="jazzcash">JazzCash</option>
+                        </select>
+                        <input type="number" min={0} max={dueNow} value={paid} onChange={(e) => setPaid(e.target.value)} className="w-28 rounded-lg border border-clinic-teal/20 px-2 py-1.5 text-right" />
+                        <button type="button" onClick={() => setPaid(String(dueNow))} className="text-xs text-clinic-teal">
+                          poora
+                        </button>
+                      </span>
+                    </div>
+                  )}
+                  {paidNum > 0 && (
+                    <p className="flex justify-between text-sm">
+                      <span>Is ke baad baqaya</span>
+                      <span className="font-semibold">{money(Math.max(0, dueNow - paidNum))}</span>
+                    </p>
+                  )}
                 </div>
-              )}
-              {v && paidNum > 0 && (
-                <p className="flex justify-between text-sm">
-                  <span>Is ke baad baqaya</span>
-                  <span className="font-semibold">{money(Math.max(0, dueNow - paidNum))}</span>
-                </p>
-              )}
-            </div>
-            {!v && <p className="text-xs text-clinic-ink/50">Treatment ki payment step 8 mein treatment par &quot;Payment lo&quot; se.</p>}
-            <a href={`/admin/patients/${p.patient.id}/invoice`} className="justify-self-start text-xs font-semibold text-clinic-teal hover:underline">Poora hisaab / statement (print / PDF)</a>
-            {p.plansSlot}
-          </div>
-        </Section>
-      )}
+                <a href={`/admin/patients/${p.patient.id}/invoice`} className="justify-self-start text-xs font-semibold text-clinic-teal hover:underline">
+                  Poora hisaab / statement (print / PDF)
+                </a>
+                {p.plansSlot}
+              </div>
+            </Section>
+          )}
 
-      {/* 10. NEXT APPOINTMENT */}
-      {v ? (
-        <Section n={11} title="Agli Appointment">
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div>
-              <label className="text-xs font-medium text-clinic-ink/70">Tareekh</label>
-              <input type="date" min={todayKarachi()} value={nextDate} onChange={(e) => setNextDate(e.target.value)} className={input} />
-              <div className="mt-1 flex flex-wrap gap-1">
-                {[3, 7, 14, 30].map((d) => (
-                  <button key={d} type="button" onClick={() => setNextDate(addDays(todayKarachi(), d))} className="rounded-full bg-clinic-mint px-2.5 py-0.5 text-[11px] font-semibold text-clinic-teal">
-                    +{d < 30 ? `${d} din` : '1 mahina'}
+          {/* 12. NEXT APPOINTMENT */}
+          <Section n={12} title="Agli Appointment">
+            <fieldset disabled={!canEdit} className="grid gap-3 sm:grid-cols-3">
+              <div>
+                <label className="text-xs font-medium text-clinic-ink/70">Tareekh</label>
+                <input type="date" min={todayKarachi()} value={nextDate} onChange={(e) => setNextDate(e.target.value)} className={input} />
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {[3, 7, 14, 30].map((d) => (
+                    <button key={d} type="button" onClick={() => setNextDate(addDays(todayKarachi(), d))} className="rounded-full bg-clinic-mint px-2.5 py-0.5 text-[11px] font-semibold text-clinic-teal">
+                      +{d < 30 ? `${d} din` : '1 mahina'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-clinic-ink/70">Waqt</label>
+                <select value={nextTime} onChange={(e) => setNextTime(e.target.value)} disabled={!nextDate} className={input}>
+                  <option value="">—</option>
+                  {SLOTS.map((t) => (
+                    <option key={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-clinic-ink/70">Kis treatment ke liye</label>
+                <select value={nextT} onChange={(e) => setNextT(e.target.value)} disabled={!nextDate} className={input}>
+                  <option value="">— checkup —</option>
+                  {live
+                    .filter((t) => t.status === 'active')
+                    .map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                        {t.teeth.length ? ` (${t.teeth.map(toothLabel).join(', ')})` : ''}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            </fieldset>
+          </Section>
+
+          {/* SAVE / FINISH */}
+          {canEdit && (
+            <div className="sticky bottom-0 z-10 -mx-4 border-t border-clinic-teal/15 bg-white/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
+              {msg && <p className={`mb-2 rounded-lg px-3 py-2 text-sm ${msg.ok ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-700'}`}>{msg.t}</p>}
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs text-clinic-ink/50">Aaj {fmtDate(todayKarachi())}</p>
+                <div className="flex gap-2">
+                  <button onClick={save} disabled={!!busy} className="rounded-full border-2 border-clinic-teal px-5 py-2.5 text-sm font-semibold text-clinic-teal disabled:opacity-50">
+                    {busy === 'save' ? 'Save...' : 'Save'}
                   </button>
-                ))}
+                  <button onClick={finish} disabled={!!busy} className="rounded-full bg-clinic-teal px-6 py-2.5 text-sm font-semibold text-white disabled:opacity-50">
+                    {busy === 'finish' ? 'Mukammal ho raha hai...' : 'Finish Visit ✓'}
+                  </button>
+                </div>
               </div>
             </div>
-            <div>
-              <label className="text-xs font-medium text-clinic-ink/70">Waqt</label>
-              <select value={nextTime} onChange={(e) => setNextTime(e.target.value)} disabled={!nextDate} className={input}>
-                <option value="">—</option>
-                {SLOTS.map((t) => (
-                  <option key={t}>{t}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-medium text-clinic-ink/70">Kis treatment ke liye</label>
-              <select value={nextT} onChange={(e) => setNextT(e.target.value)} disabled={!nextDate} className={input}>
-                <option value="">— checkup —</option>
-                {activeTreatments.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                    {t.teeth.length ? ` (${t.teeth.join(', ')})` : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <p className="mt-2 text-xs text-clinic-ink/50">&quot;Finish Visit&quot; par appointment khud ban jayegi (Appointments aur Home par). Dobara Finish se dohri nahi banti.</p>
-        </Section>
-      ) : (
-        <Locked n={11} title="Agli Appointment" />
+          )}
+        </>
       )}
-
-      {/* SAVE DRAFT / FINISH VISIT */}
-      {v && (
-        <div className="sticky bottom-0 z-10 -mx-4 border-t border-clinic-teal/15 bg-white/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
-          {msg && <p className={`mb-2 rounded-lg px-3 py-2 text-sm ${msg.ok ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-700'}`}>{msg.t}</p>}
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs text-clinic-ink/50">Visit {fmtDate(v.visit_date)} · draft</p>
-            <div className="flex gap-2">
-              <button onClick={saveDraft} disabled={!!busy} className="rounded-full border-2 border-clinic-teal px-5 py-2.5 text-sm font-semibold text-clinic-teal disabled:opacity-50">
-                {busy === 'draft' ? 'Save...' : 'Save Draft'}
-              </button>
-              <button onClick={finish} disabled={!!busy} className="rounded-full bg-clinic-teal px-6 py-2.5 text-sm font-semibold text-white disabled:opacity-50">
-                {busy === 'finish' ? 'Mukammal ho raha hai...' : 'Finish Visit ✓'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {!v && msg && <p className={`rounded-lg px-3 py-2 text-sm ${msg.ok ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-700'}`}>{msg.t}</p>}
     </div>
+  )
+}
+
+/** Reception: sirf paisa dekhna */
+function BillSummary({ patientId, balance, plansSlot }: { patientId: string; balance: number; plansSlot?: ReactNode }) {
+  return (
+    <section className="rounded-2xl border border-clinic-teal/10 bg-white p-4">
+      <p className="flex justify-between text-sm">
+        <span>Kul baqaya</span>
+        <span className={balance > 0 ? 'font-semibold text-red-600' : 'font-semibold'}>{money(balance)}</span>
+      </p>
+      <a href={`/admin/patients/${patientId}/invoice`} className="mt-2 inline-block text-xs font-semibold text-clinic-teal hover:underline">
+        Poora hisaab / statement (print / PDF)
+      </a>
+      {plansSlot}
+    </section>
   )
 }
