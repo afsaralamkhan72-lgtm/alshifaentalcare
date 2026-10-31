@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { toothLabel } from '@/lib/teeth'
 import { addDays, todayKarachi, money, fmtDate } from '@/lib/karachi'
-import ToothPicker from './ToothPicker'
+const VALID_TOOTH = /^([1-4][1-8]|[5-8][1-5])$/
 import MediaStrip, { type MediaItem } from './MediaStrip'
 import { uploadPatientFiles } from '@/lib/upload'
 
@@ -238,7 +238,7 @@ function NewTreatmentForm({
   const [picked, setPicked] = useState<CatalogOpt | null>(null)
   const [name, setName] = useState('')
   const [teeth, setTeeth] = useState<string[]>(initialTeeth)
-  const [showTeeth, setShowTeeth] = useState(initialTeeth.length > 0)
+  const [teethInput, setTeethInput] = useState(initialTeeth.join(' '))
   const [price, setPrice] = useState('')
   const [paid, setPaid] = useState('')
   const [method, setMethod] = useState('cash')
@@ -419,15 +419,16 @@ function NewTreatmentForm({
             <label className="text-xs font-medium text-clinic-ink/70">
               Daant {teeth.length > 0 && <span className="font-semibold text-clinic-teal">: {teethText(teeth)}</span>}
             </label>
-            <button type="button" onClick={() => setShowTeeth(!showTeeth)} className="text-xs text-clinic-teal">
-              {showTeeth ? 'band karein' : teeth.length ? 'badlein' : 'daant chunein (agar ho)'}
-            </button>
           </div>
-          {showTeeth && (
-            <div className="mt-1 overflow-x-auto rounded-lg border border-clinic-teal/10 p-2">
-              <ToothPicker selected={teeth} onChange={setTeeth} />
-            </div>
-          )}
+          <input
+            value={teethInput}
+            onChange={(e) => {
+              setTeethInput(e.target.value)
+              setTeeth(Array.from(new Set(e.target.value.split(/[\s,]+/).filter((x) => VALID_TOOTH.test(x)))).sort())
+            }}
+            placeholder="Chart se daant chunein, ya yahan number likhein: 36 46 (bachon ke: 74 85)"
+            className="mt-1 w-full rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm outline-none focus:border-clinic-teal"
+          />
           {cond && teeth.length > 0 && (
             <label className="mt-1.5 flex items-center gap-2 text-xs text-clinic-ink/60">
               <input type="checkbox" checked={onChart} onChange={(e) => setOnChart(e.target.checked)} />
@@ -722,16 +723,6 @@ function TreatmentCard({
             <button onClick={() => open('begin')} className="rounded-full bg-clinic-teal px-4 py-1.5 text-xs font-semibold text-white">
               Aaj shuru karein (V1)
             </button>
-          )}
-          {active && (
-            <a href="#s8" className="rounded-full border border-clinic-teal/30 px-4 py-1.5 text-xs font-semibold text-clinic-ink/70">
-              Prescription
-            </a>
-          )}
-          {active && canLab && (
-            <a href={`/admin/patients/${patientId}?treatment=${t.id}#lab`} className="rounded-full border border-clinic-teal/30 px-4 py-1.5 text-xs font-semibold text-clinic-ink/70">
-              Lab case
-            </a>
           )}
           {active && canEdit && (
             <button onClick={() => open('visit')} className="rounded-full bg-clinic-teal px-4 py-1.5 text-xs font-semibold text-white">

@@ -1,7 +1,6 @@
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import PatientHistoryWizard, { type HistoryRecord } from '@/components/admin/PatientHistoryWizard'
 import PatientHistorySummary from '@/components/admin/PatientHistorySummary'
 import HistoryPrintButton from '@/components/admin/HistoryPrintButton'
 
@@ -14,6 +13,8 @@ export default async function PatientHistoryPage({
 }) {
   const { id } = await params
   const { view } = await searchParams
+  // Purana 9-step wizard hata diya: form ab patient page ke step 2 mein hai
+  if (view !== 'summary') redirect(`/admin/patients/${id}#s2`)
   const supabase = await createClient()
 
   const { data: patient } = await supabase
@@ -85,14 +86,14 @@ export default async function PatientHistoryPage({
         {started && !needsMigration && (
           <div className="flex flex-wrap items-center gap-2">
             <Link
-              href={`/admin/patients/${id}/history?view=${showSummary ? 'form' : 'summary'}`}
+              href={`/admin/patients/${id}#s2`}
               className={`rounded-full px-4 py-2 text-sm font-semibold ${
                 showSummary
                   ? 'border border-clinic-teal text-clinic-teal'
                   : 'bg-clinic-teal text-white'
               }`}
             >
-              {showSummary ? 'Edit History' : 'View Full Page'}
+              Edit History
             </Link>
             {showSummary && <HistoryPrintButton />}
           </div>
@@ -107,16 +108,7 @@ export default async function PatientHistoryPage({
             dentalRecords={dentalRecords}
             clinic={clinic}
           />
-        ) : (
-          <PatientHistoryWizard
-            patientId={patient.id}
-            patientName={patient.full_name}
-            department={patient.department}
-            initial={(history ?? null) as HistoryRecord | null}
-            dentalRecords={dentalRecords}
-            needsMigration={needsMigration}
-          />
-        )}
+        ) : null}
       </div>
     </div>
   )

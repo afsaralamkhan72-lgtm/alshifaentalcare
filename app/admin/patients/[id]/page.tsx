@@ -9,19 +9,11 @@ import PortalLinkButton from '@/components/admin/PortalLinkButton'
 import DeletePatientButton from '@/components/admin/DeletePatientButton'
 import VisitWorkspace, { type VisitRow, type MedOpt, type TodayBill } from '@/components/admin/visit/VisitWorkspace'
 import type { CatalogOpt, MaterialOpt, TItem, TVisit } from '@/components/admin/TreatmentsPanel'
-import VisitNotes, { type VisitNote } from '@/components/admin/VisitNotes'
-import LabCaseForm, { type LabOption } from '@/components/admin/LabCaseForm'
-import PatientAppointments, { type PAppt } from '@/components/admin/PatientAppointments'
-import PatientRecalls, { type PatientRecall } from '@/components/admin/PatientRecalls'
 import PatientPhotoGallery, { type PatientPhoto } from '@/components/admin/PatientPhotoGallery'
-import TreatmentList, { type TreatmentRow } from '@/components/admin/TreatmentList'
-import MediaStrip, { type MediaItem } from '@/components/admin/MediaStrip'
 import TreatmentPlanCard, { type Installment, type Plan } from '@/components/admin/TreatmentPlanCard'
-import LedgerTimeline from '@/components/admin/LedgerTimeline'
-import { HISTORY_STEPS } from '@/lib/history-steps'
 import { todayKarachi, money, fmtDate } from '@/lib/karachi'
-import { toBalance, type LedgerRow, type PatientBalance } from '@/lib/ledger'
-import { toothLabel } from '@/lib/teeth'
+import { toBalance, type PatientBalance } from '@/lib/ledger'
+import HistoryForm from '@/components/admin/HistoryForm'
 import WhatsAppMenu from '@/components/admin/WhatsAppMenu'
 import { apptReminderLink, generalLink, paymentReminderLink } from '@/lib/messages'
 
@@ -31,6 +23,8 @@ interface Props {
 }
 
 type Sb = Awaited<ReturnType<typeof createClient>>
+
+type ApptRow = { id: string; preferred_date: string | null; preferred_time: string | null; treatment_name: string | null; status: string; notes: string | null }
 
 const num = (v: unknown) => Number(v ?? 0)
 
@@ -106,22 +100,6 @@ async function loadTreatments(supabase: Sb, patientId: string): Promise<TItem[]>
 
 const getTreatments = cache(async (patientId: string) => loadTreatments(await createClient(), patientId))
 
-/** Chhota khana (collapsible) Previous History ke andar */
-function Fold({ id, title, count, children, open }: { id?: string; title: string; count?: number | string; children: React.ReactNode; open?: boolean }) {
-  return (
-    <details id={id} open={open} className="scroll-mt-20 group rounded-xl border border-clinic-teal/10 bg-white">
-      <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-semibold text-clinic-ink">
-        <span>
-          {title}
-          {count !== undefined && <span className="ml-2 rounded-full bg-clinic-mint px-2 py-0.5 text-xs text-clinic-teal">{count}</span>}
-        </span>
-        <span className="text-clinic-ink/40 transition-transform group-open:rotate-180">▾</span>
-      </summary>
-      <div className="border-t border-clinic-teal/10 p-3 sm:p-4">{children}</div>
-    </details>
-  )
-}
-
 function SectionHead({ n, title }: { n: number; title: string }) {
   return (
     <h2 className="mb-3 font-display text-lg font-semibold text-clinic-ink">
@@ -132,6 +110,7 @@ function SectionHead({ n, title }: { n: number; title: string }) {
 }
 
 const Loading = ({ h = 'h-24' }: { h?: string }) => <div className={`${h} animate-pulse rounded-2xl bg-white/70`} />
+
 
 export default async function PatientDetailPage({ params, searchParams }: Props) {
   const { id } = await params
@@ -163,7 +142,7 @@ export default async function PatientDetailPage({ params, searchParams }: Props)
   ])
   const balance: PatientBalance | null = balRes.data ? toBalance(balRes.data as Record<string, string | number | null>) : null
   // Appointment purane data mein phone se judi hoti thi; dusre patient ki na aaye is liye phone wali sirf tab jab patient_id khali ho
-  const appts = ((apptRes.data ?? []) as (PAppt & { patient_id: string | null; phone: string })[]).filter(
+  const appts = ((apptRes.data ?? []) as (ApptRow & { patient_id: string | null; phone: string })[]).filter(
     (a) => a.patient_id === id || (!a.patient_id && String(a.phone).replace(/[^0-9]/g, '') === digits)
   )
   const nextAppt = [...appts]
@@ -188,7 +167,7 @@ export default async function PatientDetailPage({ params, searchParams }: Props)
           <div className="flex items-center gap-3">
             <PatientProfilePhoto patientId={patient.id} hasPhoto={Boolean(patient.profile_photo_path)} />
             <div>
-              <h1 className="font-display text-xl font-semibold capitalize text-clinic-ink">{patient.full_name}</h1>
+              <h1 className="font-display text-xl font-semibold capitalize text-clinic-ink"><span className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-clinic-teal text-sm font-normal text-white">1</span>{patient.full_name}</h1>
               <p className="text-sm text-clinic-ink/60">
                 <span className="font-semibold text-clinic-teal">{patient.mr_number}</span>
                 <span className="ml-2 rounded-full bg-clinic-mint px-2 py-0.5 text-[11px] capitalize text-clinic-teal">{patient.department}</span>
@@ -266,39 +245,21 @@ export default async function PatientDetailPage({ params, searchParams }: Props)
         <p className="text-sm text-clinic-ink/60">Aap ko is patient ka record dekhne ki permission nahi.</p>
       )}
 
-      {/* ================= 2. PREVIOUS HISTORY ================= */}
-      {(canClinical || canMoney || can('appointments.view')) && (
-        <section id="s2" className="rounded-2xl border border-clinic-teal/10 bg-clinic-sand/40 p-4 sm:p-5">
-          <SectionHead n={2} title="Previous History (pichla record)" />
+      {/* ================= 2. HISTORY ================= */}
+      {(canClinical || canMoney) && (
+        <section id="s2" className="rounded-2xl border border-clinic-teal/10 bg-white p-4 sm:p-5">
+          <SectionHead n={2} title="Medical / Dental History (pichla record)" />
           <Suspense fallback={<Loading />}>
-            <PreviousHistory
-              patient={patient}
-              history={history}
-              perms={perms}
-              isOwner={isOwner}
-              appts={appts}
-              balance={balance}
-              openLab={sp.treatment}
-            />
+            <HistorySection patient={patient} history={history} canClinical={canClinical} canEdit={can('clinical.edit')} />
           </Suspense>
         </section>
       )}
 
-      {/* ================= 3 - 10. AAJ KA VISIT ================= */}
+      {/* ================= 3 - 11. AAJ KA VISIT ================= */}
       {(canClinical || canMoney) && (
         <Suspense fallback={<Loading h="h-64" />}>
           <WorkspaceSection patient={patient} perms={perms} isOwner={isOwner} balance={balance?.balance ?? 0} isDental={isDental} />
         </Suspense>
-      )}
-
-      {/* ================= 11. DOCUMENTS ================= */}
-      {canClinical && (
-        <section id="s11" className="rounded-2xl border border-clinic-teal/10 bg-white p-4 sm:p-5">
-          <SectionHead n={11} title="Documents / X-rays / Photos" />
-          <Suspense fallback={<Loading />}>
-            <DocsTab supabase={supabase} patientId={id} canDelete={isOwner} />
-          </Suspense>
-        </section>
       )}
 
       {/* Kam istemal hone wali cheezein: neeche */}
@@ -311,68 +272,72 @@ export default async function PatientDetailPage({ params, searchParams }: Props)
 }
 
 /* ------------------------------------------------------------ */
-async function PreviousHistory({
-  patient,
-  history,
-  perms,
-  isOwner,
-  appts,
-  balance,
-  openLab,
-}: {
-  patient: PatientRow
-  history: Record<string, unknown> | null
-  perms: string[]
-  isOwner: boolean
-  appts: PAppt[]
-  balance: PatientBalance | null
-  openLab?: string
-}) {
-  const supabase = await createClient()
-  const can = (p: string) => perms.includes(p)
-  const canClinical = can('clinical.view')
-  const canMoney = isOwner || can('billing.view')
-  const isDental = patient.department === 'dental'
-  const today = todayKarachi()
+type PatientRow = {
+  id: string
+  full_name: string
+  phone: string
+  department: string
+  mr_number: string | null
+  primary_doctor?: string | null
+  portal_code?: string | null
+}
 
-  const [cvRes, vnRes, rxRes, labRes, treatments] = await Promise.all([
-    canClinical
-      ? supabase
-          .from('clinical_visits')
-          .select('id, visit_date, complaint, diagnoses, findings, doctor')
-          .eq('patient_id', patient.id)
-          .eq('status', 'finished')
-          .order('visit_date', { ascending: false })
-          .order('created_at', { ascending: false })
-          .limit(50)
-      : Promise.resolve({ data: [] }),
-    canClinical ? supabase.from('visit_notes').select('id', { count: 'exact', head: true }).eq('patient_id', patient.id).is('voided_at', null) : Promise.resolve({ count: 0 }),
-    can('prescriptions.view') ? supabase.from('prescriptions').select('id', { count: 'exact', head: true }).eq('patient_id', patient.id) : Promise.resolve({ count: 0 }),
-    can('lab.view') && isDental ? supabase.from('lab_cases').select('id', { count: 'exact', head: true }).eq('patient_id', patient.id).is('deleted_at', null) : Promise.resolve({ count: 0 }),
-    canClinical || canMoney ? getTreatments(patient.id) : Promise.resolve([] as TItem[]),
-  ])
+const show = (v: unknown) => (Array.isArray(v) ? v.filter((x) => x !== 'None').join(', ') : typeof v === 'string' ? v : v == null ? '' : String(v))
+
+async function HistorySection({ patient, history, canClinical, canEdit }: { patient: PatientRow; history: Record<string, unknown> | null; canClinical: boolean; canEdit: boolean }) {
+  const supabase = await createClient()
+  const { data } = canClinical
+    ? await supabase
+        .from('clinical_visits')
+        .select('id, visit_date, complaint, diagnoses, doctor')
+        .eq('patient_id', patient.id)
+        .eq('status', 'finished')
+        .order('visit_date', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(30)
+    : { data: [] }
   type CV = { id: string; visit_date: string; complaint: { items?: string[]; other?: string; duration?: string }; diagnoses: { text: string; teeth?: string[] }[]; doctor: string | null }
-  const visits = ((cvRes.data ?? []) as CV[])
-  const nNotes = ('count' in vnRes ? vnRes.count : 0) ?? 0
-  const nRx = ('count' in rxRes ? rxRes.count : 0) ?? 0
-  const nLab = ('count' in labRes ? labRes.count : 0) ?? 0
-  const done = treatments.filter((t) => t.status === 'completed')
-  const isNew = !history && visits.length === 0 && nNotes === 0 && nRx === 0 && nLab === 0 && treatments.length === 0 && (!balance || balance.total_charges === 0)
+  const visits = (data ?? []) as CV[]
+  const mh = (history?.medical_history ?? {}) as Record<string, unknown>
+  const dh = (history?.dental_history ?? {}) as Record<string, unknown>
+  const lines: [string, string][] = (
+    [
+      ['Bimari', show(mh.conditions)],
+      ['Allergy', show(mh.allergies)],
+      ['Dawaiyan', show(mh.current_medications)],
+      ['Habits', show(mh.habits)],
+      ['Pehle ka dental ilaaj', show(dh.previous_treatments)],
+      ['Aakhri dental visit', show(dh.last_dental_visit)],
+    ] as [string, string][]
+  ).filter(([, v]) => v.trim() !== '')
+  const isNew = lines.length === 0 && visits.length === 0
 
   return (
-    <div className="grid gap-2">
-      {isNew && <p className="rounded-xl bg-white px-4 py-3 text-sm font-semibold text-clinic-ink/60">No Previous History — naya patient.</p>}
-
-      {canClinical && (
-        <Fold title="Medical / Dental history" count={history ? (history.is_finalized ? 'mukammal' : 'adhoori') : 'nahi bhari'} open={!history}>
-          <HistoryTab patientId={patient.id} history={history} />
-        </Fold>
+    <div className="grid gap-3">
+      {isNew && <p className="rounded-xl bg-clinic-sand/60 px-4 py-3 text-sm font-semibold text-clinic-ink/60">No Previous History: naya patient.</p>}
+      {lines.length > 0 && (
+        <dl className="grid gap-x-4 gap-y-1 text-sm sm:grid-cols-2">
+          {lines.map(([k, v]) => (
+            <div key={k} className="flex gap-2">
+              <dt className="shrink-0 text-clinic-ink/50">{k}:</dt>
+              <dd className="text-clinic-ink">{v}</dd>
+            </div>
+          ))}
+        </dl>
       )}
-
-      {canClinical && visits.length > 0 && (
-        <Fold title="Pichle visits (takleef aur diagnosis)" count={visits.length} open>
-          <ul className="divide-y divide-clinic-teal/10 text-sm">
-            {visits.slice(0, 15).map((v) => (
+      {canClinical && <HistoryForm patientId={patient.id} initial={history} canEdit={canEdit} startOpen={false} />}
+      {canClinical && history && (
+        <Link href={`/admin/patients/${patient.id}/history?view=summary`} className="justify-self-start text-xs font-semibold text-clinic-teal hover:underline">
+          Poori purani history (print / PDF)
+        </Link>
+      )}
+      {visits.length > 0 && (
+        <details className="rounded-xl border border-clinic-teal/10 bg-white" open={visits.length <= 3}>
+          <summary className="cursor-pointer px-4 py-2.5 text-sm font-semibold text-clinic-ink">
+            Pichle visits <span className="ml-1 rounded-full bg-clinic-mint px-2 py-0.5 text-xs text-clinic-teal">{visits.length}</span>
+          </summary>
+          <ul className="divide-y divide-clinic-teal/10 border-t border-clinic-teal/10 px-4 text-sm">
+            {visits.map((v) => (
               <li key={v.id} className="flex flex-wrap items-start justify-between gap-2 py-2">
                 <div className="min-w-0">
                   <p className="text-xs text-clinic-ink/50">
@@ -383,11 +348,7 @@ async function PreviousHistory({
                     {[...(v.complaint?.items ?? []).filter((x) => x !== 'Other'), v.complaint?.other].filter(Boolean).join(', ') || '—'}
                     {v.complaint?.duration ? <span className="text-clinic-ink/50"> ({v.complaint.duration})</span> : null}
                   </p>
-                  {(v.diagnoses ?? []).length > 0 && (
-                    <p className="text-xs text-clinic-teal">
-                      Dx: {(v.diagnoses ?? []).map((d) => d.text + (d.teeth?.length ? ` (${d.teeth.join(', ')})` : '')).join(' · ')}
-                    </p>
-                  )}
+                  {(v.diagnoses ?? []).length > 0 && <p className="text-xs text-clinic-teal">Dx: {(v.diagnoses ?? []).map((d) => d.text + (d.teeth?.length ? ` (${d.teeth.join(', ')})` : '')).join(' · ')}</p>}
                 </div>
                 <Link href={`/admin/visits/${v.id}/print`} target="_blank" className="text-xs font-semibold text-clinic-teal hover:underline">
                   Record / PDF
@@ -395,65 +356,10 @@ async function PreviousHistory({
               </li>
             ))}
           </ul>
-        </Fold>
-      )}
-
-      {done.length > 0 && (
-        <Fold title="Mukammal treatments" count={done.length}>
-          <ul className="text-sm">
-            {done.map((t) => (
-              <li key={t.id} className="flex justify-between py-1">
-                <span>
-                  {t.name} {t.teeth.length > 0 && <span className="text-xs text-clinic-teal">{t.teeth.map(toothLabel).join(', ')}</span>}
-                </span>
-                <span className="text-xs text-clinic-ink/50">{fmtDate(t.completed_on ?? t.started_on)}</span>
-              </li>
-            ))}
-          </ul>
-        </Fold>
-      )}
-
-      {canClinical && nNotes > 0 && (
-        <Fold title="Treatment visits ka record" count={nNotes}>
-          <VisitsTab supabase={supabase} patientId={patient.id} canEdit={can('clinical.edit')} />
-        </Fold>
-      )}
-
-      {can('prescriptions.view') && nRx > 0 && (
-        <Fold title="Purani prescriptions" count={nRx}>
-          <RxTab supabase={supabase} patient={patient} />
-        </Fold>
-      )}
-
-      {can('lab.view') && isDental && (
-        <Fold id="lab" title="Lab cases" count={nLab} open={Boolean(openLab)}>
-          <LabTab supabase={supabase} patient={patient} canManage={can('lab.manage')} openFor={openLab} />
-        </Fold>
-      )}
-
-      {can('appointments.view') && (
-        <Fold title="Appointments" count={appts.length}>
-          <AppointmentsTab supabase={supabase} patient={patient} appts={appts} canManage={can('appointments.manage')} canClinical={canClinical} />
-        </Fold>
-      )}
-
-      {canMoney && balance && (balance.total_charges > 0 || balance.total_paid > 0) && (
-        <Fold title="Bills aur payments (poora hisaab)" count={balance.balance > 0 ? `baqaya ${money(balance.balance)}` : 'saaf'}>
-          <BillingTab supabase={supabase} patient={patient} balance={balance} isOwner={isOwner} />
-        </Fold>
+        </details>
       )}
     </div>
   )
-}
-/* ============================================================ */
-type PatientRow = {
-  id: string
-  full_name: string
-  phone: string
-  department: string
-  mr_number: string | null
-  primary_doctor?: string | null
-  portal_code?: string | null
 }
 
 async function WorkspaceSection({
@@ -473,7 +379,7 @@ async function WorkspaceSection({
   const can = (p: string) => perms.includes(p)
   const today = todayKarachi()
   const canMoney = isOwner || can('billing.view')
-  const [treatments, chartRes, catRes, docRes, matRes, cvRes, medRes, billRes] = await Promise.all([
+  const [treatments, chartRes, catRes, docRes, matRes, cvRes, medRes, billRes, rxRes, photoRes] = await Promise.all([
     getTreatments(patient.id),
     isDental && can('clinical.view')
       ? supabase
@@ -510,7 +416,18 @@ async function WorkspaceSection({
           .neq('status', 'void')
           .order('created_at')
       : Promise.resolve({ data: [] }),
+    can('prescriptions.view')
+      ? supabase.from('prescriptions').select('id, items, prescribed_date').eq('patient_id', patient.id).order('prescribed_date', { ascending: false }).order('created_at', { ascending: false }).limit(30)
+      : Promise.resolve({ data: [] }),
+    can('clinical.view')
+      ? supabase.from('patient_photos').select('id, storage_path, caption, taken_on, category').eq('patient_id', patient.id).order('taken_on', { ascending: false })
+      : Promise.resolve({ data: [], error: null }),
   ])
+  const pastRx = ((rxRes.data ?? []) as { id: string; items: { name_en?: string; name_ur?: string }[] | null; prescribed_date: string }[]).map((r) => ({
+    id: r.id,
+    date: r.prescribed_date,
+    names: (r.items ?? []).map((it) => it.name_en || it.name_ur).filter(Boolean).join(' · '),
+  }))
   const materials: Record<string, MaterialOpt[]> = {}
   for (const m of (matRes.data ?? []) as unknown as { treatment_id: string; inventory_id: string; default_qty: number; inventory: { item_name: string; unit: string | null } | null }[]) {
     ;(materials[m.treatment_id] ??= []).push({ inventory_id: m.inventory_id, name: m.inventory?.item_name ?? '', unit: m.inventory?.unit ?? null, default_qty: num(m.default_qty) })
@@ -543,6 +460,9 @@ async function WorkspaceSection({
       defaultDoctor={patient.primary_doctor ?? null}
       medicines={((medRes.data ?? []) as MedOpt[]).map((m) => ({ ...m, price: num(m.price), stock_qty: m.stock_qty == null ? null : num(m.stock_qty) }))}
       todayBills={todayBills}
+      pastRx={pastRx}
+      xraySlot={can('clinical.view') ? <PatientPhotoGallery patientId={patient.id} photos={(('error' in photoRes && photoRes.error ? [] : photoRes.data ?? []) as PatientPhoto[])} canDelete={isOwner} /> : null}
+      plansSlot={canMoney ? <Suspense fallback={null}><PlansSlot patient={patient} /></Suspense> : null}
       balance={balance}
       perms={{
         clinicalView: can('clinical.view'),
@@ -558,320 +478,38 @@ async function WorkspaceSection({
   )
 }
 
-async function VisitsTab({ supabase, patientId, canEdit }: { supabase: Sb; patientId: string; canEdit: boolean }) {
-  const [{ data: visits }, { data: trs }] = await Promise.all([
-    supabase
-      .from('visit_notes')
-      .select('id, visit_date, procedure, notes, next_visit, voided_at, void_reason, visit_no, treatment_id')
-      .eq('patient_id', patientId)
-      .order('visit_date', { ascending: false })
-      .order('created_at', { ascending: false }),
-    supabase.from('patient_treatments').select('id, name').eq('patient_id', patientId),
-  ])
-  const names = new Map((trs ?? []).map((t) => [t.id as string, t.name as string]))
-  const rows: VisitNote[] = (visits ?? []).map((v) => ({ ...v, treatment_name: v.treatment_id ? names.get(v.treatment_id) ?? null : null }))
-  return <VisitNotes patientId={patientId} notes={rows} canCancel={canEdit} />
-}
 
-function HistoryTab({ patientId, history }: { patientId: string; history: Record<string, unknown> | null }) {
-  const show = (v: unknown) => (Array.isArray(v) ? v.join(', ') : typeof v === 'string' ? v : v == null ? '' : String(v))
+async function PlansSlot({ patient }: { patient: PatientRow }) {
+  const supabase = await createClient()
+  const { data: plansData } = await supabase
+    .from('treatment_plans')
+    .select('id, title, total_cost, advance_paid, duration_months, monthly_amount, start_date, status, doctor_id')
+    .eq('patient_id', patient.id)
+    .order('created_at', { ascending: false })
+  const plans = (plansData ?? []) as Plan[]
+  if (plans.length === 0) return null
+  const { data } = await supabase
+    .from('installments')
+    .select('id, plan_id, installment_no, due_date, amount, paid_amount, paid_date, payment_method')
+    .in('plan_id', plans.map((p) => p.id))
+    .order('installment_no')
+  const installments = (data ?? []) as (Installment & { plan_id: string })[]
   return (
-    <div className="rounded-2xl border border-clinic-teal/10 bg-white p-4 sm:p-5">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="font-display text-lg font-semibold text-clinic-ink">Clinical History</h2>
-        <Link href={`/admin/patients/${patientId}/history`} className="rounded-full bg-clinic-teal px-4 py-2 text-sm font-semibold text-white">
-          {history ? (history.is_finalized ? 'History kholein / print' : 'History mukammal karein') : 'History shuru karein'}
-        </Link>
-      </div>
-      {!history ? (
-        <p className="mt-3 text-sm text-clinic-ink/50">Abhi history nahi bhari gayi.</p>
-      ) : (
-        <div className="mt-3 grid gap-4">
-          {HISTORY_STEPS.map((step) => {
-            const data = (history[step.column] ?? {}) as Record<string, unknown>
-            const filled = step.fields.filter((f) => show(data[f.key]).trim() !== '')
-            if (filled.length === 0) return null
-            return (
-              <div key={step.column}>
-                <p className="text-xs font-semibold uppercase tracking-wide text-clinic-teal">{step.title}</p>
-                <dl className="mt-1 grid gap-x-4 gap-y-1 text-sm sm:grid-cols-2">
-                  {filled.map((f) => (
-                    <div key={f.key} className="flex gap-2">
-                      <dt className="shrink-0 text-clinic-ink/50">{f.label}:</dt>
-                      <dd className="text-clinic-ink">{show(data[f.key])}</dd>
-                    </div>
-                  ))}
-                </dl>
-              </div>
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
-}
-
-async function RxTab({ supabase, patient }: { supabase: Sb; patient: PatientRow }) {
-  const [{ data: rx }, { data: trs }] = await Promise.all([
-    supabase.from('prescriptions').select('id, department, items, notes_en, prescribed_date, treatment_id').eq('patient_id', patient.id).order('prescribed_date', { ascending: false }).order('created_at', { ascending: false }),
-    supabase.from('patient_treatments').select('id, name').eq('patient_id', patient.id),
-  ])
-  const names = new Map((trs ?? []).map((t) => [t.id as string, t.name as string]))
-  return (
-    <div className="grid gap-6">
-      <div>
-        <div className="divide-y divide-clinic-teal/10 rounded-2xl border border-clinic-teal/10 bg-white">
-          {(rx ?? []).length === 0 ? (
-            <p className="px-4 py-6 text-center text-sm text-clinic-ink/50">Koi prescription nahi.</p>
-          ) : (
-            (rx ?? []).map((r) => {
-              const items = (r.items ?? []) as { name_en?: string; name_ur?: string }[]
-              return (
-                <div key={r.id} className="flex flex-wrap items-start justify-between gap-2 px-4 py-3">
-                  <div>
-                    <p className="text-xs text-clinic-ink/50">
-                      {fmtDate(r.prescribed_date)}
-                      {r.treatment_id && names.get(r.treatment_id) ? ` · ${names.get(r.treatment_id)}` : ''}
-                    </p>
-                    <p className="mt-0.5 text-sm text-clinic-ink">{items.map((it) => it.name_en || it.name_ur).filter(Boolean).join(' · ')}</p>
-                    {r.notes_en && <p className="text-xs text-clinic-ink/50">{r.notes_en}</p>}
-                  </div>
-                  <Link href={`/admin/prescriptions/${r.id}/print`} className="text-xs font-semibold text-clinic-teal hover:underline">
-                    Print
-                  </Link>
-                </div>
-              )
-            })
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-async function LabTab({ supabase, patient, canManage, openFor }: { supabase: Sb; patient: PatientRow; canManage: boolean; openFor?: string }) {
-  const [{ data: cases }, { data: labs }, { data: trs }, { data: labFiles }] = await Promise.all([
-    supabase
-      .from('lab_cases')
-      .select('id, case_number, lab_name, work_type, tooth_numbers, status, due_date, delivered_date, created_at')
-      .eq('patient_id', patient.id)
-      .is('deleted_at', null)
-      .order('created_at', { ascending: false }),
-    supabase.from('labs').select('id, name, whatsapp').order('name'),
-    supabase.from('patient_treatments').select('id, name, teeth').eq('patient_id', patient.id).eq('status', 'active'),
-    supabase.from('patient_photos').select('id, storage_path, caption, category, lab_case_id').eq('patient_id', patient.id).not('lab_case_id', 'is', null),
-  ])
-  const filesOf = (caseId: string) => (labFiles ?? []).filter((f) => f.lab_case_id === caseId) as MediaItem[]
-  return (
-    <div>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="font-display text-lg font-semibold text-clinic-ink">Lab cases</h2>
-        {canManage && (
-          <LabCaseForm
-            labs={(labs ?? []) as LabOption[]}
-            patients={[]}
-            fixedPatient={{ id: patient.id, full_name: patient.full_name, mr_number: patient.mr_number }}
-            treatments={(trs ?? []).map((t) => ({ id: t.id as string, name: t.name as string, teeth: (t.teeth ?? []) as string[] }))}
-            defaultTreatmentId={openFor}
+    <div className="mt-3">
+      <p className="text-xs font-semibold text-clinic-ink/60">Purane installment plans (qist yahin se lein)</p>
+      <div className="mt-2 grid gap-4">
+        {plans.map((plan) => (
+          <TreatmentPlanCard
+            key={plan.id}
+            plan={plan}
+            installments={installments.filter((i) => i.plan_id === plan.id)}
+            patientId={patient.id}
+            patientName={patient.full_name}
+            patientPhone={patient.phone}
+            portalCode={patient.portal_code ?? null}
           />
-        )}
-      </div>
-      <div className="mt-3 divide-y divide-clinic-teal/10 rounded-2xl border border-clinic-teal/10 bg-white">
-        {(cases ?? []).length === 0 ? (
-          <p className="px-4 py-6 text-center text-sm text-clinic-ink/50">Koi lab case nahi.</p>
-        ) : (
-          (cases ?? []).map((c) => (
-            <div key={c.id} className="flex flex-wrap items-start justify-between gap-2 px-4 py-3">
-              <div>
-              <Link href={`/admin/lab/${c.id}`} className="block hover:text-clinic-teal">
-                <p className="text-sm font-medium text-clinic-ink">
-                  {c.work_type ?? 'Lab work'} {((c.tooth_numbers ?? []) as string[]).length > 0 && <span className="text-clinic-teal">{((c.tooth_numbers ?? []) as string[]).map(toothLabel).join(', ')}</span>}
-                </p>
-                <p className="text-xs text-clinic-ink/50">
-                  {c.case_number} · {c.lab_name} · {c.due_date ? `wapsi ${fmtDate(c.due_date)}` : 'tareekh nahi'}
-                </p>
-              </Link>
-              <MediaStrip items={filesOf(c.id)} size={48} />
-              </div>
-              <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${filesOf(c.id).length ? 'bg-emerald-50 text-emerald-700' : 'bg-clinic-mint text-clinic-ink/60'}`}>
-                {filesOf(c.id).length ? 'Report aa gayi' : 'Report abhi nahi'}
-              </span>
-            </div>
-          ))
-        )}
+        ))}
       </div>
     </div>
   )
-}
-
-async function AppointmentsTab({
-  supabase,
-  patient,
-  appts,
-  canManage,
-  canClinical,
-}: {
-  supabase: Sb
-  patient: PatientRow
-  appts: PAppt[]
-  canManage: boolean
-  canClinical: boolean
-}) {
-  const [{ data: trs }, recallRes] = await Promise.all([
-    canClinical ? supabase.from('patient_treatments').select('id, name').eq('patient_id', patient.id).eq('status', 'active') : Promise.resolve({ data: [] }),
-    canClinical
-      ? supabase.from('recalls').select('id, recall_type, interval_months, last_done, next_due, status').eq('patient_id', patient.id).order('next_due', { ascending: true })
-      : Promise.resolve({ data: [] }),
-  ])
-  return (
-    <div className="grid gap-8">
-      <PatientAppointments
-        patient={{ id: patient.id, full_name: patient.full_name, phone: patient.phone, department: patient.department }}
-        appointments={appts}
-        treatments={(trs ?? []) as { id: string; name: string }[]}
-        canManage={canManage}
-      />
-      {canClinical && <PatientRecalls patientId={patient.id} recalls={(recallRes.data ?? []) as PatientRecall[]} />}
-    </div>
-  )
-}
-
-async function BillingTab({ supabase, patient, balance, isOwner }: { supabase: Sb; patient: PatientRow; balance: PatientBalance | null; isOwner: boolean }) {
-  const [treatments, invRes, plansRes, ledRes] = await Promise.all([
-    getTreatments(patient.id),
-    supabase
-      .from('invoices')
-      .select('id, invoice_number, invoice_date, total, paid_amount, balance, status, patient_treatment_id')
-      .eq('patient_id', patient.id)
-      .order('invoice_date', { ascending: false })
-      .order('invoice_number', { ascending: false }),
-    supabase
-      .from('treatment_plans')
-      .select('id, title, total_cost, advance_paid, duration_months, monthly_amount, start_date, status, doctor_id')
-      .eq('patient_id', patient.id)
-      .order('created_at', { ascending: false }),
-    supabase.from('patient_ledger').select('entry_date, sort_at, source, kind, label, charge, payment').eq('patient_id', patient.id),
-  ])
-  const invoices = (invRes.data ?? []).map((i) => ({ ...i, total: num(i.total), paid_amount: num(i.paid_amount), balance: num(i.balance) }))
-  const oldInvoices = invoices.filter((i) => !i.patient_treatment_id)
-  const items: Record<string, { name: string; tooth: string | null }[]> = {}
-  if (oldInvoices.length) {
-    const { data } = await supabase.from('invoice_items').select('invoice_id, name, tooth').in('invoice_id', oldInvoices.map((i) => i.id))
-    for (const it of data ?? []) (items[it.invoice_id as string] ??= []).push({ name: it.name as string, tooth: it.tooth as string | null })
-  }
-  const plans = (plansRes.data ?? []) as Plan[]
-  let installments: (Installment & { plan_id: string })[] = []
-  if (plans.length) {
-    const { data } = await supabase
-      .from('installments')
-      .select('id, plan_id, installment_no, due_date, amount, paid_amount, paid_date, payment_method')
-      .in('plan_id', plans.map((p) => p.id))
-      .order('installment_no')
-    installments = (data ?? []) as (Installment & { plan_id: string })[]
-  }
-  const billed = treatments.filter((t) => t.charged > 0 || t.paid > 0)
-  const invByTreatment = new Map<string, typeof invoices>()
-  for (const i of invoices) if (i.patient_treatment_id) (invByTreatment.get(i.patient_treatment_id) ?? invByTreatment.set(i.patient_treatment_id, []).get(i.patient_treatment_id)!).push(i)
-
-  return (
-    <div className="grid gap-8">
-      {/* Har treatment ka hisaab */}
-      <div>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="font-display text-lg font-semibold text-clinic-ink">Treatment ke hisaab se</h2>
-          <Link href={`/admin/patients/${patient.id}/invoice`} className="rounded-full border border-clinic-teal px-4 py-1.5 text-xs font-semibold text-clinic-teal">
-            Poora statement (print / PDF)
-          </Link>
-        </div>
-        <p className="text-sm text-clinic-ink/60">Payment lene ke liye upar Treatments (7) mein treatment par &quot;Payment lo&quot; dabayein.</p>
-        <div className="mt-3 overflow-x-auto rounded-2xl border border-clinic-teal/10 bg-white">
-          <table className="w-full text-sm">
-            <thead className="bg-clinic-mint text-left text-xs text-clinic-ink/60">
-              <tr>
-                <th className="px-4 py-2">Treatment</th>
-                <th className="px-4 py-2">Bill</th>
-                <th className="px-4 py-2 text-right">Kul</th>
-                <th className="px-4 py-2 text-right">Mile</th>
-                <th className="px-4 py-2 text-right">Baqaya</th>
-              </tr>
-            </thead>
-            <tbody>
-              {billed.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-4 py-5 text-center text-clinic-ink/50">
-                    Nayi treatments ka koi bill nahi.
-                  </td>
-                </tr>
-              ) : (
-                billed.map((t) => (
-                  <tr key={t.id} className={`border-t border-clinic-teal/10 ${t.status === 'cancelled' ? 'text-clinic-ink/40 line-through' : ''}`}>
-                    <td className="px-4 py-2">
-                      {t.name} {t.teeth.length > 0 && <span className="text-xs text-clinic-teal">{t.teeth.map(toothLabel).join(', ')}</span>}
-                    </td>
-                    <td className="px-4 py-2 text-xs">
-                      {(invByTreatment.get(t.id) ?? []).map((i) => (
-                        <Link key={i.id} href={`/admin/invoices/${i.id}`} className={`mr-2 hover:underline ${i.status === 'void' ? 'text-red-500' : 'text-clinic-teal'}`}>
-                          {i.invoice_number}
-                          {i.status === 'void' ? ' (cancel)' : ''}
-                        </Link>
-                      ))}
-                    </td>
-                    <td className="px-4 py-2 text-right">{money(t.charged)}</td>
-                    <td className="px-4 py-2 text-right text-emerald-700">{money(t.paid)}</td>
-                    <td className={`px-4 py-2 text-right font-semibold ${t.balance > 0 ? 'text-red-600' : ''}`}>{money(t.balance)}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-        <p className="mt-2 text-xs text-clinic-ink/50">Refund ya bill cancel: bill number par click karein (sirf doctor/admin).</p>
-      </div>
-
-      {/* Purane bills (naye treatment system se pehle ke) */}
-      {oldInvoices.length > 0 && (
-        <TreatmentList title="Purane bills (naye treatment system se pehle ke)" rows={oldInvoices.map((i): TreatmentRow => ({ ...i, items: items[i.id] ?? [] }))} />
-      )}
-
-      {/* Purane installment plans: sirf dekhna aur qist lena (naye plan ab treatment se banate hain) */}
-      {plans.length > 0 && (
-        <div>
-          <h2 className="font-display text-lg font-semibold text-clinic-ink">Purane installment plans</h2>
-          <div className="mt-3 grid gap-4">
-            {plans.map((plan) => (
-              <TreatmentPlanCard
-                key={plan.id}
-                plan={plan}
-                installments={installments.filter((i) => i.plan_id === plan.id)}
-                patientId={patient.id}
-                patientName={patient.full_name}
-                patientPhone={patient.phone}
-                portalCode={patient.portal_code ?? null}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Poora ledger: har charge aur har payment tareekh ke hisaab se (purana + naya) */}
-      {balance && !ledRes.error && (
-        <div>
-          <h2 className="font-display text-lg font-semibold text-clinic-ink">Poora hisaab (ledger)</h2>
-          <div className="mt-3">
-            <LedgerTimeline rows={(ledRes.data ?? []) as LedgerRow[]} balance={balance} />
-          </div>
-        </div>
-      )}
-      {!isOwner && <p className="text-xs text-clinic-ink/50">Refund, bill cancel aur riyayat sirf doctor/admin kar sakta hai.</p>}
-    </div>
-  )
-}
-
-async function DocsTab({ supabase, patientId, canDelete }: { supabase: Sb; patientId: string; canDelete: boolean }) {
-  const { data, error } = await supabase
-    .from('patient_photos')
-    .select('id, storage_path, caption, taken_on, category')
-    .eq('patient_id', patientId)
-    .order('taken_on', { ascending: false })
-  return <PatientPhotoGallery patientId={patientId} photos={(error ? [] : data ?? []) as PatientPhoto[]} canDelete={canDelete} />
 }

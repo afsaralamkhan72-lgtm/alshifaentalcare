@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { fmtDate, money, todayKarachi, addDays } from '@/lib/karachi'
@@ -95,6 +95,10 @@ interface Props {
   medicines: MedOpt[]
   todayBills: TodayBill[]
   balance: number
+  xraySlot?: ReactNode
+  apptSlot?: ReactNode
+  plansSlot?: ReactNode
+  pastRx?: { id: string; date: string; names: string }[]
   perms: { clinicalView: boolean; clinicalEdit: boolean; bill: boolean; collect: boolean; money: boolean; owner: boolean; rx: boolean; lab: boolean }
 }
 
@@ -103,13 +107,9 @@ const HOMEO_COMPLAINTS = ['Bukhar', 'Sar dard', 'Khansi / zukam', 'Pait ki takle
 const DURATIONS = ['Aaj se', '2-3 din', '1 hafta', '2 hafte', '1 mahina', '1 mahine se zyada']
 const SEVERITY = ['Halka', 'Darmiyana', 'Shadeed']
 const FINDINGS = [
-  { k: 'extraoral', l: 'Extraoral examination' },
-  { k: 'intraoral', l: 'Intraoral examination' },
-  { k: 'soft_tissue', l: 'Soft tissue' },
+  { k: 'extraoral', l: 'Extraoral (chehra, jabra)' },
+  { k: 'intraoral', l: 'Intraoral aur soft tissue (munh ke andar)' },
   { k: 'periodontal', l: 'Periodontal (masoorhe)' },
-  { k: 'tooth', l: 'Daant ki khaas baatein' },
-  { k: 'radiographic', l: 'X-ray (radiographic) findings' },
-  { k: 'notes', l: 'Aur notes' },
 ]
 const DIAG_SUGGEST = [
   'Dental caries', 'Reversible pulpitis', 'Irreversible pulpitis', 'Pulp necrosis', 'Periapical abscess', 'Periapical periodontitis',
@@ -143,6 +143,15 @@ function Section({ n, title, children, right }: { n: number; title: string; chil
   )
 }
 
+function Locked({ n, title }: { n: number; title: string }) {
+  return (
+    <div id={`s${n}`} className="flex items-center gap-2 rounded-2xl border border-dashed border-clinic-teal/20 px-4 py-3 text-sm text-clinic-ink/40">
+      <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-clinic-teal/20 text-sm text-white">{n}</span>
+      {title} <span className="text-xs">(visit shuru karne ke baad)</span>
+    </div>
+  )
+}
+
 /* ------------------------------------------------------------------ */
 export default function VisitWorkspace(p: Props) {
   const router = useRouter()
@@ -159,8 +168,7 @@ export default function VisitWorkspace(p: Props) {
   const [cSev, setCSev] = useState(v?.complaint?.severity ?? '')
   const [cLoc, setCLoc] = useState(v?.complaint?.location ?? '')
   const [findings, setFindings] = useState<Record<string, string>>(v?.findings ?? {})
-  const [showMoreFind, setShowMoreFind] = useState(Object.values(v?.findings ?? {}).some(Boolean))
-  const [diags, setDiags] = useState<Diagnosis[]>(v?.diagnoses?.length ? v.diagnoses : [])
+    const [diags, setDiags] = useState<Diagnosis[]>(v?.diagnoses?.length ? v.diagnoses : [])
   const [nextDate, setNextDate] = useState(v?.next_date ?? '')
   const [nextTime, setNextTime] = useState(v?.next_time ?? '')
   const [nextT, setNextT] = useState(v?.next_treatment_id ?? '')
@@ -314,7 +322,7 @@ export default function VisitWorkspace(p: Props) {
       <Section n={3} title="Chief Complaint (takleef)">
         {!v ? (
           p.perms.clinicalEdit ? (
-            <div id="s8" className="scroll-mt-20 rounded-xl bg-clinic-mint/60 p-4 text-center">
+            <div className="rounded-xl bg-clinic-mint/60 p-4 text-center">
               <p className="text-sm text-clinic-ink/70">Aaj patient aaya hai? Visit shuru karein: takleef, muaina, diagnosis, prescription, bill aur agli appointment aik hi jagah.</p>
               <button onClick={openVisit} disabled={busy === 'open'} className="mt-3 rounded-full bg-clinic-teal px-6 py-3 text-base font-semibold text-white disabled:opacity-60">
                 {busy === 'open' ? 'Khul raha hai...' : '+ Aaj ka visit shuru karein'}
@@ -372,26 +380,20 @@ export default function VisitWorkspace(p: Props) {
         )}
       </Section>
 
-      {/* 4. CLINICAL FINDINGS */}
-      {v && (
-        <Section
-          n={4}
-          title="Clinical Findings (muaina)"
-          right={
-            <button type="button" onClick={() => setShowMoreFind(!showMoreFind)} className="text-xs font-semibold text-clinic-teal">
-              {showMoreFind ? 'kam' : 'sab khanay kholein'}
-            </button>
-          }
-        >
-          <div className="grid gap-3 sm:grid-cols-2">
-            {(showMoreFind ? FINDINGS : FINDINGS.filter((f) => ['intraoral', 'notes'].includes(f.k))).map((f) => (
+      {/* 4. CLINICAL EXAMINATION */}
+      {v ? (
+        <Section n={4} title="Clinical Examination (muaina)">
+          <div className="grid gap-3 sm:grid-cols-3">
+            {FINDINGS.map((f) => (
               <div key={f.k}>
-                <label className="text-xs font-medium text-clinic-ink/70">{homeo && f.k === 'intraoral' ? 'Muaina' : f.l}</label>
+                <label className="text-xs font-medium text-clinic-ink/70">{f.l}</label>
                 <textarea rows={2} value={findings[f.k] ?? ''} onChange={(e) => setFindings({ ...findings, [f.k]: e.target.value })} className={input} />
               </div>
             ))}
           </div>
         </Section>
+      ) : (
+        <Locked n={4} title="Clinical Examination" />
       )}
 
       {/* 5. DENTAL CHART */}
@@ -408,9 +410,22 @@ export default function VisitWorkspace(p: Props) {
         </div>
       )}
 
+      {/* 6. X-RAY / INVESTIGATION */}
+      {p.perms.clinicalView && (
+        <Section n={6} title="X-ray / Investigation">
+          {v && (
+            <div className="mb-3">
+              <label className="text-xs font-medium text-clinic-ink/70">X-ray / report mein kya nazar aaya</label>
+              <textarea rows={2} value={findings.radiographic ?? ''} onChange={(e) => setFindings({ ...findings, radiographic: e.target.value })} placeholder="Caries, bone loss, periapical ..." className={input} />
+            </div>
+          )}
+          {p.xraySlot}
+        </Section>
+      )}
+
       {/* 6. DIAGNOSIS */}
-      {v && (
-        <Section n={6} title="Diagnosis">
+      {v ? (
+        <Section n={7} title="Diagnosis">
           <datalist id="diag-list">
             {DIAG_SUGGEST.map((d) => (
               <option key={d} value={d} />
@@ -438,11 +453,13 @@ export default function VisitWorkspace(p: Props) {
             </button>
           </div>
         </Section>
+      ) : (
+        <Locked n={7} title="Diagnosis" />
       )}
 
       {/* 7. TREATMENT PLAN / TREATMENTS */}
       {(p.perms.clinicalView || p.perms.money) && (
-        <Section n={7} title="Treatment Plan aur Treatments">
+        <Section n={8} title="Treatment (plan aur visit)">
           <TreatmentsPanel
             patientId={p.patient.id}
             department={p.patient.department}
@@ -463,9 +480,9 @@ export default function VisitWorkspace(p: Props) {
         </Section>
       )}
 
-      {/* 8. PRESCRIPTION */}
+      {/* 9. PRESCRIPTION */}
       {v && p.perms.rx && (
-        <Section n={8} title="Prescription (optional)">
+        <Section n={9} title="Prescription (optional)">
           <div className="flex flex-wrap items-center gap-2">
             {(['dental', 'homeopathic'] as const).map((c) => (
               <button key={c} type="button" onClick={() => setRxCat(c)} className={`rounded-full px-4 py-1.5 text-sm font-semibold ${rxCat === c ? 'bg-clinic-teal text-white' : 'border border-clinic-teal/25 text-clinic-ink/70'}`}>
@@ -546,12 +563,26 @@ export default function VisitWorkspace(p: Props) {
             </div>
           )}
           <p className="mt-2 text-xs text-clinic-ink/50">Prescription &quot;Finish Visit&quot; par save hoti hai. Sirf &quot;Clinic se di&quot; wali dawa ka paisa bill mein judta hai.</p>
+          {(p.pastRx ?? []).length > 0 && (
+            <details className="mt-3 rounded-xl border border-clinic-teal/10 px-3 py-2 text-sm">
+              <summary className="cursor-pointer text-xs font-semibold text-clinic-ink/60">Pichli prescriptions ({p.pastRx!.length})</summary>
+              <ul className="mt-2 divide-y divide-clinic-teal/10">
+                {p.pastRx!.map((r) => (
+                  <li key={r.id} className="flex items-center justify-between gap-2 py-1.5">
+                    <span className="min-w-0 truncate"><span className="text-xs text-clinic-ink/50">{fmtDate(r.date)}</span> {r.names}</span>
+                    <a href={`/admin/prescriptions/${r.id}/print`} target="_blank" className="shrink-0 text-xs font-semibold text-clinic-teal">Print</a>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
         </Section>
       )}
+      {!v && p.perms.rx && <Locked n={9} title="Prescription" />}
 
       {/* 9. BILL */}
       {p.perms.money && (
-        <Section n={9} title="Bill / Paisa">
+        <Section n={10} title="Bill / Paisa">
           <div className="grid gap-2 text-sm">
             {p.todayBills.length > 0 && (
               <div className="rounded-xl bg-clinic-sand/60 p-3">
@@ -638,14 +669,16 @@ export default function VisitWorkspace(p: Props) {
                 </p>
               )}
             </div>
-            {!v && <p className="text-xs text-clinic-ink/50">Treatment ki payment upar treatment par &quot;Payment lo&quot; se. Poora hisaab neeche &quot;Bills aur payments&quot; mein.</p>}
+            {!v && <p className="text-xs text-clinic-ink/50">Treatment ki payment step 8 mein treatment par &quot;Payment lo&quot; se.</p>}
+            <a href={`/admin/patients/${p.patient.id}/invoice`} className="justify-self-start text-xs font-semibold text-clinic-teal hover:underline">Poora hisaab / statement (print / PDF)</a>
+            {p.plansSlot}
           </div>
         </Section>
       )}
 
       {/* 10. NEXT APPOINTMENT */}
-      {v && (
-        <Section n={10} title="Agli Appointment">
+      {v ? (
+        <Section n={11} title="Agli Appointment">
           <div className="grid gap-3 sm:grid-cols-3">
             <div>
               <label className="text-xs font-medium text-clinic-ink/70">Tareekh</label>
@@ -682,6 +715,8 @@ export default function VisitWorkspace(p: Props) {
           </div>
           <p className="mt-2 text-xs text-clinic-ink/50">&quot;Finish Visit&quot; par appointment khud ban jayegi (Appointments aur Home par). Dobara Finish se dohri nahi banti.</p>
         </Section>
+      ) : (
+        <Locked n={11} title="Agli Appointment" />
       )}
 
       {/* SAVE DRAFT / FINISH VISIT */}
