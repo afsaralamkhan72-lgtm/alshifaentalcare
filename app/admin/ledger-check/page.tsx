@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { requireOwner } from '@/lib/auth'
+import { requireAnyPerm } from '@/lib/auth'
 import { money } from '@/lib/karachi'
 
 /**
@@ -8,7 +8,7 @@ import { money } from '@/lib/karachi'
  * Jahan farq ho wahan doctor ek nazar dekh le. Kuch badla nahi jata, sirf dikhaya jata hai.
  */
 export default async function LedgerCheckPage() {
-  await requireOwner()
+  await requireAnyPerm('reports.view')
   const supabase = await createClient()
 
   const { data, error } = await supabase

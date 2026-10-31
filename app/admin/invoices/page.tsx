@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { requireOwner } from '@/lib/auth'
+import { requireAnyPerm } from '@/lib/auth'
 import { fmtDate, money } from '@/lib/karachi'
 
 export default async function InvoicesPage({
@@ -8,7 +8,7 @@ export default async function InvoicesPage({
 }: {
   searchParams: Promise<{ q?: string; status?: string }>
 }) {
-  await requireOwner()
+  await requireAnyPerm('billing.view')
   const params = await searchParams
   const supabase = await createClient()
 

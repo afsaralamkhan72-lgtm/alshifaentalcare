@@ -4,6 +4,18 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { addDays, fmtDate, todayKarachi } from '@/lib/karachi'
+import WhatsAppMenu from './WhatsAppMenu'
+import { apptConfirmLink, apptReminderLink, apptRescheduleLink } from '@/lib/messages'
+
+const SLOTS = (() => {
+  const out: string[] = []
+  for (let h = 10; h <= 20; h++)
+    for (const m of [0, 30]) {
+      if (h === 20 && m === 30) continue
+      out.push(`${h > 12 ? h - 12 : h}:${m ? '30' : '00'} ${h >= 12 ? 'PM' : 'AM'}`)
+    }
+  return out
+})()
 
 export interface PAppt {
   id: string
@@ -12,6 +24,7 @@ export interface PAppt {
   treatment_name: string | null
   status: string | null
   notes: string | null
+  doctor?: string | null
 }
 
 const STATUS: Record<string, { l: string; c: string }> = {
@@ -42,6 +55,16 @@ export default function PatientAppointments({
   const [notes, setNotes] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [resId, setResId] = useState<string | null>(null)
+  const [resDate, setResDate] = useState('')
+  const [resTime, setResTime] = useState('')
+
+  async function reschedule(id: string) {
+    const { error: err } = await createClient().rpc('reschedule_appointment', { p_id: id, p_date: resDate, p_time: resTime || null })
+    if (err) return setError(err.message)
+    setResId(null)
+    router.refresh()
+  }
 
   async function add(e: React.FormEvent) {
     e.preventDefault()
@@ -82,23 +105,46 @@ export default function PatientAppointments({
 
   function Row({ a }: { a: PAppt }) {
     const st = STATUS[a.status ?? 'pending'] ?? STATUS.pending
+    const ap = { ...a, patient_name: patient.full_name, phone: patient.phone }
+    const live = a.status === 'pending' || a.status === 'confirmed'
     return (
-      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+      <div className="px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="text-sm font-medium text-clinic-ink">
             {fmtDate(a.preferred_date)} {a.preferred_time && <span className="text-clinic-ink/60">· {a.preferred_time}</span>}
           </p>
           <p className="text-xs text-clinic-ink/60">
             {a.treatment_name ?? 'Visit'}
+            {a.doctor ? ` · ${a.doctor}` : ''}
             {a.notes ? ` · ${a.notes}` : ''}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${st.c}`}>{st.l}</span>
-          {canManage && (a.status === 'pending' || a.status === 'confirmed') && (
+          {live && (
+            <WhatsAppMenu
+              items={[
+                { label: 'Confirm ka message', href: apptConfirmLink(ap) },
+                { label: 'Yaad dehani (reminder)', href: apptReminderLink(ap) },
+                { label: 'Nayi tareekh ka message', href: apptRescheduleLink(ap) },
+              ]}
+            />
+          )}
+          {canManage && live && (
             <>
               <button onClick={() => setStatus(a.id, 'completed')} className="text-xs font-semibold text-emerald-700 hover:underline">
                 Aa gaye
+              </button>
+              <button
+                onClick={() => {
+                  setResId(resId === a.id ? null : a.id)
+                  setResDate(a.preferred_date ?? today)
+                  setResTime(a.preferred_time ?? '')
+                }}
+                className="text-xs font-semibold text-clinic-teal hover:underline"
+              >
+                Reschedule
               </button>
               <button onClick={() => setStatus(a.id, 'cancelled')} className="text-xs text-red-600 hover:underline">
                 Cancel
@@ -106,6 +152,23 @@ export default function PatientAppointments({
             </>
           )}
         </div>
+      </div>
+      {resId === a.id && (
+        <div className="mt-2 flex flex-wrap items-end gap-2 rounded-lg bg-clinic-mint/50 p-2">
+          <input type="date" value={resDate} min={today} onChange={(e) => setResDate(e.target.value)} className="rounded-lg border border-clinic-teal/20 px-2 py-1 text-sm" />
+          <select value={resTime} onChange={(e) => setResTime(e.target.value)} className="rounded-lg border border-clinic-teal/20 px-2 py-1 text-sm">
+            <option value="">—</option>
+            {SLOTS.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+          <button onClick={() => reschedule(a.id)} className="rounded-full bg-clinic-teal px-3 py-1 text-xs font-semibold text-white">
+            Save
+          </button>
+        </div>
+      )}
       </div>
     )
   }
@@ -129,7 +192,14 @@ export default function PatientAppointments({
           </div>
           <div>
             <label className="text-xs font-medium text-clinic-ink/70">Waqt (optional)</label>
-            <input value={time} onChange={(e) => setTime(e.target.value)} placeholder="11:30 AM" className={input} />
+            <select value={time} onChange={(e) => setTime(e.target.value)} className={input}>
+              <option value="">—</option>
+              {SLOTS.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
           </div>
           {treatments.length > 0 ? (
             <div>

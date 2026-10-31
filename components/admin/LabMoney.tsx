@@ -84,19 +84,9 @@ export default function LabMoney({ caseId, status, cost, labPaid }: Props) {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {status === 'pending' && (
-            <button disabled={busy} onClick={() => setStatus('sent')} className="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
-              Lab ko bhej diya
-            </button>
-          )}
           {!received && (
             <button disabled={busy} onClick={() => setOpen('receive')} className="rounded-full bg-clinic-teal px-4 py-2 text-sm font-semibold text-white">
-              Lab se wapas aa gaya
-            </button>
-          )}
-          {received && status !== 'fitted' && (
-            <button disabled={busy} onClick={() => setStatus('fitted')} className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
-              Patient ko lag gaya
+              Lab ka bill likhein
             </button>
           )}
           {received && owed > 0 && (
@@ -113,7 +103,7 @@ export default function LabMoney({ caseId, status, cost, labPaid }: Props) {
           <div className="w-full max-w-sm rounded-2xl bg-white p-6">
             <div className="flex items-center justify-between">
               <p className="font-display text-lg font-semibold text-clinic-ink">
-                {open === 'receive' ? 'Lab se wapas aa gaya' : 'Lab ko payment'}
+                {open === 'receive' ? 'Lab ka bill' : 'Lab ko payment'}
               </p>
               <button onClick={() => setOpen(null)} className="text-clinic-ink/40">✕</button>
             </div>

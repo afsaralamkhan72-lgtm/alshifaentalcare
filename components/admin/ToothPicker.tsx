@@ -1,6 +1,7 @@
 'use client'
 
-import { localNumber, toothLabel, isWisdom } from '@/lib/teeth'
+import { localNumber, toothLabel, isWisdom, toothName, PRIMARY, isPrimary } from '@/lib/teeth'
+import { useState } from 'react'
 import ToothShape from './ToothShape'
 
 /** FDI notation, arranged the way a dentist reads a chart (patient's view) */
@@ -17,6 +18,7 @@ interface Props {
 }
 
 export default function ToothPicker({ selected, onChange }: Props) {
+  const [primary, setPrimary] = useState(() => selected.some(isPrimary))
   function toggle(tooth: string) {
     onChange(
       selected.includes(tooth) ? selected.filter((t) => t !== tooth) : [...selected, tooth].sort()
@@ -44,7 +46,7 @@ export default function ToothPicker({ selected, onChange }: Props) {
                     on ? 'text-clinic-teal' : 'text-clinic-ink/50'
                   }`}
                 >
-                  {localNumber(t)}
+                  {toothName(t)}
                 </span>
               )}
               <ToothShape number={localNumber(t)} upper={upper} selected={on} size={26} />
@@ -54,7 +56,7 @@ export default function ToothPicker({ selected, onChange }: Props) {
                     on ? 'text-clinic-teal' : 'text-clinic-ink/50'
                   }`}
                 >
-                  {localNumber(t)}
+                  {toothName(t)}
                 </span>
               )}
             </button>
@@ -66,6 +68,10 @@ export default function ToothPicker({ selected, onChange }: Props) {
 
   return (
     <div>
+      <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-clinic-ink/70">
+        <input type="checkbox" checked={primary} onChange={(e) => setPrimary(e.target.checked)} />
+        Bachon ke daant (A-E)
+      </label>
       <div className="overflow-x-auto rounded-xl border border-clinic-teal/10 bg-white p-3">
         {/* Upper arch */}
         <div className="mb-1 flex justify-center gap-3 text-[10px] font-semibold uppercase tracking-wide text-clinic-ink/40">
@@ -78,9 +84,23 @@ export default function ToothPicker({ selected, onChange }: Props) {
           <div className="w-px bg-clinic-teal/20" />
           <Row teeth={FDI_QUADRANTS.upperLeft} upper />
         </div>
+        {primary && (
+          <div className="mt-1 flex justify-center gap-3 rounded-lg bg-amber-50/60">
+            <Row teeth={PRIMARY.upperRight} upper />
+            <div className="w-px bg-clinic-teal/20" />
+            <Row teeth={PRIMARY.upperLeft} upper />
+          </div>
+        )}
 
         <div className="my-2 border-t border-dashed border-clinic-teal/20" />
 
+        {primary && (
+          <div className="mb-1 flex justify-center gap-3 rounded-lg bg-amber-50/60">
+            <Row teeth={PRIMARY.lowerRight} upper={false} />
+            <div className="w-px bg-clinic-teal/20" />
+            <Row teeth={PRIMARY.lowerLeft} upper={false} />
+          </div>
+        )}
         {/* Lower arch */}
         <div className="flex justify-center gap-3">
           <Row teeth={FDI_QUADRANTS.lowerRight} upper={false} />

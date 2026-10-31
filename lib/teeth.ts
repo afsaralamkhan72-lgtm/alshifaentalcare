@@ -20,26 +20,48 @@ export function localNumber(fdi: string) {
   return fdi.slice(1)
 }
 
-/** FDI '16' se quadrant ka short naam 'UR' nikalta hai */
+/** Bachon ka (doodh ka) daant? FDI 51-55, 61-65, 71-75, 81-85 */
+export function isPrimary(fdi: string) {
+  return /^[5-8][1-5]$/.test(fdi)
+}
+
+/** FDI '16' (ya bachon ka '55') se quadrant ka short naam 'UR' nikalta hai */
 export function quadrantOf(fdi: string) {
   switch (fdi[0]) {
     case '1':
+    case '5':
       return QUADRANTS.upperRight
     case '2':
+    case '6':
       return QUADRANTS.upperLeft
     case '3':
+    case '7':
       return QUADRANTS.lowerLeft
     case '4':
+    case '8':
       return QUADRANTS.lowerRight
     default:
       return null
   }
 }
 
+/** Screen par daant ka naam: pakke daant 1-8, bachon ke daant A-E (jaise "UR E") */
+export function toothName(fdi: string) {
+  return isPrimary(fdi) ? 'ABCDE'[Number(fdi[1]) - 1] : localNumber(fdi)
+}
+
+/** Bachon ke daant: rows usi tarteeb mein jaise pakke daant (wast se bahar) */
+export const PRIMARY = {
+  upperRight: ['55', '54', '53', '52', '51'],
+  upperLeft: ['61', '62', '63', '64', '65'],
+  lowerRight: ['85', '84', '83', '82', '81'],
+  lowerLeft: ['71', '72', '73', '74', '75'],
+}
+
 /** Poora label jaise "UR 6" — jahan quadrant saaf na ho wahan istemaal karein */
 export function toothLabel(fdi: string) {
   const q = quadrantOf(fdi)
-  return q ? `${q.short} ${localNumber(fdi)}` : fdi
+  return q ? `${q.short} ${toothName(fdi)}` : fdi
 }
 
 /** Aqal daarh (wisdom tooth) hai ya nahi */

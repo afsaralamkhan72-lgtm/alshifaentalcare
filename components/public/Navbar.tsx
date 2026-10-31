@@ -16,9 +16,6 @@ const NAV_LINKS = [
   { href: '/contact', label: 'Contact' },
 ]
 
-// Desktop par sirf zaroori links (bhar-maar se header tang aur bachkana lagta tha); baqi mobile list aur footer mein
-const PRIMARY = ['/', '/services/dental', '/services/homeopathic', '/doctors', '/testimonials', '/contact']
-
 export default function Navbar({ logoUrl }: { logoUrl?: string | null }) {
   return (
     <header className="sticky top-0 z-30 border-b border-clinic-teal/10 bg-clinic-sand/95 backdrop-blur">
@@ -40,22 +37,16 @@ export default function Navbar({ logoUrl }: { logoUrl?: string | null }) {
           Book
         </a>
 
-        <nav className="hidden items-center gap-6 lg:flex">
-          {NAV_LINKS.filter((l) => PRIMARY.includes(l.href)).map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="whitespace-nowrap text-sm font-medium text-clinic-ink/70 transition-colors hover:text-clinic-teal"
-            >
-              {link.label}
-            </Link>
-          ))}
-        </nav>
-
-        <div className="hidden items-center gap-4 lg:flex">
+        <div className="hidden items-center gap-3 lg:flex">
+          <Link
+            href="/login"
+            className="whitespace-nowrap text-xs font-medium text-clinic-ink/50 transition-colors hover:text-clinic-teal"
+          >
+            Staff Login
+          </Link>
           <a
             href={`tel:${CLINIC.phone.dial}`}
-            className="hidden whitespace-nowrap text-sm font-semibold xl:inline text-clinic-teal transition-colors hover:text-clinic-teal-light"
+            className="whitespace-nowrap text-sm font-semibold text-clinic-teal transition-colors hover:text-clinic-teal-light"
           >
             {CLINIC.phone.display}
           </a>
@@ -67,6 +58,21 @@ export default function Navbar({ logoUrl }: { logoUrl?: string | null }) {
           </Link>
         </div>
       </div>
+
+      {/* Desktop: sab purane links doosri line mein (aik line mein samate nahi the, toot jate the) */}
+      <nav className="hidden border-t border-clinic-teal/10 lg:block">
+        <div className="mx-auto flex max-w-6xl items-center justify-center gap-7 px-6 py-2">
+          {NAV_LINKS.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className="whitespace-nowrap text-sm font-medium text-clinic-ink/70 transition-colors hover:text-clinic-teal"
+            >
+              {link.label}
+            </Link>
+          ))}
+        </div>
+      </nav>
 
       {/* Mobile: saare sections aik hi nazar mein, scroll kar ke */}
       <nav className="lg:hidden">

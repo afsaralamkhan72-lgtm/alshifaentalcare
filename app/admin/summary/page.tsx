@@ -1,10 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
-import { requireOwner } from '@/lib/auth'
+import { requireAnyPerm } from '@/lib/auth'
 import { todayKarachi } from '@/lib/karachi'
 import SummaryReport, { type ReportData } from '@/components/admin/SummaryReport'
 
 export default async function SummaryPage({ searchParams }: { searchParams: Promise<{ from?: string; to?: string }> }) {
-  await requireOwner()
+  await requireAnyPerm('reports.view')
   const sp = await searchParams
   const today = todayKarachi()
   const ok = (s?: string) => /^\d{4}-\d{2}-\d{2}$/.test(s ?? '')

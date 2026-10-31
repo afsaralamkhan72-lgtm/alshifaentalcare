@@ -1,38 +1,29 @@
 import { requirePerm } from '@/lib/auth'
 import Link from 'next/link'
+import { toothLabel } from '@/lib/teeth'
 import { createClient } from '@/lib/supabase/server'
 import LabCaseForm, { type LabOption, type PatientOption } from '@/components/admin/LabCaseForm'
 import { todayKarachi } from '@/lib/karachi'
 
-const STATUS_STYLES: Record<string, string> = {
-  pending: 'bg-amber-50 text-amber-700',
-  sent: 'bg-blue-50 text-blue-700',
-  in_progress: 'bg-clinic-teal/10 text-clinic-teal',
-  received: 'bg-emerald-50 text-emerald-700',
-  fitted: 'bg-emerald-100 text-emerald-800',
-  remake: 'bg-red-50 text-red-700',
-}
-
-const STATUSES = ['all', 'pending', 'sent', 'in_progress', 'received', 'fitted', 'remake'] as const
-
 export default async function LabPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>
+  searchParams: Promise<{ q?: string }>
 }) {
   await requirePerm('lab.view')
   const params = await searchParams
-  const status = params.status || 'all'
+  const q = (params.q ?? '').replace(/[%,()*\\"']/g, ' ').trim()
 
   const supabase = await createClient()
 
   let query = supabase
     .from('lab_cases')
-    .select('id, case_number, lab_name, work_type, tooth_numbers, status, due_date, cost, lab_paid, patients(full_name, mr_number)')
+    .select('id, case_number, lab_name, work_type, tooth_numbers, status, due_date, cost, lab_paid, created_at, patients(full_name, mr_number)')
     .is('deleted_at', null)
     .order('created_at', { ascending: false })
+    .limit(200)
 
-  if (status !== 'all') query = query.eq('status', status)
+  if (q) query = query.or(`case_number.ilike.%${q}%,lab_name.ilike.%${q}%,work_type.ilike.%${q}%`)
 
   const [casesRes, labsRes, patientsRes] = await Promise.all([
     query,
@@ -63,14 +54,11 @@ export default async function LabPage({
   const cases = casesRes.data ?? []
   const today = todayKarachi()
 
-  const { data: allCases } = await supabase
-    .from('lab_cases')
-    .select('status')
-    .is('deleted_at', null)
-
-  function countFor(s: string) {
-    if (s === 'all') return allCases?.length ?? 0
-    return allCases?.filter((c) => c.status === s).length ?? 0
+  // Har case ki report / files (clinic staff upload karta hai; WhatsApp bhejne se khud "aa gayi" nahi hoti)
+  const reports = new Map<string, number>()
+  if (cases.length) {
+    const { data: files } = await supabase.from('patient_photos').select('lab_case_id').in('lab_case_id', cases.map((c) => c.id))
+    for (const f of files ?? []) reports.set(f.lab_case_id as string, (reports.get(f.lab_case_id as string) ?? 0) + 1)
   }
 
   return (
@@ -79,7 +67,7 @@ export default async function LabPage({
         <div>
           <h1 className="font-display text-2xl font-semibold text-clinic-ink">Lab Work</h1>
           <p className="mt-1 text-sm text-clinic-ink/60">
-            Crown, bridge, denture ke work orders, lab ko WhatsApp par bhejein.
+            Work order banayein, lab ko WhatsApp par bhejein, report aaye to case mein upload karein.
           </p>
         </div>
         <LabCaseForm
@@ -88,21 +76,10 @@ export default async function LabPage({
         />
       </div>
 
-      <div className="mt-6 flex flex-wrap gap-2">
-        {STATUSES.map((s) => (
-          <Link
-            key={s}
-            href={`/admin/lab?status=${s}`}
-            className={`rounded-full px-4 py-1.5 text-sm font-medium capitalize ${
-              status === s
-                ? 'bg-clinic-teal text-white'
-                : 'border border-clinic-teal/10 bg-white text-clinic-ink/60'
-            }`}
-          >
-            {s.replace('_', ' ')} ({countFor(s)})
-          </Link>
-        ))}
-      </div>
+      <form className="mt-6 flex gap-2">
+        <input name="q" defaultValue={q} placeholder="Case no., lab ya kaam talash karein" className="w-full max-w-sm rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm" />
+        <button className="rounded-lg bg-clinic-teal px-4 py-2 text-sm font-semibold text-white">Talash</button>
+      </form>
 
       <div className="mt-6 grid gap-3">
         {cases.length === 0 ? (
@@ -112,8 +89,8 @@ export default async function LabPage({
         ) : (
           cases.map((c) => {
             const patient = c.patients as unknown as { full_name: string; mr_number: string } | null
-            const overdue =
-              c.due_date && c.due_date < today && !['received', 'fitted'].includes(c.status)
+            const nReports = reports.get(c.id) ?? 0
+            const overdue = c.due_date && c.due_date < today && nReports === 0
 
             return (
               <Link
@@ -134,19 +111,19 @@ export default async function LabPage({
                     </p>
                     <p className="mt-1 text-sm text-clinic-ink/60">
                       {c.work_type ?? 'Lab work'} · Tooth{' '}
-                      {(c.tooth_numbers ?? []).join(', ') || '—'} · {c.lab_name}
+                      {((c.tooth_numbers ?? []) as string[]).map(toothLabel).join(', ') || '—'} · {c.lab_name}
                     </p>
                   </div>
 
                   <div className="text-right">
                     <span
-                      className={`rounded-full px-3 py-1 text-xs font-semibold capitalize ${
-                        STATUS_STYLES[c.status] ?? 'bg-clinic-mint text-clinic-ink/50'
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                        nReports > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-clinic-mint text-clinic-ink/60'
                       }`}
                     >
-                      {c.status.replace('_', ' ')}
+                      {nReports > 0 ? `Report: ${nReports} file` : 'Report abhi nahi'}
                     </span>
-                    {Number(c.cost ?? 0) - Number(c.lab_paid ?? 0) > 0 && ['received', 'fitted'].includes(c.status) && (
+                    {Number(c.cost ?? 0) - Number(c.lab_paid ?? 0) > 0 && (
                       <p className="mt-1 text-xs font-semibold text-red-600">
                         Lab ka baqaya Rs. {(Number(c.cost) - Number(c.lab_paid)).toLocaleString()}
                       </p>
@@ -158,7 +135,7 @@ export default async function LabPage({
                         }`}
                       >
                         Due {new Date(c.due_date).toLocaleDateString('en-GB')}
-                        {overdue ? ', late' : ''}
+                        {overdue ? ', der ho gayi' : ''}
                       </p>
                     )}
                   </div>

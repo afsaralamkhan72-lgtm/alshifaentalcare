@@ -1,10 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
-import { requireOwner } from '@/lib/auth'
+import { requireAnyPerm } from '@/lib/auth'
 import DuesList, { type DueRow } from '@/components/admin/DuesList'
 import { todayKarachi } from '@/lib/karachi'
 
 export default async function DuesPage() {
-  await requireOwner()
+  await requireAnyPerm('billing.view')
   const supabase = await createClient()
 
   const { data, error } = await supabase

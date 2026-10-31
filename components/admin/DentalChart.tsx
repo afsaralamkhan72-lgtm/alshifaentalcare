@@ -1,6 +1,6 @@
 'use client'
 
-import { localNumber, toothLabel } from '@/lib/teeth'
+import { localNumber, toothLabel, toothName, PRIMARY, isPrimary } from '@/lib/teeth'
 import ToothShape from './ToothShape'
 
 import { useEffect, useState } from 'react'
@@ -22,6 +22,8 @@ interface DentalChartProps {
   canEdit?: boolean
   /** Daant chun kar "Treatment shuru" (paisa/bill sirf treatment form se banta hai, chart se nahi) */
   onStartTreatment?: (tooth: string) => void
+  /** Plan wali treatments ke daant (neeli dotted line) */
+  plannedTeeth?: string[]
 }
 
 const CONDITIONS = [
@@ -99,7 +101,10 @@ export default function DentalChart({
   initialRecords,
   canEdit = false,
   onStartTreatment,
+  plannedTeeth = [],
 }: DentalChartProps) {
+  // Bachon ke daant: agar pehle se in ka record ho to khud khule
+  const [showPrimary, setShowPrimary] = useState(() => initialRecords.some((r) => isPrimary(r.tooth_number)))
   const [records, setRecords] = useState<DentalRecord[]>(initialRecords)
   // Treatment save hone ke baad (router.refresh) naye nishan bhi dikhen
   useEffect(() => setRecords(initialRecords), [initialRecords])
@@ -152,16 +157,17 @@ export default function DentalChart({
           const latest = getLatestForTooth(records, tooth)
           const cond = latest?.condition ?? 'healthy'
           const active = selectedTooth === tooth
+          const planned = plannedTeeth.includes(tooth)
           return (
             <button
               key={tooth}
               onClick={() => openTooth(tooth)}
-              title={`${toothLabel(tooth)}${cond !== 'healthy' ? ` — ${cond}` : ''}`}
+              title={`${toothLabel(tooth)}${cond !== 'healthy' ? ` — ${cond}` : ''}${planned ? ' — plan' : ''}`}
               className={`flex shrink-0 flex-col items-center rounded-lg px-0.5 py-1 transition-transform hover:scale-105 ${
-                active ? 'bg-clinic-teal/15 ring-2 ring-clinic-teal' : ''
+                active ? 'bg-clinic-teal/15 ring-2 ring-clinic-teal' : planned ? 'outline-dashed outline-2 outline-clinic-teal/60' : ''
               }`}
             >
-              {upper && <span className="text-[11px] font-semibold text-clinic-ink/60">{localNumber(tooth)}</span>}
+              {upper && <span className="text-[11px] font-semibold text-clinic-ink/60">{toothName(tooth)}</span>}
               <ToothShape
                 number={localNumber(tooth)}
                 upper={upper}
@@ -169,7 +175,7 @@ export default function DentalChart({
                 fill={cond === 'healthy' ? undefined : (TOOTH_FILL[cond] ?? undefined)}
                 size={26}
               />
-              {!upper && <span className="text-[11px] font-semibold text-clinic-ink/60">{localNumber(tooth)}</span>}
+              {!upper && <span className="text-[11px] font-semibold text-clinic-ink/60">{toothName(tooth)}</span>}
             </button>
           )
         })}
@@ -191,7 +197,13 @@ export default function DentalChart({
     <div className="min-w-0 rounded-2xl border border-clinic-teal/10 bg-white p-4 sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-display text-lg font-semibold text-clinic-ink">Dental Chart</h2>
-        <p className="text-xs text-clinic-ink/50">Daant par click karein</p>
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-1.5 text-xs font-medium text-clinic-ink/70">
+            <input type="checkbox" checked={showPrimary} onChange={(e) => setShowPrimary(e.target.checked)} />
+            Bachon ke daant (A-E)
+          </label>
+          <p className="hidden text-xs text-clinic-ink/50 sm:block">Daant par click karein</p>
+        </div>
       </div>
       {legend.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-3">
@@ -211,7 +223,21 @@ export default function DentalChart({
             <div className="w-px bg-clinic-teal/20" />
             {renderRow(UPPER_LEFT)}
           </div>
+          {showPrimary && (
+            <div className="flex gap-3 rounded-lg bg-amber-50/60 px-2">
+              {renderRow(PRIMARY.upperRight)}
+              <div className="w-px bg-clinic-teal/20" />
+              {renderRow(PRIMARY.upperLeft)}
+            </div>
+          )}
           <div className="h-px w-full bg-clinic-teal/10" />
+          {showPrimary && (
+            <div className="flex gap-3 rounded-lg bg-amber-50/60 px-2">
+              {renderRow(PRIMARY.lowerRight, false)}
+              <div className="w-px bg-clinic-teal/20" />
+              {renderRow(PRIMARY.lowerLeft, false)}
+            </div>
+          )}
           <div className="flex gap-3">
             {renderRow(LOWER_RIGHT, false)}
             <div className="w-px bg-clinic-teal/20" />

@@ -2,6 +2,26 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Rang: website clinic ke green brand mein; software (staff panel + login) blue-white.
+   Sab classes (bg-clinic-teal wagera) wahi hain, sirf in variables ki value badalti hai. */
+:root {
+  --c-teal: 11 79 74;
+  --c-teal-light: 18 114 107;
+  --c-mint: 234 244 241;
+  --c-sand: 247 243 236;
+  --c-ink: 31 42 40;
+  --c-forest: 14 59 46;
+}
+.admin-shell,
+.app-blue {
+  --c-teal: 29 78 216;       /* blue-700 */
+  --c-teal-light: 37 99 235; /* blue-600 */
+  --c-mint: 239 246 255;     /* blue-50 */
+  --c-sand: 248 250 252;     /* slate-50, safed */
+  --c-ink: 30 41 59;         /* slate-800 */
+  --c-forest: 30 58 138;     /* blue-900 */
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
@@ -16,7 +36,7 @@
   -webkit-font-smoothing: antialiased;
 }
 .admin-shell .rounded-2xl.border {
-  box-shadow: 0 1px 2px rgba(11, 79, 74, 0.05), 0 4px 14px -8px rgba(11, 79, 74, 0.12);
+  box-shadow: 0 1px 2px rgba(30, 58, 138, 0.05), 0 4px 14px -8px rgba(30, 58, 138, 0.14);
 }
 .admin-shell input:not([type='checkbox']):not([type='radio']),
 .admin-shell select,
@@ -26,7 +46,7 @@
 .admin-shell input:focus-visible,
 .admin-shell select:focus-visible,
 .admin-shell textarea:focus-visible {
-  box-shadow: 0 0 0 3px rgba(18, 114, 107, 0.15);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
 }
 .admin-shell button,
 .admin-shell a[class*='rounded-full'] {

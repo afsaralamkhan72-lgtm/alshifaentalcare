@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { requireAdmin } from '@/lib/auth'
+import { requireAnyPerm } from '@/lib/auth'
 import StatCard from '@/components/admin/StatCard'
 
 function monthBounds(month: string) {
@@ -24,7 +24,7 @@ export default async function ReportsPage({
 }: {
   searchParams: Promise<{ month?: string }>
 }) {
-  await requireAdmin()
+  await requireAnyPerm('reports.view')
   const params = await searchParams
   const now = new Date()
   const month = params.month || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`

@@ -3,7 +3,10 @@ import { createClient } from '@/lib/supabase/server'
 import StatCard from '@/components/admin/StatCard'
 import { toInternationalPKNumber } from '@/lib/whatsapp'
 import { getStaffProfile, isOwnerRole, getPermissions } from '@/lib/auth'
-import { fmtDate } from '@/lib/karachi'
+import { fmtDate, addDays } from '@/lib/karachi'
+import { getReminderDays } from '@/lib/reminders'
+import WhatsAppMenu from '@/components/admin/WhatsAppMenu'
+import { apptReminderLink } from '@/lib/messages'
 import OwnerToday from '@/components/admin/OwnerToday'
 import { todayKarachi } from '@/lib/karachi'
 
@@ -394,7 +397,8 @@ async function TodayBoard({ perms }: { perms: string[] }) {
   const today = todayKarachi()
   const canAppt = perms.includes('appointments.view')
   const canLab = perms.includes('lab.view')
-  const [todayRes, missedRes, labRes] = await Promise.all([
+  const days = await getReminderDays()
+  const [todayRes, missedRes, labRes, soonRes, activeRes, visitsTodayRes] = await Promise.all([
     canAppt
       ? supabase
           .from('appointments')
@@ -424,7 +428,28 @@ async function TodayBoard({ perms }: { perms: string[] }) {
           .order('due_date', { ascending: true })
           .limit(30)
       : Promise.resolve({ data: [] }),
+    canAppt
+      ? supabase
+          .from('appointments')
+          .select('id, patient_name, phone, treatment_name, preferred_date, preferred_time, patient_id, doctor')
+          .is('deleted_at', null)
+          .gt('preferred_date', today)
+          .lte('preferred_date', addDays(today, days))
+          .in('status', ['pending', 'confirmed'])
+          .order('preferred_date')
+          .order('preferred_time')
+          .limit(40)
+      : Promise.resolve({ data: [] }),
+    perms.includes('clinical.view')
+      ? supabase.from('patient_treatments').select('id', { count: 'exact', head: true }).eq('status', 'active')
+      : Promise.resolve({ count: null }),
+    perms.includes('clinical.view')
+      ? supabase.from('visit_notes').select('patient_id').eq('visit_date', today).is('voided_at', null)
+      : Promise.resolve({ data: null }),
   ])
+  const soon = (soonRes.data ?? []) as { id: string; patient_name: string; phone: string; treatment_name: string | null; preferred_date: string; preferred_time: string | null; patient_id: string | null; doctor: string | null }[]
+  const activeCount = 'count' in activeRes ? activeRes.count : null
+  const seenToday = visitsTodayRes.data ? new Set((visitsTodayRes.data as { patient_id: string }[]).map((v) => v.patient_id)).size : null
   const todays = (todayRes.data ?? []) as { id: string; patient_name: string; phone: string; treatment_name: string | null; preferred_time: string | null; status: string; patient_id: string | null }[]
   const missed = (missedRes.data ?? []) as { id: string; patient_name: string; phone: string; treatment_name: string | null; preferred_date: string; patient_id: string | null }[]
   const labs = ((labRes.data ?? []) as unknown as { id: string; case_number: string | null; work_type: string | null; lab_name: string; due_date: string | null; status: string; patients: { full_name: string } | null }[])
@@ -443,7 +468,36 @@ async function TodayBoard({ perms }: { perms: string[] }) {
     )
 
   return (
-    <div className="mt-6 grid gap-4 lg:grid-cols-3">
+    <>
+    {(seenToday !== null || activeCount !== null) && (
+      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {seenToday !== null && (
+          <div className="rounded-2xl border border-clinic-teal/10 bg-white p-4">
+            <p className="text-xs text-clinic-ink/50">Aaj ke patients (visit hua)</p>
+            <p className="font-display text-2xl font-semibold text-clinic-ink">{seenToday}</p>
+          </div>
+        )}
+        {canAppt && (
+          <div className="rounded-2xl border border-clinic-teal/10 bg-white p-4">
+            <p className="text-xs text-clinic-ink/50">Aaj ki appointments</p>
+            <p className="font-display text-2xl font-semibold text-clinic-ink">{todays.length}</p>
+          </div>
+        )}
+        {canAppt && (
+          <div className="rounded-2xl border border-clinic-teal/10 bg-white p-4">
+            <p className="text-xs text-clinic-ink/50">Agle {days} din</p>
+            <p className="font-display text-2xl font-semibold text-clinic-ink">{soon.length}</p>
+          </div>
+        )}
+        {activeCount !== null && (
+          <Link href="/admin/treatments" className="rounded-2xl border border-clinic-teal/10 bg-white p-4 hover:border-clinic-teal">
+            <p className="text-xs text-clinic-ink/50">Chalti treatments</p>
+            <p className="font-display text-2xl font-semibold text-clinic-ink">{activeCount}</p>
+          </Link>
+        )}
+      </div>
+    )}
+    <div className="mt-4 grid gap-4 lg:grid-cols-3">
       {canAppt && (
         <section className="rounded-2xl border border-clinic-teal/15 bg-white p-4 lg:col-span-2">
           <div className="flex items-center justify-between">
@@ -465,6 +519,26 @@ async function TodayBoard({ perms }: { perms: string[] }) {
                   </span>
                 </div>
               ))}
+            </div>
+          )}
+          {soon.length > 0 && (
+            <div className="mt-3 rounded-xl bg-clinic-mint/60 p-3">
+              <p className="text-xs font-semibold text-clinic-teal">Agle {days} din ki appointments — reminder bhejein</p>
+              <div className="mt-1 grid gap-1.5 text-sm">
+                {soon.map((a) => (
+                  <div key={a.id} className="flex flex-wrap items-center justify-between gap-2">
+                    <span>
+                      {who(a)}{' '}
+                      <span className="text-xs text-clinic-ink/50">
+                        · {fmtDate(a.preferred_date)}
+                        {a.preferred_time ? ` ${a.preferred_time}` : ''}
+                        {a.treatment_name ? ` · ${a.treatment_name}` : ''}
+                      </span>
+                    </span>
+                    <WhatsAppMenu items={[{ label: 'Yaad dehani (reminder)', href: apptReminderLink(a) }]} label="Reminder" />
+                  </div>
+                ))}
+              </div>
             </div>
           )}
           {missed.length > 0 && (
@@ -505,5 +579,6 @@ async function TodayBoard({ perms }: { perms: string[] }) {
         </section>
       )}
     </div>
+    </>
   )
 }

@@ -72,9 +72,9 @@ export default function ToothShape({
 }: Props) {
   const { crown, roots } = paths(number)
 
-  const crownFill = fill ?? (selected ? '#0B4F4A' : '#FFFFFF')
-  const rootFill = fill ? fill : selected ? '#0B4F4A' : '#F3EDE2'
-  const stroke = selected ? '#0B4F4A' : '#9FB8B3'
+  const crownFill = fill ?? (selected ? '#1D4ED8' : '#FFFFFF')
+  const rootFill = fill ? fill : selected ? '#1D4ED8' : '#F1F5F9'
+  const stroke = selected ? '#1D4ED8' : '#94A3B8'
 
   return (
     <svg

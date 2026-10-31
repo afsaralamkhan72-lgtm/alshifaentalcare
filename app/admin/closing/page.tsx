@@ -1,10 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
-import { requireOwner } from '@/lib/auth'
+import { requireAnyPerm } from '@/lib/auth'
 import { todayKarachi } from '@/lib/karachi'
 import ClosingPanel, { type Summary, type ClosingRow } from '@/components/admin/ClosingPanel'
 
 export default async function ClosingPage({ searchParams }: { searchParams: Promise<{ date?: string }> }) {
-  await requireOwner()
+  await requireAnyPerm('billing.collect', 'reports.view')
   const sp = await searchParams
   const today = todayKarachi()
   const date = /^\d{4}-\d{2}-\d{2}$/.test(sp.date ?? '') && (sp.date as string) <= today ? (sp.date as string) : today

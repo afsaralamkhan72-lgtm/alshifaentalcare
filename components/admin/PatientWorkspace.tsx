@@ -29,6 +29,7 @@ export default function PatientWorkspace(props: {
   canCollect: boolean
   canSeeMoney: boolean
   isOwner: boolean
+  canLab?: boolean
 }) {
   const [startTeeth, setStartTeeth] = useState<string[] | null>(null)
   const consumed = useCallback(() => setStartTeeth(null), [])
@@ -41,6 +42,7 @@ export default function PatientWorkspace(props: {
           initialRecords={props.chartRecords}
           canEdit={props.canEdit}
           onStartTreatment={(tooth) => setStartTeeth([tooth])}
+          plannedTeeth={props.treatments.filter((t) => t.status === 'planned').flatMap((t) => t.teeth)}
         />
       )}
       <TreatmentsPanel
@@ -56,6 +58,7 @@ export default function PatientWorkspace(props: {
         canCollect={props.canCollect}
         canSeeMoney={props.canSeeMoney}
         isOwner={props.isOwner}
+        canLab={props.canLab}
         startTeeth={startTeeth}
         onStartConsumed={consumed}
       />

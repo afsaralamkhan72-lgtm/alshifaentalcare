@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { requireOwner } from '@/lib/auth'
+import { requireAnyPerm } from '@/lib/auth'
 import { todayKarachi, addDays, money } from '@/lib/karachi'
 import ExpenseManager, { type ExpenseRow, type CategoryRow } from '@/components/admin/ExpenseManager'
 
@@ -9,7 +9,7 @@ export default async function ExpensesPage({
 }: {
   searchParams: Promise<{ month?: string }>
 }) {
-  await requireOwner()
+  await requireAnyPerm('expenses.manage')
   const sp = await searchParams
   const today = todayKarachi()
   const month = /^\d{4}-\d{2}$/.test(sp.month ?? '') ? (sp.month as string) : today.slice(0, 7)

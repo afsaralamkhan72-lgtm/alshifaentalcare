@@ -6,14 +6,14 @@ const config: Config = {
     extend: {
       colors: {
         clinic: {
-          teal: '#0B4F4A',      // primary brand — clinical trust
-          'teal-light': '#12726B',
-          mint: '#EAF4F1',      // soft surface / card background
-          sand: '#F7F3EC',      // page background, warmer than plain white
-          ink: '#1F2A28',       // body text
+          teal: 'rgb(var(--c-teal) / <alpha-value>)',      // primary brand — clinical trust
+          'teal-light': 'rgb(var(--c-teal-light) / <alpha-value>)',
+          mint: 'rgb(var(--c-mint) / <alpha-value>)',      // soft surface / card background
+          sand: 'rgb(var(--c-sand) / <alpha-value>)',      // page background, warmer than plain white
+          ink: 'rgb(var(--c-ink) / <alpha-value>)',       // body text
           amber: '#E8873A',     // urgency accent (emergency popup) — not red
           gold: '#C9A227',      // letterhead accent (invoice, certificates)
-          forest: '#0E3B2E',    // deep green from the clinic letterhead
+          forest: 'rgb(var(--c-forest) / <alpha-value>)',    // deep green from the clinic letterhead
         },
         whatsapp: '#25D366',    // kept as WhatsApp's own green — functional recognition, not decoration
       },

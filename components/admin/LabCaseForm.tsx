@@ -37,7 +37,10 @@ export default function LabCaseForm({
   patients,
   fixedPatient,
   treatments = [],
+  defaultTreatmentId,
 }: {
+  /** Treatment card ke "Lab case" button se: form khud khule aur ye treatment chuna ho */
+  defaultTreatmentId?: string
   labs: LabOption[]
   patients: PatientOption[]
   /** Patient profile se: patient pehle se chuna hua */
@@ -46,13 +49,14 @@ export default function LabCaseForm({
   treatments?: { id: string; name: string; teeth: string[] }[]
 }) {
   const router = useRouter()
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(Boolean(defaultTreatmentId && treatments.some((t) => t.id === defaultTreatmentId)))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
   const [patientId, setPatientId] = useState(fixedPatient?.id ?? '')
   const [pickedLabel, setPickedLabel] = useState(fixedPatient ? `${fixedPatient.mr_number}, ${fixedPatient.full_name}` : '')
-  const [treatmentId, setTreatmentId] = useState('')
+  const startT = treatments.find((t) => t.id === defaultTreatmentId)
+  const [treatmentId, setTreatmentId] = useState(startT?.id ?? '')
   const [pq, setPq] = useState('')
   const [pResults, setPResults] = useState<PatientOption[]>(patients.slice(0, 8))
 
@@ -78,7 +82,7 @@ export default function LabCaseForm({
   const [saveLab, setSaveLab] = useState(true)
 
   const [workType, setWorkType] = useState('')
-  const [teeth, setTeeth] = useState<string[]>([])
+  const [teeth, setTeeth] = useState<string[]>(treatments.find((t) => t.id === defaultTreatmentId)?.teeth ?? [])
   const [shade, setShade] = useState('')
   const [material, setMaterial] = useState('')
   const [ponticDesign, setPonticDesign] = useState('')

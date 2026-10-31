@@ -11,8 +11,10 @@ interface NavItem {
   href: string
   label: string
   roles: Role[]
-  /** receptionist ko ye link tab dikhe jab ye permission ho */
-  perm?: string
+  /** receptionist ko ye link tab dikhe jab ye permission ho (in mein se koi aik) */
+  perm?: string | string[]
+  /** Bara button (main 6) */
+  big?: boolean
 }
 interface NavGroup {
   title: string
@@ -24,30 +26,22 @@ const OWNER: Role[] = ['admin', 'doctor']
 
 const GROUPS: NavGroup[] = [
   {
-    title: 'Rozana',
+    title: '',
     items: [
-      { href: '/admin/dashboard', label: 'Aaj (Dashboard)', roles: ALL },
-      { href: '/admin/appointments', label: 'Appointments', roles: ALL, perm: 'appointments.view' },
-      { href: '/admin/patients', label: 'Patients', roles: ALL, perm: 'patients.view' },
+      { href: '/admin/dashboard', label: 'Home', roles: ALL, big: true },
+      { href: '/admin/patients', label: 'Patients', roles: ALL, perm: 'patients.view', big: true },
+      { href: '/admin/appointments', label: 'Appointments', roles: ALL, perm: 'appointments.view', big: true },
+      { href: '/admin/treatments', label: 'Treatments', roles: ALL, perm: ['clinical.view', 'billing.view'], big: true },
+      { href: '/admin/lab', label: 'Lab', roles: ALL, perm: 'lab.view', big: true },
+      { href: '/admin/accounts', label: 'Accounts', roles: ALL, perm: ['billing.view', 'reports.view', 'expenses.manage'], big: true },
+    ],
+  },
+  {
+    title: 'Aur',
+    items: [
+      { href: '/admin/prescriptions', label: 'Prescriptions', roles: ALL, perm: 'prescriptions.view' },
       { href: '/admin/recall', label: 'Recall (checkup yaad)', roles: ALL, perm: 'clinical.view' },
-    ],
-  },
-  {
-    title: 'Clinic',
-    items: [
-      { href: '/admin/lab', label: 'Lab Cases', roles: ALL, perm: 'lab.view' },
       { href: '/admin/inventory', label: 'Stock', roles: ALL, perm: 'inventory.view' },
-    ],
-  },
-  {
-    title: 'Paisa',
-    items: [
-      { href: '/admin/closing', label: 'Aaj ka hisaab', roles: OWNER },
-      { href: '/admin/dues', label: 'Baqaya', roles: OWNER },
-      { href: '/admin/invoices', label: 'Bills', roles: OWNER },
-      { href: '/admin/expenses', label: 'Kharche', roles: OWNER },
-      { href: '/admin/payroll', label: 'Staff Salary', roles: OWNER },
-      { href: '/admin/summary', label: 'Reports', roles: OWNER },
       { href: '/admin/prices', label: 'Treatment Prices', roles: OWNER },
     ],
   },
@@ -61,6 +55,11 @@ const GROUPS: NavGroup[] = [
     ],
   },
 ]
+
+const allowed = (i: NavItem, role: Role, perms: string[]) =>
+  role === 'admin' || role === 'doctor'
+    ? i.roles.includes(role)
+    : i.roles.includes(role) && (!i.perm || (Array.isArray(i.perm) ? i.perm : [i.perm]).some((p) => perms.includes(p)))
 
 export default function Sidebar({ role, perms }: { role: Role; perms: string[] }) {
   const pathname = usePathname()
@@ -105,11 +104,11 @@ export default function Sidebar({ role, perms }: { role: Role; perms: string[] }
 
         <nav className="px-3 pb-8">
           {GROUPS.map((g) => {
-            const items = g.items.filter((i) => i.roles.includes(role) && (!i.perm || perms.includes(i.perm)))
+            const items = g.items.filter((i) => allowed(i, role, perms))
             if (items.length === 0) return null
             return (
               <div key={g.title} className="mt-4">
-                <p className="px-3 text-[10px] font-semibold uppercase tracking-widest text-white/40">{g.title}</p>
+                {g.title && <p className="px-3 text-[10px] font-semibold uppercase tracking-widest text-white/40">{g.title}</p>}
                 <div className="mt-1 flex flex-col gap-0.5">
                   {items.map((item) => {
                     const active = item.href === activeHref
@@ -118,7 +117,7 @@ export default function Sidebar({ role, perms }: { role: Role; perms: string[] }
                         key={item.href}
                         href={item.href}
                         onClick={() => setOpen(false)}
-                        className={`relative rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                        className={`relative rounded-lg px-3 ${item.big ? 'py-2.5 text-base' : 'py-2 text-sm'} font-medium transition-colors ${
                           active ? 'bg-white/15 text-white' : 'text-white/70 hover:bg-white/10 hover:text-white'
                         }`}
                       >

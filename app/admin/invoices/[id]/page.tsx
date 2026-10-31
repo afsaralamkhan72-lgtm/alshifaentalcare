@@ -1,14 +1,14 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { requireOwner } from '@/lib/auth'
+import { requireAnyPerm } from '@/lib/auth'
 import ClinicLogo from '@/components/ClinicLogo'
 import InvoicePanel, { type PayRow } from '@/components/admin/InvoicePanel'
 import { CLINIC } from '@/clinic.config'
 import { fmtDate, money } from '@/lib/karachi'
 
 export default async function InvoicePage({ params }: { params: Promise<{ id: string }> }) {
-  await requireOwner()
+  await requireAnyPerm('billing.view')
   const { id } = await params
   const supabase = await createClient()
 

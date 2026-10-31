@@ -3,6 +3,9 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import LabOrderActions from '@/components/admin/LabOrderActions'
 import LabMoney from '@/components/admin/LabMoney'
+import LabReports from '@/components/admin/LabReports'
+import type { MediaItem } from '@/components/admin/MediaStrip'
+import { getPermissions, requirePerm } from '@/lib/auth'
 import ClinicLogo from '@/components/ClinicLogo'
 import { toothLabel } from '@/lib/teeth'
 import { CLINIC } from '@/clinic.config'
@@ -21,6 +24,8 @@ interface LabCase {
   impression_date: string | null
   due_date: string | null
   status: string
+  patient_id: string | null
+  treatment_id: string | null
   cost: number | null
   lab_paid: number | null
   patients: { full_name: string; mr_number: string | null; age: number | null; gender: string | null } | null
@@ -31,13 +36,14 @@ function fmt(d: string | null) {
 }
 
 export default async function LabOrderPage({ params }: { params: Promise<{ id: string }> }) {
+  await requirePerm('lab.view')
   const { id } = await params
   const supabase = await createClient()
 
   const { data, error } = await supabase
     .from('lab_cases')
     .select(
-      'id, case_number, lab_name, lab_whatsapp, work_type, tooth_numbers, shade, material, pontic_design, instructions, impression_date, due_date, status, cost, lab_paid, patients(full_name, mr_number, age, gender)'
+      'id, case_number, lab_name, lab_whatsapp, work_type, tooth_numbers, shade, material, pontic_design, instructions, impression_date, due_date, status, cost, lab_paid, patient_id, treatment_id, patients(full_name, mr_number, age, gender)'
     )
     .eq('id', id)
     .single()
@@ -55,14 +61,27 @@ export default async function LabOrderPage({ params }: { params: Promise<{ id: s
     .maybeSingle()
 
   const clinic = (clinicRow?.value ?? {}) as Record<string, string>
+  const perms = await getPermissions()
+  const [{ data: files }, { data: tr }] = await Promise.all([
+    supabase.from('patient_photos').select('id, storage_path, caption, category').eq('lab_case_id', c.id).order('created_at'),
+    c.treatment_id ? supabase.from('patient_treatments').select('name').eq('id', c.treatment_id).maybeSingle() : Promise.resolve({ data: null }),
+  ])
 
   return (
     <div>
-      <Link href="/admin/lab" className="text-sm text-clinic-ink/50 hover:text-clinic-teal print:hidden">
-        ← Sab Lab Cases
-      </Link>
+      <div className="flex flex-wrap gap-4 print:hidden">
+        <Link href="/admin/lab" className="text-sm text-clinic-ink/50 hover:text-clinic-teal">
+          ← Sab Lab Cases
+        </Link>
+        {c.patient_id && (
+          <Link href={`/admin/patients/${c.patient_id}?tab=lab`} className="text-sm text-clinic-ink/50 hover:text-clinic-teal">
+            Patient profile →
+          </Link>
+        )}
+      </div>
 
       <div className="mt-3">
+        <LabReports caseId={c.id} patientId={c.patient_id} treatmentId={c.treatment_id} files={(files ?? []) as MediaItem[]} canUpload={perms.includes('lab.manage')} />
         <LabMoney caseId={c.id} status={c.status} cost={Number(c.cost ?? 0)} labPaid={Number(c.lab_paid ?? 0)} />
         <LabOrderActions
           caseNumber={c.case_number ?? ''}
@@ -126,8 +145,8 @@ export default async function LabOrderPage({ params }: { params: Promise<{ id: s
             </p>
           </div>
           <div>
-            <p className="text-xs text-clinic-ink/50">Status</p>
-            <p className="font-medium capitalize text-clinic-ink">{c.status.replace('_', ' ')}</p>
+            <p className="text-xs text-clinic-ink/50">Treatment</p>
+            <p className="font-medium text-clinic-ink">{(tr as { name?: string } | null)?.name ?? '—'}</p>
           </div>
           <div>
             <p className="text-xs text-clinic-ink/50">Impression Date</p>

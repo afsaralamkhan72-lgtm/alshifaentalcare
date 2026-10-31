@@ -74,3 +74,12 @@ export async function requirePerm(code: string): Promise<StaffProfile> {
   if (!(await getPermissions()).includes(code)) redirect('/admin/dashboard')
   return profile
 }
+
+/** Owner (admin/doctor) ko hamesha; baqi staff ko in mein se koi aik permission ho to page khule */
+export async function requireAnyPerm(...codes: string[]): Promise<StaffProfile> {
+  const profile = await getStaffProfile()
+  if (isOwnerRole(profile.role)) return profile
+  const perms = await getPermissions()
+  if (!codes.some((c) => perms.includes(c))) redirect('/admin/dashboard')
+  return profile
+}

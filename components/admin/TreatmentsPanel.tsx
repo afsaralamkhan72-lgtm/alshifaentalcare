@@ -6,6 +6,8 @@ import { createClient } from '@/lib/supabase/client'
 import { toothLabel } from '@/lib/teeth'
 import { addDays, todayKarachi, money, fmtDate } from '@/lib/karachi'
 import ToothPicker from './ToothPicker'
+import MediaStrip, { type MediaItem } from './MediaStrip'
+import { uploadPatientFiles } from '@/lib/upload'
 
 export interface TVisit {
   id: string
@@ -20,7 +22,7 @@ export interface TItem {
   id: string
   name: string
   teeth: string[]
-  status: 'active' | 'completed' | 'cancelled'
+  status: 'planned' | 'active' | 'completed' | 'cancelled'
   price: number
   list_price: number
   doctor: string | null
@@ -31,6 +33,10 @@ export interface TItem {
   paid: number
   balance: number
   visits: TVisit[]
+  /** Is treatment ki payments (receipt ke liye) */
+  payments?: { id: string; paid_on: string; amount: number; method: string | null; kind: string }[]
+  /** Visit / treatment ki tasveerein aur files */
+  photos?: (MediaItem & { visit_id: string | null })[]
 }
 
 export interface MaterialOpt {
@@ -60,6 +66,7 @@ interface Props {
   canCollect: boolean
   canSeeMoney: boolean
   isOwner: boolean
+  canLab?: boolean
   /** Price list ki har treatment ka aam samaan (stock se katne ke liye) */
   materials?: Record<string, MaterialOpt[]>
   /** Chart se aaya daant: form khud khul jata hai */
@@ -93,12 +100,46 @@ const newKey = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? 
 const inputClass =
   'mt-1 w-full rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm outline-none focus:border-clinic-teal'
 
-function NextVisitInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+/** Appointment ke waqt (clinic 10 se 8), bina type kiye chunne ke liye */
+const TIME_SLOTS = (() => {
+  const out: string[] = []
+  for (let h = 10; h <= 20; h++)
+    for (const m of [0, 30]) {
+      if (h === 20 && m === 30) continue
+      const hh = h > 12 ? h - 12 : h
+      out.push(`${hh}:${m === 0 ? '00' : '30'} ${h >= 12 ? 'PM' : 'AM'}`)
+    }
+  return out
+})()
+
+function NextVisitInput({
+  value,
+  onChange,
+  time = '',
+  onTime,
+}: {
+  value: string
+  onChange: (v: string) => void
+  time?: string
+  onTime?: (v: string) => void
+}) {
   const today = todayKarachi()
   return (
     <div>
       <label className="text-xs font-medium text-clinic-ink/70">Agla visit (appointment khud ban jayegi)</label>
-      <input type="date" value={value} min={today} onChange={(e) => onChange(e.target.value)} className={inputClass} />
+      <div className="flex gap-2">
+        <input type="date" value={value} min={today} onChange={(e) => onChange(e.target.value)} className={inputClass} />
+        {onTime && (
+          <select value={time} onChange={(e) => onTime(e.target.value)} className={`${inputClass} max-w-[7.5rem]`} disabled={!value}>
+            <option value="">Waqt</option>
+            {TIME_SLOTS.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
       <div className="mt-1.5 flex flex-wrap gap-1.5">
         {[3, 7, 14, 30].map((d) => (
           <button
@@ -204,6 +245,8 @@ function NewTreatmentForm({
   const [doctor, setDoctor] = useState(defaultDoctor ?? '')
   const [notes, setNotes] = useState('')
   const [nextVisit, setNextVisit] = useState('')
+  const [nextTime, setNextTime] = useState('')
+  const [planned, setPlanned] = useState(false)
   const [onChart, setOnChart] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -258,20 +301,22 @@ function NewTreatmentForm({
       p_catalog_id: picked && picked.name === name ? picked.id : null,
       p_teeth: teeth,
       p_price: canBill ? priceNum : 0,
-      p_paid: canCollect ? paidNum : 0,
+      p_paid: canCollect && !planned ? paidNum : 0,
       p_method: method,
       p_doctor: doctor || null,
       p_notes: notes || null,
-      p_next_visit: nextVisit || null,
-      p_chart_condition: onChart && cond && teeth.length > 0 ? cond : null,
+      p_next_visit: planned ? null : nextVisit || null,
+      p_chart_condition: !planned && onChart && cond && teeth.length > 0 ? cond : null,
       p_key: keyRef.current,
+      p_next_time: planned ? null : nextTime || null,
+      p_planned: planned,
     })
     if (err) {
       setSaving(false)
       return setError(err.message)
     }
     // Samaan stock se kaatein (treatment save ho chuki; stock kam ho to sirf warning)
-    const usage = mats
+    const usage = (planned ? [] : mats)
       .map((m) => ({ inventory_id: m.inventory_id, qty: Number(used[m.inventory_id]) || 0, treatment_id: picked?.id ?? null }))
       .filter((u) => u.qty > 0)
     if (usage.length > 0) {
@@ -392,6 +437,12 @@ function NewTreatmentForm({
         </div>
       )}
 
+      {/* Plan ya aaj se shuru */}
+      <label className="mt-3 flex items-center gap-2 rounded-lg bg-clinic-mint/60 px-3 py-2 text-sm text-clinic-ink">
+        <input type="checkbox" checked={planned} onChange={(e) => setPlanned(e.target.checked)} />
+        Sirf <b>Treatment Plan</b> mein daalo (aaj shuru nahi, bill baad mein)
+      </label>
+
       {/* 3. Paisa */}
       {canBill && (
         <div className="mt-3 rounded-xl bg-clinic-sand/60 p-3">
@@ -415,7 +466,7 @@ function NewTreatmentForm({
               Riyayat: {money(picked!.price - priceNum)} {isOwner ? '(bill par likha jayega)' : '(sirf doctor/admin de sakta hai)'}
             </p>
           )}
-          {canCollect && total > 0 && (
+          {canCollect && total > 0 && !planned && (
             <div className="mt-2">
               <PayFields label="Abhi kitne mile" max={total} amount={paid} setAmount={setPaid} method={method} setMethod={setMethod} />
               {paidNum > 0 && paidNum < total && <p className="mt-1 text-xs text-clinic-ink/60">Baqaya: {money(total - paidNum)}</p>}
@@ -426,7 +477,7 @@ function NewTreatmentForm({
       )}
 
       {/* Samaan (stock se katega) */}
-      {mats.length > 0 && (
+      {mats.length > 0 && !planned && (
         <div className="mt-3">
           <p className="text-xs font-medium text-clinic-ink/70">Samaan istemal hua (stock se katega)</p>
           <div className="mt-1 grid gap-1.5 sm:grid-cols-2">
@@ -456,10 +507,10 @@ function NewTreatmentForm({
       {/* 4. Pehla visit (V1) */}
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <div>
-          <label className="text-xs font-medium text-clinic-ink/70">Aaj kya kiya (V1)</label>
+          <label className="text-xs font-medium text-clinic-ink/70">{planned ? 'Plan ki note' : 'Aaj kya kiya (V1)'}</label>
           <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes" className={inputClass} />
         </div>
-        <NextVisitInput value={nextVisit} onChange={setNextVisit} />
+        {!planned && <NextVisitInput value={nextVisit} onChange={setNextVisit} time={nextTime} onTime={setNextTime} />}
       </div>
 
       {error && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
@@ -468,7 +519,7 @@ function NewTreatmentForm({
         disabled={saving}
         className="mt-4 w-full rounded-full bg-clinic-teal px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
       >
-        {saving ? 'Save ho raha hai...' : 'Treatment save karein'}
+        {saving ? 'Save ho raha hai...' : planned ? 'Plan mein save karein' : 'Treatment save karein'}
       </button>
     </form>
   )
@@ -484,6 +535,8 @@ function TreatmentCard({
   canCollect,
   canSeeMoney,
   isOwner,
+  patientId,
+  canLab,
 }: {
   t: TItem
   canEdit: boolean
@@ -491,9 +544,15 @@ function TreatmentCard({
   canCollect: boolean
   canSeeMoney: boolean
   isOwner: boolean
+  patientId: string
+  canLab: boolean
 }) {
   const router = useRouter()
-  const [mode, setMode] = useState<'none' | 'visit' | 'pay' | 'cancel'>('none')
+  const [mode, setMode] = useState<'none' | 'visit' | 'pay' | 'cancel' | 'begin'>('none')
+  const [nextTime, setNextTime] = useState('')
+  const [files, setFiles] = useState<File[]>([])
+  const [showPays, setShowPays] = useState(false)
+  const [price, setPrice] = useState(String(t.price || ''))
   const [showAll, setShowAll] = useState(false)
   const keyRef = useRef(newKey())
   const [procedure, setProcedure] = useState('')
@@ -511,6 +570,9 @@ function TreatmentCard({
   const last = visits[0]
   const nextNo = (last?.visit_no ?? 0) + 1
   const active = t.status === 'active'
+  const isPlan = t.status === 'planned'
+  const photosOf = (visitId: string | null) => (t.photos ?? []).filter((ph) => ph.visit_id === visitId)
+  const lastPhotos = last ? photosOf(last.id) : []
 
   function open(m: typeof mode) {
     keyRef.current = newKey()
@@ -522,16 +584,36 @@ function TreatmentCard({
     setNotes('')
     setProcedure('')
     setNextVisit('')
+    setNextTime('')
+    setFiles([])
     setReason('')
+    setPrice(String(t.price || ''))
   }
 
-  async function run(fn: () => PromiseLike<{ error: { message: string } | null }>) {
+  async function run(fn: () => PromiseLike<{ data?: unknown; error: { message: string } | null }>, uploadToVisit = false) {
     if (busy) return
     setBusy(true)
     setError('')
-    const { error: err } = await fn()
+    const { data, error: err } = await fn()
+    if (err) {
+      setBusy(false)
+      return setError(err.message)
+    }
+    // Visit save ho gaya; ab is visit ki tasveerein / files
+    if (uploadToVisit && files.length > 0) {
+      const res = await uploadPatientFiles(createClient(), patientId, files, {
+        category: /ortho|braces|aligner/i.test(t.name) ? 'progress' : 'photo',
+        treatment_id: t.id,
+        visit_id: typeof data === 'string' ? data : null,
+      })
+      if (res.error) {
+        setBusy(false)
+        setMode('none')
+        router.refresh()
+        return setError('Visit save ho gaya, magar file: ' + res.error)
+      }
+    }
     setBusy(false)
-    if (err) return setError(err.message)
     setMode('none')
     router.refresh()
   }
@@ -550,7 +632,8 @@ function TreatmentCard({
             {t.teeth.length > 0 && <span className="ml-2 text-sm font-medium text-clinic-teal">{teethText(t.teeth)}</span>}
           </p>
           <p className="text-xs text-clinic-ink/50">
-            Shuru {fmtDate(t.started_on)}
+            {isPlan ? 'Plan' : 'Shuru'} {fmtDate(t.started_on)}
+            {isPlan && t.price > 0 ? ` · andaza ${money(t.price)}` : ''}
             {t.doctor ? ` · ${t.doctor}` : ''}
             {t.status === 'completed' && t.completed_on ? ` · Mukammal ${fmtDate(t.completed_on)}` : ''}
             {` · ${visits.length} visit`}
@@ -558,10 +641,10 @@ function TreatmentCard({
         </div>
         <span
           className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-            active ? 'bg-emerald-50 text-emerald-700' : t.status === 'completed' ? 'bg-clinic-mint text-clinic-teal' : 'bg-red-50 text-red-700'
+            active ? 'bg-emerald-50 text-emerald-700' : isPlan ? 'bg-amber-50 text-amber-700' : t.status === 'completed' ? 'bg-clinic-mint text-clinic-teal' : 'bg-red-50 text-red-700'
           }`}
         >
-          {active ? 'Chal rahi' : t.status === 'completed' ? 'Mukammal' : 'Cancel'}
+          {active ? 'Chal rahi' : isPlan ? 'Plan' : t.status === 'completed' ? 'Mukammal' : 'Cancel'}
         </span>
       </div>
 
@@ -595,6 +678,7 @@ function TreatmentCard({
               </p>
               {v.notes && <p className="mt-0.5 text-clinic-ink/70">{v.notes}</p>}
               {v.next_visit && <p className="text-xs text-clinic-teal">Agla visit: {fmtDate(v.next_visit)}</p>}
+              <MediaStrip items={photosOf(v.id)} size={48} />
             </div>
           ))}
           {visits.length > 1 && (
@@ -605,9 +689,50 @@ function TreatmentCard({
         </div>
       )}
 
+      {canSeeMoney && (t.payments ?? []).length > 0 && (
+        <div className="mt-2">
+          <button onClick={() => setShowPays(!showPays)} className="text-xs font-semibold text-clinic-teal">
+            {showPays ? '▾' : '▸'} Payments ({(t.payments ?? []).length})
+          </button>
+          {showPays && (
+            <div className="mt-1 divide-y divide-clinic-teal/10 rounded-lg border border-clinic-teal/10 text-xs">
+              {(t.payments ?? []).map((p) => (
+                <div key={p.id} className="flex items-center justify-between px-3 py-1.5">
+                  <span>
+                    {fmtDate(p.paid_on)} · <span className="capitalize">{p.method ?? ''}</span>
+                    {p.kind === 'refund' && <span className="ml-1 font-semibold text-red-600">refund</span>}
+                  </span>
+                  <span className="flex items-center gap-3">
+                    <span className={p.kind === 'refund' ? 'text-red-600' : 'text-emerald-700'}>{money(p.amount)}</span>
+                    <a href={`/admin/payments/${p.id}/receipt`} target="_blank" className="font-semibold text-clinic-teal hover:underline">
+                      Receipt
+                    </a>
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Buttons */}
       {mode === 'none' && (
         <div className="mt-3 flex flex-wrap gap-2">
+          {isPlan && canEdit && (
+            <button onClick={() => open('begin')} className="rounded-full bg-clinic-teal px-4 py-1.5 text-xs font-semibold text-white">
+              Aaj shuru karein (V1)
+            </button>
+          )}
+          {active && (
+            <a href={`/admin/patients/${patientId}?tab=rx`} className="rounded-full border border-clinic-teal/30 px-4 py-1.5 text-xs font-semibold text-clinic-ink/70">
+              Prescription
+            </a>
+          )}
+          {active && canLab && (
+            <a href={`/admin/patients/${patientId}?tab=lab&treatment=${t.id}`} className="rounded-full border border-clinic-teal/30 px-4 py-1.5 text-xs font-semibold text-clinic-ink/70">
+              Lab case
+            </a>
+          )}
           {active && canEdit && (
             <button onClick={() => open('visit')} className="rounded-full bg-clinic-teal px-4 py-1.5 text-xs font-semibold text-white">
               + Agla visit (V{nextNo})
@@ -659,7 +784,9 @@ function TreatmentCard({
                 p_paid: canCollect ? amtNum : 0,
                 p_method: method,
                 p_key: keyRef.current,
-              })
+                p_next_time: nextTime || null,
+              }),
+              true
             )
           }}
           className="mt-3 rounded-xl border border-clinic-teal/20 bg-clinic-mint/30 p-3"
@@ -669,7 +796,9 @@ function TreatmentCard({
             <div className="mt-1 rounded-lg bg-white px-3 py-2 text-xs text-clinic-ink/70">
               <span className="font-semibold">Pichla (V{last.visit_no}, {fmtDate(last.visit_date)}):</span> {last.procedure}
               {last.notes ? ` — ${last.notes}` : ''}
-              {canSeeMoney && t.charged > 0 ? ` · Baqaya ${money(t.balance)}` : ''}
+              {canSeeMoney && t.charged > 0 ? ` · Kul ${money(t.charged)}, mile ${money(t.paid)}, baqaya ${money(t.balance)}` : ''}
+              {last.next_visit ? ` · appointment thi ${fmtDate(last.next_visit)}` : ''}
+              <MediaStrip items={lastPhotos} size={44} />
             </div>
           )}
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
@@ -677,9 +806,19 @@ function TreatmentCard({
               <label className="text-xs font-medium text-clinic-ink/70">Aaj kya kiya</label>
               <input value={procedure} onChange={(e) => setProcedure(e.target.value)} placeholder={t.name} className={inputClass} />
             </div>
-            <NextVisitInput value={nextVisit} onChange={setNextVisit} />
+            <NextVisitInput value={nextVisit} onChange={setNextVisit} time={nextTime} onTime={setNextTime} />
           </div>
           <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes" className={inputClass} />
+          <label className="mt-2 block text-xs font-medium text-clinic-ink/70">
+            Tasveer / X-ray (optional)
+            <input
+              type="file"
+              accept="image/*,application/pdf"
+              multiple
+              onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
+              className="mt-1 block w-full text-xs"
+            />
+          </label>
           {canBill && (
             <div className="mt-2 grid grid-cols-2 gap-2">
               <div>
@@ -701,6 +840,57 @@ function TreatmentCard({
           <div className="mt-3 flex gap-2">
             <button disabled={busy} className="rounded-full bg-clinic-teal px-5 py-2 text-sm font-semibold text-white disabled:opacity-60">
               {busy ? 'Save...' : `V${nextNo} save karein`}
+            </button>
+            <button type="button" onClick={() => setMode('none')} className="text-sm text-clinic-ink/60">
+              Wapas
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* Plan se shuru */}
+      {mode === 'begin' && (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            const pr = Number(price) || 0
+            if (amtNum > pr) return setError('Mili raqam qeemat se zyada nahi ho sakti')
+            run(() =>
+              supabase.rpc('begin_planned_treatment', {
+                p_treatment_id: t.id,
+                p_price: canBill ? pr : 0,
+                p_paid: canCollect ? amtNum : 0,
+                p_method: method,
+                p_notes: notes || null,
+                p_next_visit: nextVisit || null,
+                p_next_time: nextTime || null,
+                p_chart_condition: chartCondition(t.name),
+                p_key: keyRef.current,
+              })
+            )
+          }}
+          className="mt-3 rounded-xl border border-clinic-teal/20 bg-clinic-mint/30 p-3"
+        >
+          <p className="text-sm font-semibold text-clinic-ink">Aaj shuru: V1</p>
+          {canBill && (
+            <div className="mt-2">
+              <label className="text-xs font-medium text-clinic-ink/70">Qeemat (Rs.)</label>
+              <input type="number" min={0} value={price} onChange={(e) => setPrice(e.target.value)} className={inputClass} />
+            </div>
+          )}
+          {canCollect && Number(price) > 0 && (
+            <div className="mt-2">
+              <PayFields label="Aaj mile" max={Number(price)} amount={amount} setAmount={setAmount} method={method} setMethod={setMethod} />
+            </div>
+          )}
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Aaj kya kiya" className={inputClass} />
+            <NextVisitInput value={nextVisit} onChange={setNextVisit} time={nextTime} onTime={setNextTime} />
+          </div>
+          {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+          <div className="mt-3 flex gap-2">
+            <button disabled={busy} className="rounded-full bg-clinic-teal px-5 py-2 text-sm font-semibold text-white disabled:opacity-60">
+              {busy ? 'Save...' : 'Shuru karein'}
             </button>
             <button type="button" onClick={() => setMode('none')} className="text-sm text-clinic-ink/60">
               Wapas
@@ -790,7 +980,8 @@ export default function TreatmentsPanel(props: Props) {
   }, [startTeeth, onStartConsumed])
 
   const activeList = treatments.filter((t) => t.status === 'active')
-  const closed = treatments.filter((t) => t.status !== 'active')
+  const planList = treatments.filter((t) => t.status === 'planned')
+  const closed = treatments.filter((t) => t.status === 'completed' || t.status === 'cancelled')
 
   return (
     <div ref={boxRef} className="scroll-mt-4">
@@ -838,9 +1029,20 @@ export default function TreatmentsPanel(props: Props) {
           </p>
         )}
         {activeList.map((t) => (
-          <TreatmentCard key={t.id} t={t} canEdit={props.canEdit} canBill={props.canBill} canCollect={props.canCollect} canSeeMoney={props.canSeeMoney} isOwner={props.isOwner} />
+          <TreatmentCard key={t.id} t={t} canEdit={props.canEdit} canBill={props.canBill} canCollect={props.canCollect} canSeeMoney={props.canSeeMoney} isOwner={props.isOwner} patientId={props.patientId} canLab={props.canLab ?? false} />
         ))}
       </div>
+
+      {planList.length > 0 && (
+        <div className="mt-4">
+          <p className="text-sm font-semibold text-amber-800">Treatment Plan ({planList.length}) — abhi shuru nahi</p>
+          <div className="mt-2 grid gap-3">
+            {planList.map((t) => (
+              <TreatmentCard key={t.id} t={t} canEdit={props.canEdit} canBill={props.canBill} canCollect={props.canCollect} canSeeMoney={props.canSeeMoney} isOwner={props.isOwner} patientId={props.patientId} canLab={false} />
+            ))}
+          </div>
+        </div>
+      )}
 
       {closed.length > 0 && (
         <div className="mt-3">
@@ -850,7 +1052,7 @@ export default function TreatmentsPanel(props: Props) {
           {showClosed && (
             <div className="mt-2 grid gap-3">
               {closed.map((t) => (
-                <TreatmentCard key={t.id} t={t} canEdit={props.canEdit} canBill={props.canBill} canCollect={props.canCollect} canSeeMoney={props.canSeeMoney} isOwner={props.isOwner} />
+                <TreatmentCard key={t.id} t={t} canEdit={props.canEdit} canBill={props.canBill} canCollect={props.canCollect} canSeeMoney={props.canSeeMoney} isOwner={props.isOwner} patientId={props.patientId} canLab={props.canLab ?? false} />
               ))}
             </div>
           )}
