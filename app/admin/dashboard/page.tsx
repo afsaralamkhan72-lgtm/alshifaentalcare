@@ -2,7 +2,8 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import StatCard from '@/components/admin/StatCard'
 import { toInternationalPKNumber } from '@/lib/whatsapp'
-import { getStaffProfile, isOwnerRole } from '@/lib/auth'
+import { getStaffProfile, isOwnerRole, getPermissions } from '@/lib/auth'
+import { fmtDate } from '@/lib/karachi'
 import OwnerToday from '@/components/admin/OwnerToday'
 import { todayKarachi } from '@/lib/karachi'
 
@@ -147,6 +148,7 @@ export default async function DashboardPage({
 
   const profile = await getStaffProfile()
   const canSeeMoney = isOwnerRole(profile.role)
+  const perms = await getPermissions()
   const stats = await getDashboardStats(month, canSeeMoney)
 
   // Samaan ke alerts: kam stock aur 30 din mein expiry (sab staff ke liye, is mein paisa nahi)
@@ -173,8 +175,18 @@ export default async function DashboardPage({
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="font-display text-2xl font-semibold text-clinic-ink">Dashboard</h1>
-          <p className="mt-1 text-sm text-clinic-ink/60">Clinic overview, {monthLabel}.</p>
+          <h1 className="font-display text-2xl font-semibold text-clinic-ink">Aaj</h1>
+          <p className="mt-1 text-sm text-clinic-ink/60">{fmtDate(todayKarachi())}</p>
+        </div>
+      </div>
+
+      <TodayBoard perms={perms} />
+      {canSeeMoney && <OwnerToday />}
+
+      <div className="mt-10 flex flex-wrap items-center justify-between gap-3 border-t border-clinic-teal/10 pt-6">
+        <div>
+          <h2 className="font-display text-lg font-semibold text-clinic-ink">Mahine ka jaiza</h2>
+          <p className="text-sm text-clinic-ink/60">{monthLabel}</p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -223,8 +235,6 @@ export default async function DashboardPage({
           </>
         )}
       </div>
-
-      {canSeeMoney && <OwnerToday />}
 
       {(lowStock.length > 0 || expiring.length > 0) && (
         <div className="mt-6 grid gap-3 sm:grid-cols-2">
@@ -374,6 +384,126 @@ export default async function DashboardPage({
           <p className="mt-3 text-sm text-clinic-ink/50">No pending appointment requests.</p>
         )}
       </div>
+    </div>
+  )
+}
+
+/** Doctor ke liye sab se pehle: aaj kaun aa raha hai, kaun reh gaya, lab ka kya bana */
+async function TodayBoard({ perms }: { perms: string[] }) {
+  const supabase = await createClient()
+  const today = todayKarachi()
+  const canAppt = perms.includes('appointments.view')
+  const canLab = perms.includes('lab.view')
+  const [todayRes, missedRes, labRes] = await Promise.all([
+    canAppt
+      ? supabase
+          .from('appointments')
+          .select('id, patient_name, phone, treatment_name, preferred_time, status, patient_id')
+          .is('deleted_at', null)
+          .eq('preferred_date', today)
+          .in('status', ['pending', 'confirmed', 'completed'])
+          .order('preferred_time', { ascending: true })
+      : Promise.resolve({ data: [] }),
+    canAppt
+      ? supabase
+          .from('appointments')
+          .select('id, patient_name, phone, treatment_name, preferred_date, patient_id')
+          .is('deleted_at', null)
+          .lt('preferred_date', today)
+          .gte('preferred_date', new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10))
+          .eq('status', 'confirmed')
+          .order('preferred_date', { ascending: false })
+          .limit(8)
+      : Promise.resolve({ data: [] }),
+    canLab
+      ? supabase
+          .from('lab_cases')
+          .select('id, case_number, work_type, lab_name, due_date, status, patients(full_name)')
+          .is('deleted_at', null)
+          .in('status', ['pending', 'sent', 'in_progress', 'received'])
+          .order('due_date', { ascending: true })
+          .limit(30)
+      : Promise.resolve({ data: [] }),
+  ])
+  const todays = (todayRes.data ?? []) as { id: string; patient_name: string; phone: string; treatment_name: string | null; preferred_time: string | null; status: string; patient_id: string | null }[]
+  const missed = (missedRes.data ?? []) as { id: string; patient_name: string; phone: string; treatment_name: string | null; preferred_date: string; patient_id: string | null }[]
+  const labs = ((labRes.data ?? []) as unknown as { id: string; case_number: string | null; work_type: string | null; lab_name: string; due_date: string | null; status: string; patients: { full_name: string } | null }[])
+    .filter((l) => l.status === 'received' || (l.due_date && l.due_date <= today))
+  if (!canAppt && !canLab) return null
+
+  const who = (a: { patient_id: string | null; patient_name: string; phone: string }) =>
+    a.patient_id ? (
+      <Link href={`/admin/patients/${a.patient_id}`} className="font-medium text-clinic-ink hover:text-clinic-teal">
+        {a.patient_name}
+      </Link>
+    ) : (
+      <Link href={`/admin/search?q=${encodeURIComponent(a.phone)}`} className="font-medium text-clinic-ink hover:text-clinic-teal">
+        {a.patient_name}
+      </Link>
+    )
+
+  return (
+    <div className="mt-6 grid gap-4 lg:grid-cols-3">
+      {canAppt && (
+        <section className="rounded-2xl border border-clinic-teal/15 bg-white p-4 lg:col-span-2">
+          <div className="flex items-center justify-between">
+            <p className="font-display font-semibold text-clinic-ink">Aaj ki appointments ({todays.length})</p>
+            <Link href="/admin/appointments" className="text-xs font-semibold text-clinic-teal">Sab →</Link>
+          </div>
+          {todays.length === 0 ? (
+            <p className="mt-3 text-sm text-clinic-ink/50">Aaj koi appointment nahi.</p>
+          ) : (
+            <div className="mt-2 divide-y divide-clinic-teal/10">
+              {todays.map((a) => (
+                <div key={a.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+                  <span>
+                    {who(a)}
+                    <span className="ml-2 text-xs text-clinic-ink/50">{[a.preferred_time, a.treatment_name].filter(Boolean).join(' · ')}</span>
+                  </span>
+                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${a.status === 'completed' ? 'bg-emerald-50 text-emerald-700' : a.status === 'pending' ? 'bg-amber-50 text-amber-700' : 'bg-clinic-mint text-clinic-teal'}`}>
+                    {a.status === 'completed' ? 'Aa gaye' : a.status === 'pending' ? 'Request' : 'Aana hai'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          {missed.length > 0 && (
+            <div className="mt-3 rounded-xl bg-amber-50 p-3">
+              <p className="text-xs font-semibold text-amber-800">Nahi aaye (pichle 30 din) — call karein</p>
+              <div className="mt-1 grid gap-1 text-sm">
+                {missed.map((a) => (
+                  <p key={a.id}>
+                    {who(a)} <span className="text-xs text-clinic-ink/50">· {fmtDate(a.preferred_date)}{a.treatment_name ? ` · ${a.treatment_name}` : ''}</span>
+                    <a href={`tel:${a.phone.replace(/[^0-9+]/g, '')}`} className="ml-2 text-xs font-semibold text-clinic-teal">Call</a>
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+      {canLab && (
+        <section className="rounded-2xl border border-clinic-teal/15 bg-white p-4">
+          <div className="flex items-center justify-between">
+            <p className="font-display font-semibold text-clinic-ink">Lab ({labs.length})</p>
+            <Link href="/admin/lab" className="text-xs font-semibold text-clinic-teal">Sab →</Link>
+          </div>
+          {labs.length === 0 ? (
+            <p className="mt-3 text-sm text-clinic-ink/50">Aaj lab ka koi kaam due nahi.</p>
+          ) : (
+            <div className="mt-2 grid gap-1.5 text-sm">
+              {labs.slice(0, 8).map((l) => (
+                <Link key={l.id} href={`/admin/lab/${l.id}`} className="rounded-lg px-2 py-1 hover:bg-clinic-mint">
+                  <span className="font-medium">{l.patients?.full_name ?? '—'}</span>
+                  <span className="ml-1 text-xs text-clinic-ink/50">
+                    {l.work_type} · {l.status === 'received' ? 'aa gaya, fit karna hai' : `due ${fmtDate(l.due_date)}`}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
     </div>
   )
 }

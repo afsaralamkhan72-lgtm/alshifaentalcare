@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { getStaffProfile, isOwnerRole } from '@/lib/auth'
+import { getStaffProfile, isOwnerRole, requirePerm } from '@/lib/auth'
 import PatientsToolbar from '@/components/admin/PatientsToolbar'
 import PatientsTable, { type PatientRow } from '@/components/admin/PatientsTable'
 
@@ -93,6 +93,7 @@ export default async function PatientsPage({
 }: {
   searchParams: Promise<SearchParams>
 }) {
+  await requirePerm('patients.view')
   const params = await searchParams
   const profile = await getStaffProfile()
   const canBill = isOwnerRole(profile.role)

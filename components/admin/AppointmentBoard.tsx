@@ -8,6 +8,7 @@ import { CLINIC } from '@/clinic.config'
 import { todayKarachi } from '@/lib/karachi'
 
 export interface Appointment {
+  patient_id?: string | null
   id: string
   patient_name: string
   phone: string
@@ -184,7 +185,15 @@ export default function AppointmentBoard({ appointments }: { appointments: Appoi
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="font-medium text-clinic-ink">{a.patient_name}</p>
+                    {a.patient_id ? (
+                      <a href={`/admin/patients/${a.patient_id}`} className="font-medium text-clinic-ink hover:text-clinic-teal">
+                        {a.patient_name} <span className="text-xs text-clinic-teal">· profile →</span>
+                      </a>
+                    ) : (
+                      <a href={`/admin/search?q=${encodeURIComponent(a.phone)}`} className="font-medium text-clinic-ink hover:text-clinic-teal">
+                        {a.patient_name} <span className="text-xs text-clinic-ink/40">· talash</span>
+                      </a>
+                    )}
                     <p className="text-sm text-clinic-ink/60">{a.phone}</p>
                     <p className="mt-1 text-xs text-clinic-ink/50">
                       {a.preferred_date

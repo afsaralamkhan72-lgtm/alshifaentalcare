@@ -1,12 +1,10 @@
 'use client'
 
-import { localNumber, toothLabel, isWisdom } from '@/lib/teeth'
+import { localNumber, toothLabel } from '@/lib/teeth'
 import ToothShape from './ToothShape'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { addDays, todayKarachi } from '@/lib/karachi'
 
 interface DentalRecord {
   id: string
@@ -14,19 +12,17 @@ interface DentalRecord {
   condition: string
   notes: string | null
   treatment_date: string
+  created_at?: string | null
 }
 
 interface DentalChartProps {
   patientId: string
   initialRecords: DentalRecord[]
-  /** Sirf owner ke liye: treatment chunte hi qeemat likh kar bill ban jaye */
-  canBill?: boolean
-  defaultDoctor?: string | null
-  catalog?: { id: string; name: string; price: number }[]
+  /** Chart par nishan lagana (clinical.edit) */
+  canEdit?: boolean
+  /** Daant chun kar "Treatment shuru" (paisa/bill sirf treatment form se banta hai, chart se nahi) */
+  onStartTreatment?: (tooth: string) => void
 }
-
-/** Jin conditions par paisa lagta hai (baaqi sirf chart ka nishan hain) */
-const BILLABLE = ['filling', 'rct', 'crown', 'bridge', 'implant', 'scaling', 'extraction', 'denture', 'other']
 
 const CONDITIONS = [
   { value: 'healthy', label: 'Healthy', dot: 'bg-white border border-clinic-ink/30' },
@@ -81,19 +77,6 @@ const TOOTH_FILL: Record<string, string> = {
   other: '#FBCFA3',
 }
 
-const TOOTH_STYLES: Record<string, string> = {
-  healthy: 'bg-white border-clinic-ink/15 text-clinic-ink/40',
-  missing: 'bg-clinic-ink/10 border-clinic-ink/20 text-clinic-ink/30 line-through',
-  caries: 'bg-red-50 border-red-400 text-red-700',
-  filling: 'bg-blue-50 border-blue-400 text-blue-700',
-  rct: 'bg-purple-50 border-purple-400 text-purple-700',
-  crown: 'bg-amber-50 border-amber-500 text-amber-700',
-  bridge: 'bg-teal-50 border-teal-500 text-teal-700',
-  implant: 'bg-green-50 border-green-500 text-green-700',
-  scaling: 'bg-cyan-50 border-cyan-400 text-cyan-700',
-  extraction: 'bg-gray-100 border-gray-400 text-gray-500 line-through',
-  other: 'bg-clinic-amber/10 border-clinic-amber/50 text-clinic-amber',
-}
 
 // FDI notation, arranged so each tooth visually lines up with its
 // counterpart in the opposite arch (e.g. 48 sits under 18).
@@ -105,60 +88,44 @@ const LOWER_LEFT = ['31', '32', '33', '34', '35', '36', '37', '38']
 function getLatestForTooth(records: DentalRecord[], tooth: string) {
   const matches = records.filter((r) => r.tooth_number === tooth)
   if (matches.length === 0) return null
-  return matches.sort(
-    (a, b) => new Date(b.treatment_date).getTime() - new Date(a.treatment_date).getTime()
+  // Same din ki do entries: jo baad mein likhi gayi wo
+  return [...matches].sort(
+    (a, b) => b.treatment_date.localeCompare(a.treatment_date) || (b.created_at ?? '').localeCompare(a.created_at ?? '')
   )[0]
 }
 
 export default function DentalChart({
   patientId,
   initialRecords,
-  canBill = false,
-  defaultDoctor = null,
-  catalog = [],
+  canEdit = false,
+  onStartTreatment,
 }: DentalChartProps) {
-  const router = useRouter()
-  const [price, setPrice] = useState('')
-  const [paidNow, setPaidNow] = useState('')
-  const [method, setMethod] = useState('cash')
-  const [billError, setBillError] = useState('')
   const [records, setRecords] = useState<DentalRecord[]>(initialRecords)
+  // Treatment save hone ke baad (router.refresh) naye nishan bhi dikhen
+  useEffect(() => setRecords(initialRecords), [initialRecords])
   const [selectedTooth, setSelectedTooth] = useState<string | null>(null)
-  const [condition, setCondition] = useState('healthy')
+  const [condition, setCondition] = useState('caries')
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
 
   function openTooth(tooth: string) {
     setSelectedTooth(tooth)
     const latest = getLatestForTooth(records, tooth)
-    setCondition(latest?.condition ?? 'healthy')
+    setCondition(latest?.condition ?? 'caries')
     setNotes('')
-    setPrice('')
-    setPaidNow('')
-    setBillError('')
-  }
-
-  function labelOf(c: string) {
-    return CONDITIONS.find((x) => x.value === c)?.label ?? c
-  }
-
-  function pickCondition(c: string) {
-    setCondition(c)
-    // List price mil jaye to khud bhar do, doctor badal sakta hai
-    const hit = catalog.find((x) => x.name.toLowerCase().includes(labelOf(c).toLowerCase()))
-    setPrice(hit && BILLABLE.includes(c) ? String(hit.price) : '')
+    setError('')
   }
 
   async function handleSave() {
-    if (!selectedTooth) return
+    if (!selectedTooth || saving) return // dobara click par dobara save nahi
     setSaving(true)
-
+    setError('')
     const supabase = createClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()
-
-    const { data, error } = await supabase
+    const { data, error: err } = await supabase
       .from('dental_chart')
       .insert({
         patient_id: patientId,
@@ -167,50 +134,15 @@ export default function DentalChart({
         notes: notes || null,
         recorded_by: user?.id ?? null,
       })
-      .select()
+      .select('id, tooth_number, condition, notes, treatment_date, created_at')
       .single()
-
-    if (error || !data) {
-      setSaving(false)
+    setSaving(false)
+    if (err || !data) {
+      setError('Save NAHI hua' + (err ? ': ' + err.message : '') + '. Dobara koshish karein.')
       return
     }
     setRecords((prev) => [...prev, data as DentalRecord])
     setNotes('')
-
-    // Qeemat likhi ho to isi treatment ka apna bill khud ban jaye
-    const priceNum = Number(price) || 0
-    if (canBill && BILLABLE.includes(condition) && priceNum > 0) {
-      const paidNum = Math.min(priceNum, Math.max(0, Number(paidNow) || 0))
-      const hit = catalog.find((x) => x.name.toLowerCase().includes(labelOf(condition).toLowerCase()))
-      const { error: invErr } = await supabase.rpc('create_invoice', {
-        p_patient_id: patientId,
-        p_items: [
-          {
-            treatment_id: hit?.id ?? null,
-            name: labelOf(condition),
-            tooth: toothLabel(selectedTooth),
-            qty: 1,
-            unit_price: priceNum,
-          },
-        ],
-        p_discount_percent: 0,
-        p_paid: paidNum,
-        p_method: method,
-        p_doctor: defaultDoctor,
-        p_due_date: priceNum - paidNum > 0 ? addDays(todayKarachi(), 7) : null,
-        p_notes: null,
-        p_idempotency_key: crypto.randomUUID(),
-      })
-      if (invErr) {
-        setSaving(false)
-        setBillError(`Chart save ho gaya, magar bill nahi bana: ${invErr.message}`)
-        return
-      }
-      setPrice('')
-      setPaidNow('')
-      router.refresh()
-    }
-    setSaving(false)
   }
 
   function renderRow(teeth: string[], upper = true) {
@@ -220,7 +152,6 @@ export default function DentalChart({
           const latest = getLatestForTooth(records, tooth)
           const cond = latest?.condition ?? 'healthy'
           const active = selectedTooth === tooth
-
           return (
             <button
               key={tooth}
@@ -230,11 +161,7 @@ export default function DentalChart({
                 active ? 'bg-clinic-teal/15 ring-2 ring-clinic-teal' : ''
               }`}
             >
-              {upper && (
-                <span className="text-[11px] font-semibold text-clinic-ink/60">
-                  {localNumber(tooth)}
-                </span>
-              )}
+              {upper && <span className="text-[11px] font-semibold text-clinic-ink/60">{localNumber(tooth)}</span>}
               <ToothShape
                 number={localNumber(tooth)}
                 upper={upper}
@@ -242,11 +169,7 @@ export default function DentalChart({
                 fill={cond === 'healthy' ? undefined : (TOOTH_FILL[cond] ?? undefined)}
                 size={26}
               />
-              {!upper && (
-                <span className="text-[11px] font-semibold text-clinic-ink/60">
-                  {localNumber(tooth)}
-                </span>
-              )}
+              {!upper && <span className="text-[11px] font-semibold text-clinic-ink/60">{localNumber(tooth)}</span>}
             </button>
           )
         })}
@@ -260,20 +183,28 @@ export default function DentalChart({
         .sort((a, b) => new Date(b.treatment_date).getTime() - new Date(a.treatment_date).getTime())
     : []
 
-  return (
-    <div className="rounded-2xl border border-clinic-teal/10 bg-white p-4 sm:p-6">
-      {/* Legend */}
-      <div className="mb-6 flex flex-wrap gap-3">
-        {CONDITIONS.map((c) => (
-          <span key={c.value} className="flex items-center gap-1.5 text-xs text-clinic-ink/60">
-            <span className={`h-2.5 w-2.5 rounded-full ${c.dot}`} />
-            {c.label}
-          </span>
-        ))}
-      </div>
+  // Legend mein sirf wo rang jo is chart par lage hain (lambi list ka shor nahi)
+  const used = new Set(records.map((r) => r.condition))
+  const legend = CONDITIONS.filter((c) => c.value !== 'healthy' && used.has(c.value))
 
-      {/* Tooth chart */}
-      <div className="overflow-x-auto">
+  return (
+    <div className="min-w-0 rounded-2xl border border-clinic-teal/10 bg-white p-4 sm:p-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-display text-lg font-semibold text-clinic-ink">Dental Chart</h2>
+        <p className="text-xs text-clinic-ink/50">Daant par click karein</p>
+      </div>
+      {legend.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-3">
+          {legend.map((c) => (
+            <span key={c.value} className="flex items-center gap-1.5 text-xs text-clinic-ink/60">
+              <span className={`h-2.5 w-2.5 rounded-full ${c.dot}`} />
+              {c.label}
+            </span>
+          ))}
+        </div>
+      )}
+
+      <div className="mt-4 overflow-x-auto">
         <div className="mx-auto flex w-max flex-col items-center gap-2">
           <div className="flex gap-3">
             {renderRow(UPPER_RIGHT)}
@@ -289,98 +220,68 @@ export default function DentalChart({
         </div>
       </div>
 
-      {/* Selected tooth detail panel */}
       {selectedTooth && (
-        <div className="mt-6 rounded-xl bg-clinic-mint/50 p-4">
+        <div className="mt-4 rounded-xl bg-clinic-mint/50 p-4">
           <div className="flex items-center justify-between">
-            <p className="font-display font-semibold text-clinic-ink">Tooth #{toothLabel(selectedTooth)}</p>
+            <p className="font-display font-semibold text-clinic-ink">Daant {toothLabel(selectedTooth)}</p>
             <button onClick={() => setSelectedTooth(null)} className="text-sm text-clinic-ink/40 hover:text-clinic-ink">
               ✕
             </button>
           </div>
 
-          <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto]">
-            <select
-              value={condition}
-              onChange={(e) => pickCondition(e.target.value)}
-              className="rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm"
-            >
-              {CONDITIONS.map((c) => (
-                <option key={c.value} value={c.value}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
+          {canEdit && onStartTreatment && (
             <button
-              onClick={handleSave}
-              disabled={saving}
-              className="rounded-lg bg-clinic-teal px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-clinic-teal-light disabled:opacity-60"
+              onClick={() => {
+                onStartTreatment(selectedTooth)
+                setSelectedTooth(null)
+              }}
+              className="mt-3 w-full rounded-lg bg-clinic-teal px-4 py-2.5 text-sm font-semibold text-white"
             >
-              {saving ? 'Saving...' : 'Save Record'}
+              + Is daant par treatment shuru karein
             </button>
-          </div>
+          )}
 
-          {canBill && BILLABLE.includes(condition) && (
-            <div className="mt-3 grid grid-cols-2 gap-3 rounded-xl border border-clinic-teal/20 bg-white p-3 sm:grid-cols-3">
-              <div>
-                <label className="text-xs text-clinic-ink/60">Qeemat (Rs.)</label>
-                <input
-                  type="number"
-                  min={0}
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                  placeholder="Qeemat likhein"
-                  className="mt-1 w-full rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm"
-                />
+          {canEdit && (
+            <div className="mt-3 rounded-lg border border-clinic-teal/15 bg-white p-3">
+              <p className="text-xs font-semibold text-clinic-ink/60">Sirf nishan lagayein (muaine ki baat, bill nahi)</p>
+              <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_auto]">
+                <select
+                  value={condition}
+                  onChange={(e) => setCondition(e.target.value)}
+                  className="rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm"
+                >
+                  {CONDITIONS.map((c) => (
+                    <option key={c.value} value={c.value}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="rounded-lg border border-clinic-teal px-4 py-2 text-sm font-semibold text-clinic-teal disabled:opacity-60"
+                >
+                  {saving ? 'Save...' : 'Nishan save'}
+                </button>
               </div>
-              <div>
-                <label className="text-xs text-clinic-ink/60">Abhi mile (Rs.)</label>
-                <input
-                  type="number"
-                  min={0}
-                  value={paidNow}
-                  onChange={(e) => setPaidNow(e.target.value)}
-                  placeholder="0"
-                  className="mt-1 w-full rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm"
-                />
-              </div>
-              {Number(paidNow) > 0 && (
-                <div className="col-span-2 sm:col-span-1">
-                  <label className="text-xs text-clinic-ink/60">Tareeqa</label>
-                  <select
-                    value={method}
-                    onChange={(e) => setMethod(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm"
-                  >
-                    <option value="cash">Cash</option>
-                    <option value="bank">Bank</option>
-                    <option value="easypaisa">EasyPaisa</option>
-                    <option value="jazzcash">JazzCash</option>
-                  </select>
-                </div>
-              )}
+              <input
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Note (optional)"
+                className="mt-2 w-full rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm"
+              />
+              {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
             </div>
           )}
-          {billError && <p className="mt-2 text-sm text-red-600">{billError}</p>}
-
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Notes (optional)"
-            rows={2}
-            className="mt-3 w-full rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm"
-          />
 
           {history.length > 0 && (
-            <div className="mt-4 border-t border-clinic-teal/10 pt-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-clinic-ink/40">History</p>
-              <div className="mt-2 flex flex-col gap-2">
+            <div className="mt-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-clinic-ink/40">Is daant ki history</p>
+              <div className="mt-2 flex flex-col gap-1.5">
                 {history.map((h) => (
                   <div key={h.id} className="rounded-lg bg-white px-3 py-2 text-xs">
                     <span className="font-semibold capitalize text-clinic-teal">{h.condition}</span>
-                    <span className="ml-2 text-clinic-ink/40">
-                      {new Date(h.treatment_date).toLocaleDateString('en-GB')}
-                    </span>
+                    <span className="ml-2 text-clinic-ink/40">{new Date(h.treatment_date).toLocaleDateString('en-GB')}</span>
                     {h.notes && <p className="mt-1 text-clinic-ink/60">{h.notes}</p>}
                   </div>
                 ))}

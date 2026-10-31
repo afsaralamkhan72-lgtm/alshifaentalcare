@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import InventoryManager from '@/components/admin/InventoryManager'
-import { getStaffProfile, isOwnerRole } from '@/lib/auth'
+import { getStaffProfile, isOwnerRole, requirePerm } from '@/lib/auth'
 
 async function getInventory() {
   const supabase = await createClient()
@@ -16,6 +16,7 @@ async function getInventory() {
 }
 
 export default async function InventoryPage() {
+  await requirePerm('inventory.view')
   const profile = await getStaffProfile()
   const canManage = isOwnerRole(profile.role)
   const items = await getInventory()

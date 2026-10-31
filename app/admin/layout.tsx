@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import Sidebar from '@/components/admin/Sidebar'
 import LogoutButton from '@/components/admin/LogoutButton'
 import AssistantBar from '@/components/admin/AssistantBar'
+import { getPermissions } from '@/lib/auth'
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -23,9 +24,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   // this also blocks authenticated users who aren't (or are no longer) active staff.
   if (!profile || !profile.is_active) redirect('/login')
 
+  const perms = await getPermissions()
+
   return (
     <div className="admin-shell flex min-h-screen bg-clinic-sand">
-      <Sidebar role={profile.role as 'admin' | 'doctor' | 'receptionist'} />
+      <Sidebar role={profile.role as 'admin' | 'doctor' | 'receptionist'} perms={perms} />
 
       <div className="min-w-0 flex-1">
         <header className="flex items-center justify-between border-b border-clinic-teal/10 bg-white px-4 py-3 pl-20 sm:px-6 lg:pl-6">

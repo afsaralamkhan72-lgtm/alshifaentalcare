@@ -34,17 +34,33 @@ export default function PatientsToolbar({
   const [form, setForm] = useState<FormState>(INITIAL)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  // Pehle se register? (same phone ya same naam) -> pehle dikhao, phir bhi naya chahiye to "Naya hi banao"
+  const [similar, setSimilar] = useState<{ id: string; full_name: string; phone: string; mr_number: string | null; age: number | null }[]>([])
+  const [dupOk, setDupOk] = useState(false)
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
+    if (key === 'full_name' || key === 'phone') {
+      setSimilar([])
+      setDupOk(false)
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (saving) return
     setSaving(true)
     setError('')
 
     const supabase = createClient()
+    if (!dupOk) {
+      const { data: found } = await supabase.rpc('find_similar_patients', { p_name: form.full_name, p_phone: form.phone })
+      if (Array.isArray(found) && found.length > 0) {
+        setSimilar(found)
+        setSaving(false)
+        return
+      }
+    }
     const { data: created, error: insertError } = await supabase
       .from('patients')
       .insert({
@@ -61,7 +77,7 @@ export default function PatientsToolbar({
 
     setSaving(false)
     if (insertError || !created) {
-      setError('Could not save the patient. Please try again.')
+      setError('Patient save nahi hua: ' + (insertError?.message ?? ''))
       return
     }
 
@@ -70,6 +86,8 @@ export default function PatientsToolbar({
     }
 
     setForm(INITIAL)
+    setSimilar([])
+    setDupOk(false)
     setOpen(false)
     router.push(`/admin/patients/${created.id}`)
   }
@@ -184,6 +202,33 @@ export default function PatientsToolbar({
                 rows={2}
                 className="rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm outline-none focus:border-clinic-teal"
               />
+
+              {similar.length > 0 && !dupOk && (
+                <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm">
+                  <p className="font-semibold text-amber-900">Ye patient shayad pehle se register hai:</p>
+                  <div className="mt-2 grid gap-1.5">
+                    {similar.map((p) => (
+                      <a key={p.id} href={`/admin/patients/${p.id}`} className="flex items-center justify-between rounded-lg bg-white px-3 py-2 hover:bg-clinic-mint">
+                        <span>
+                          <span className="font-semibold capitalize">{p.full_name}</span>
+                          <span className="ml-2 text-xs text-clinic-ink/60">
+                            {p.mr_number} · {p.phone}
+                            {p.age ? ` · ${p.age} saal` : ''}
+                          </span>
+                        </span>
+                        <span className="text-xs font-semibold text-clinic-teal">Ye kholein →</span>
+                      </a>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDupOk(true)}
+                    className="mt-2 text-xs font-semibold text-amber-900 underline"
+                  >
+                    Nahi, ye naya patient hai (phir Save dabayein)
+                  </button>
+                </div>
+              )}
 
               {error && <p className="text-sm text-red-600">{error}</p>}
 

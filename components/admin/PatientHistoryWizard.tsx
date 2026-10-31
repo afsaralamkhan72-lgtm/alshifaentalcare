@@ -225,7 +225,7 @@ export default function PatientHistoryWizard({
         {onChartStep ? (
           department === 'dental' ? (
             <div className="mt-4">
-              <DentalChart patientId={patientId} initialRecords={dentalRecords} />
+              <DentalChart patientId={patientId} initialRecords={dentalRecords} canEdit />
             </div>
           ) : (
             <p className="mt-4 rounded-xl bg-clinic-mint/60 p-6 text-center text-sm text-clinic-ink/60">

@@ -66,14 +66,18 @@ export default async function Footer() {
             <Link href="/services/dental" className="hover:text-white">Dental Services</Link>
             <Link href="/services/homeopathic" className="hover:text-white">Homeopathic Services</Link>
             <Link href="/booking" className="hover:text-white">Book Appointment</Link>
+            <Link href="/gallery" className="hover:text-white">Gallery</Link>
+            <Link href="/videos" className="hover:text-white">Videos</Link>
+            <Link href="/blog" className="hover:text-white">Blog</Link>
             <Link href="/contact" className="hover:text-white">Contact Us</Link>
+            <Link href="/login" className="text-white/40 hover:text-white">Staff Login</Link>
           </div>
         </div>
 
         <div>
           <p className="text-sm font-semibold uppercase tracking-wide text-white/50">Reach Us</p>
           <a href={`tel:${info.phone.replace(/[^0-9+]/g, '')}`} className="mt-3 block text-sm text-white/70 hover:text-white">
-            📞 {info.phone}
+            {info.phone}
           </a>
           <a
             href={`https://wa.me/${info.whatsapp}`}

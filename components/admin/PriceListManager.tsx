@@ -11,6 +11,7 @@ export interface CatalogRow {
   department: string | null
   price: number
   is_active: boolean
+  category?: string | null
 }
 
 interface HistoryRow {
@@ -32,7 +33,9 @@ export default function PriceListManager({
   const router = useRouter()
   const [name, setName] = useState('')
   const [price, setPrice] = useState('')
-  const [dept, setDept] = useState('')
+  const [dept, setDept] = useState('dental')
+  const [cat, setCat] = useState('')
+  const [q, setQ] = useState('')
   const [msg, setMsg] = useState('')
   const [busy, setBusy] = useState(false)
   const [editing, setEditing] = useState<string | null>(null)
@@ -57,6 +60,7 @@ export default function PriceListManager({
       name: name.trim(),
       price: Number(price),
       department: dept || null,
+      category: cat.trim() || null,
     })
     setBusy(false)
     if (error) {
@@ -139,8 +143,13 @@ export default function PriceListManager({
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Treatment ka naam" className={`${inputClass} min-w-[220px] flex-1`} />
           <input value={price} onChange={(e) => setPrice(e.target.value)} type="number" min={0} placeholder="Qeemat (Rs.)" className={`${inputClass} w-36`} />
+          <input list="cat-list" value={cat} onChange={(e) => setCat(e.target.value)} placeholder="Category (Filling, Root Canal...)" className={`${inputClass} w-48`} />
+          <datalist id="cat-list">
+            {[...new Set(rows.map((r) => r.category).filter(Boolean))].map((c) => (
+              <option key={c as string} value={c as string} />
+            ))}
+          </datalist>
           <select value={dept} onChange={(e) => setDept(e.target.value)} className={inputClass}>
-            <option value="">Department</option>
             <option value="dental">Dental</option>
             <option value="homeopathic">Homeopathic</option>
             <option value="general">General</option>
@@ -156,12 +165,21 @@ export default function PriceListManager({
         )}
       </div>
 
-      <div className="mt-4 overflow-x-auto rounded-2xl border border-clinic-teal/10 bg-white">
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Talash..." className={`${inputClass} w-60`} />
+        {rows.some((r) => r.is_active && Number(r.price) === 0) && (
+          <p className="text-xs text-amber-700">
+            Peeli qatar = qeemat abhi 0 hai (treatment par haath se likhni paregi). &quot;Qeemat badlein&quot; se apni qeemat dalein.
+          </p>
+        )}
+      </div>
+
+      <div className="mt-3 overflow-x-auto rounded-2xl border border-clinic-teal/10 bg-white">
         <table className="w-full text-sm">
           <thead className="bg-clinic-mint text-left text-clinic-ink/60">
             <tr>
               <th className="px-4 py-3">Treatment</th>
-              <th className="px-4 py-3">Dept</th>
+              <th className="px-4 py-3">Category</th>
               <th className="px-4 py-3 text-right">Qeemat</th>
               <th className="px-4 py-3"></th>
             </tr>
@@ -174,11 +192,18 @@ export default function PriceListManager({
                 </td>
               </tr>
             )}
-            {rows.map((r) => (
+            {rows
+              .filter((r) => {
+                const t = q.trim().toLowerCase()
+                return !t || r.name.toLowerCase().includes(t) || (r.category ?? '').toLowerCase().includes(t)
+              })
+              .map((r) => (
               <Fragment key={r.id}>
-                <tr className={`border-t border-clinic-teal/10 ${r.is_active ? '' : 'opacity-50'}`}>
+                <tr className={`border-t border-clinic-teal/10 ${r.is_active ? '' : 'opacity-50'} ${r.is_active && Number(r.price) === 0 ? 'bg-amber-50/60' : ''}`}>
                   <td className="px-4 py-3 font-medium text-clinic-ink">{r.name}</td>
-                  <td className="px-4 py-3 capitalize">{r.department ?? '—'}</td>
+                  <td className="px-4 py-3 text-xs text-clinic-ink/70">
+                    {r.category ?? '—'} <span className="capitalize text-clinic-ink/40">· {r.department ?? ''}</span>
+                  </td>
                   <td className="px-4 py-3 text-right">
                     {editing === r.id ? (
                       <span className="inline-flex items-center gap-2">

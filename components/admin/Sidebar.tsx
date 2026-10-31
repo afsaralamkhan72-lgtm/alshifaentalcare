@@ -11,6 +11,8 @@ interface NavItem {
   href: string
   label: string
   roles: Role[]
+  /** receptionist ko ye link tab dikhe jab ye permission ho */
+  perm?: string
 }
 interface NavGroup {
   title: string
@@ -24,50 +26,43 @@ const GROUPS: NavGroup[] = [
   {
     title: 'Rozana',
     items: [
-      { href: '/admin/dashboard', label: 'Dashboard', roles: ALL },
-      { href: '/admin/appointments', label: 'Appointments', roles: ALL },
-      { href: '/admin/patients', label: 'Patients', roles: ALL },
-      { href: '/admin/follow-ups', label: 'Follow-ups', roles: ALL },
-      { href: '/admin/recall', label: 'Recall', roles: ALL },
-      { href: '/admin/birthdays', label: 'Birthdays', roles: ALL },
+      { href: '/admin/dashboard', label: 'Aaj (Dashboard)', roles: ALL },
+      { href: '/admin/appointments', label: 'Appointments', roles: ALL, perm: 'appointments.view' },
+      { href: '/admin/patients', label: 'Patients', roles: ALL, perm: 'patients.view' },
+      { href: '/admin/recall', label: 'Recall (checkup yaad)', roles: ALL, perm: 'clinical.view' },
     ],
   },
   {
-    title: 'Clinic ka kaam',
+    title: 'Clinic',
     items: [
-      { href: '/admin/dental-chart', label: 'Dental Chart', roles: OWNER },
-      { href: '/admin/prescriptions', label: 'Prescriptions', roles: OWNER },
-      { href: '/admin/lab', label: 'Lab Cases', roles: OWNER },
-      { href: '/admin/inventory', label: 'Inventory', roles: ['admin', 'doctor', 'receptionist'] },
+      { href: '/admin/lab', label: 'Lab Cases', roles: ALL, perm: 'lab.view' },
+      { href: '/admin/inventory', label: 'Stock', roles: ALL, perm: 'inventory.view' },
     ],
   },
   {
     title: 'Paisa',
     items: [
-      { href: '/admin/invoices', label: 'Invoices', roles: OWNER },
-      { href: '/admin/dues', label: 'Baqaya Payments', roles: OWNER },
+      { href: '/admin/closing', label: 'Aaj ka hisaab', roles: OWNER },
+      { href: '/admin/dues', label: 'Baqaya', roles: OWNER },
+      { href: '/admin/invoices', label: 'Bills', roles: OWNER },
       { href: '/admin/expenses', label: 'Kharche', roles: OWNER },
-      { href: '/admin/closing', label: 'Din ki Closing', roles: OWNER },
       { href: '/admin/payroll', label: 'Staff Salary', roles: OWNER },
-      { href: '/admin/billing', label: 'Billing & Accounts', roles: OWNER },
-      { href: '/admin/summary', label: 'Munafa Report', roles: OWNER },
-      { href: '/admin/reports', label: 'Reports', roles: ['admin'] },
-      { href: '/admin/ledger-check', label: 'Hisaab Check', roles: OWNER },
+      { href: '/admin/summary', label: 'Reports', roles: OWNER },
       { href: '/admin/prices', label: 'Treatment Prices', roles: OWNER },
     ],
   },
   {
     title: 'Setup',
     items: [
-      { href: '/admin/cms', label: 'Edit Website', roles: ['admin'] },
-      { href: '/admin/staff', label: 'Reception Login', roles: ['admin'] },
+      { href: '/admin/staff', label: 'Staff aur Permissions', roles: ['admin'] },
+      { href: '/admin/cms', label: 'Website', roles: ['admin'] },
       { href: '/admin/audit', label: 'Audit Log', roles: ['admin'] },
       { href: '/admin/recycle-bin', label: 'Recycle Bin', roles: ['admin'] },
     ],
   },
 ]
 
-export default function Sidebar({ role }: { role: Role }) {
+export default function Sidebar({ role, perms }: { role: Role; perms: string[] }) {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
 
@@ -110,7 +105,7 @@ export default function Sidebar({ role }: { role: Role }) {
 
         <nav className="px-3 pb-8">
           {GROUPS.map((g) => {
-            const items = g.items.filter((i) => i.roles.includes(role))
+            const items = g.items.filter((i) => i.roles.includes(role) && (!i.perm || perms.includes(i.perm)))
             if (items.length === 0) return null
             return (
               <div key={g.title} className="mt-4">

@@ -67,12 +67,12 @@ export default function InvoicePanel(p: Props) {
 
   async function receive() {
     const ok = await run(() =>
-      createClient().rpc('record_payment', {
+      createClient().rpc('collect_payment', {
         p_invoice_id: p.invoiceId,
         p_amount: Number(amount),
         p_method: method,
         p_note: note || null,
-        p_idempotency_key: keyRef.current,
+        p_key: keyRef.current,
       })
     )
     if (ok) {

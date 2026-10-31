@@ -43,12 +43,12 @@ function Card({ t }: { t: TreatmentRow }) {
     setSaving(true)
     setError('')
     const supabase = createClient()
-    const { error: err } = await supabase.rpc('record_payment', {
+    const { error: err } = await supabase.rpc('collect_payment', {
       p_invoice_id: t.id,
       p_amount: n,
       p_method: method,
       p_note: null,
-      p_idempotency_key: key,
+      p_key: key,
     })
     setSaving(false)
     if (err) return setError(err.message)
@@ -136,7 +136,9 @@ function Card({ t }: { t: TreatmentRow }) {
 export default function TreatmentList({
   rows,
   summary,
+  title = 'Treatments aur Hisaab',
 }: {
+  title?: string
   rows: TreatmentRow[]
   /** Purane hisaab samet poora total (ledger se); na ho to sirf in cards ka */
   summary?: { total: number; paid: number; balance: number }
@@ -149,7 +151,7 @@ export default function TreatmentList({
   return (
     <div>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="font-display text-lg font-semibold text-clinic-ink">Treatments aur Hisaab</h2>
+        <h2 className="font-display text-lg font-semibold text-clinic-ink">{title}</h2>
         <p className="text-sm text-clinic-ink/60">
           Total {money(total)} · Mile <span className="text-emerald-700">{money(paid)}</span> ·{' '}
           <span className="font-semibold text-amber-700">Baqaya {money(balance)}</span>

@@ -1,3 +1,4 @@
+import { requirePerm } from '@/lib/auth'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import LabCaseForm, { type LabOption, type PatientOption } from '@/components/admin/LabCaseForm'
@@ -19,6 +20,7 @@ export default async function LabPage({
 }: {
   searchParams: Promise<{ status?: string }>
 }) {
+  await requirePerm('lab.view')
   const params = await searchParams
   const status = params.status || 'all'
 

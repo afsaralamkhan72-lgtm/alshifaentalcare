@@ -16,7 +16,14 @@ export default async function SummaryPage({ searchParams }: { searchParams: Prom
 
   return (
     <div>
-      <h1 className="font-display text-2xl font-semibold text-clinic-ink">Munafa / Nuqsan Report</h1>
+      <h1 className="font-display text-2xl font-semibold text-clinic-ink">Reports</h1>
+      <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold print:hidden">
+        <span className="rounded-full bg-clinic-teal px-3 py-1 text-white">Munafa / Nuqsan</span>
+        <a href="/admin/reports" className="rounded-full bg-clinic-mint px-3 py-1 text-clinic-teal">Mahine ki report</a>
+        <a href="/admin/ledger-check" className="rounded-full bg-clinic-mint px-3 py-1 text-clinic-teal">Hisaab check (purana vs naya)</a>
+        <a href="/admin/billing" className="rounded-full bg-clinic-mint px-3 py-1 text-clinic-teal">Purani entries (transactions)</a>
+        <a href="/admin/inventory/count" className="rounded-full bg-clinic-mint px-3 py-1 text-clinic-teal">Stock ginti</a>
+      </div>
       <form className="mt-4 flex flex-wrap items-end gap-3 print:hidden">
         <div>
           <label className="text-xs text-clinic-ink/50">Se</label>

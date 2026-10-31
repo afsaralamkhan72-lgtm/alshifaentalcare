@@ -58,11 +58,11 @@ export default function DuesList({
 
     // Naye invoice ki payment: invoice + ledger + hisaab sab aik saath (database function)
     if (row.invoice_id) {
-      const { error: rpcErr } = await supabase.rpc('record_payment', {
+      const { error: rpcErr } = await supabase.rpc('collect_payment', {
         p_invoice_id: row.invoice_id,
         p_amount: got,
         p_method: method,
-        p_idempotency_key: payKey || null,
+        p_key: payKey || null,
       })
       setBusyId(null)
       if (rpcErr) {

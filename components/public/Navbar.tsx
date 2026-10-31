@@ -16,13 +16,16 @@ const NAV_LINKS = [
   { href: '/contact', label: 'Contact' },
 ]
 
+// Desktop par sirf zaroori links (bhar-maar se header tang aur bachkana lagta tha); baqi mobile list aur footer mein
+const PRIMARY = ['/', '/services/dental', '/services/homeopathic', '/doctors', '/testimonials', '/contact']
+
 export default function Navbar({ logoUrl }: { logoUrl?: string | null }) {
   return (
     <header className="sticky top-0 z-30 border-b border-clinic-teal/10 bg-clinic-sand/95 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
         <Link href="/" className="flex items-center gap-2">
           <ClinicLogo logoUrl={logoUrl} size={38} />
-          <span className="font-display text-lg font-semibold leading-tight text-clinic-teal">
+          <span className="whitespace-nowrap font-display text-lg font-semibold leading-tight text-clinic-teal">
             {CLINIC.name}
           </span>
         </Link>
@@ -38,33 +41,27 @@ export default function Navbar({ logoUrl }: { logoUrl?: string | null }) {
         </a>
 
         <nav className="hidden items-center gap-6 lg:flex">
-          {NAV_LINKS.map((link) => (
+          {NAV_LINKS.filter((l) => PRIMARY.includes(l.href)).map((link) => (
             <Link
               key={link.href}
               href={link.href}
-              className="text-sm font-medium text-clinic-ink/70 transition-colors hover:text-clinic-teal"
+              className="whitespace-nowrap text-sm font-medium text-clinic-ink/70 transition-colors hover:text-clinic-teal"
             >
               {link.label}
             </Link>
           ))}
         </nav>
 
-        <div className="hidden items-center gap-3 lg:flex">
-          <Link
-            href="/login"
-            className="text-xs font-medium text-clinic-ink/50 transition-colors hover:text-clinic-teal"
-          >
-            Staff Login
-          </Link>
+        <div className="hidden items-center gap-4 lg:flex">
           <a
             href={`tel:${CLINIC.phone.dial}`}
-            className="text-sm font-semibold text-clinic-teal transition-colors hover:text-clinic-teal-light"
+            className="hidden whitespace-nowrap text-sm font-semibold xl:inline text-clinic-teal transition-colors hover:text-clinic-teal-light"
           >
             {CLINIC.phone.display}
           </a>
           <Link
             href="/booking"
-            className="rounded-full bg-clinic-teal px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-clinic-teal-light"
+            className="whitespace-nowrap rounded-full bg-clinic-teal px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-clinic-teal-light"
           >
             Book Appointment
           </Link>

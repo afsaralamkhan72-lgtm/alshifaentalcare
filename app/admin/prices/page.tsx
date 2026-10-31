@@ -9,8 +9,9 @@ export default async function PricesPage() {
   const [catRes, counterRes, invRes] = await Promise.all([
     supabase
       .from('treatment_catalog')
-      .select('id, name, department, price, is_active')
+      .select('id, name, department, price, is_active, category, sort_order')
       .order('is_active', { ascending: false })
+      .order('sort_order')
       .order('name'),
     supabase.from('invoice_counter').select('prefix, next_no').eq('id', 1).maybeSingle(),
     supabase.from('inventory').select('id, item_name, unit').order('item_name'),
@@ -34,7 +35,7 @@ export default async function PricesPage() {
     <div>
       <h1 className="font-display text-2xl font-semibold text-clinic-ink">Treatment Prices</h1>
       <p className="mt-1 text-sm text-clinic-ink/60">
-        Doctor ki fixed qeematein. Invoice banate waqt yahin se qeemat aati hai. Qeemat sirf doctor badal sakta hai.
+        Doctor ki qeematein. Nayi treatment chunte hi yahin se qeemat aati hai (treatment par badal bhi sakte hain). Qeemat badalne se purane bill nahi badalte.
       </p>
       <PriceListManager
         inventory={(invRes.data ?? []) as { id: string; item_name: string; unit: string | null }[]}

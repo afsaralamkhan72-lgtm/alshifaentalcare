@@ -317,25 +317,13 @@ export default function PatientsTable({
                     </p>
                   </div>
                 )}
-              {canBill ? (
-              <button
-                onClick={() => toggle(p.id)}
-                className={`rounded-full px-5 py-2 text-sm font-semibold transition-colors ${
-                  isOpen
-                    ? 'bg-clinic-ink text-white'
-                    : 'bg-clinic-teal text-white hover:bg-clinic-teal-light'
-                }`}
+              {/* Sab kuch patient ke profile mein (paisa bhi): aik hi jagah */}
+              <Link
+                href={`/admin/patients/${p.id}`}
+                className="rounded-full bg-clinic-teal px-5 py-2 text-sm font-semibold text-white hover:bg-clinic-teal-light"
               >
-                {isOpen ? 'Band Karein' : 'Open'}
-              </button>
-              ) : (
-                <Link
-                  href={`/admin/patients/${p.id}`}
-                  className="rounded-full bg-clinic-teal px-5 py-2 text-sm font-semibold text-white hover:bg-clinic-teal-light"
-                >
-                  Open
-                </Link>
-              )}
+                Open
+              </Link>
               </div>
             </div>
 

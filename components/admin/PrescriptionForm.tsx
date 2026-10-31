@@ -31,9 +31,21 @@ const EMPTY_ITEM: Item = {
   duration: '',
 }
 
-export default function PrescriptionForm({ patients }: { patients: Patient[] }) {
+export default function PrescriptionForm({
+  patients,
+  fixedPatient,
+  treatments = [],
+}: {
+  patients: Patient[]
+  /** Patient profile se: patient pehle se chuna hua */
+  fixedPatient?: Patient
+  /** Chalti treatments: prescription ko treatment (aur us ke aakhri visit) se jorna */
+  treatments?: { id: string; name: string; lastVisitId: string | null }[]
+}) {
   const router = useRouter()
-  const [patientId, setPatientId] = useState('')
+  const [patientId, setPatientId] = useState(fixedPatient?.id ?? '')
+  const [treatmentId, setTreatmentId] = useState('')
+  const [savedId, setSavedId] = useState<string | null>(null)
   const [items, setItems] = useState<Item[]>([{ ...EMPTY_ITEM }])
   const [notesEn, setNotesEn] = useState('')
   const [notesUr, setNotesUr] = useState('')
@@ -41,7 +53,7 @@ export default function PrescriptionForm({ patients }: { patients: Patient[] }) 
   const [error, setError] = useState('')
   const [savedFor, setSavedFor] = useState<Patient | null>(null)
 
-  const patient = patients.find((p) => p.id === patientId) ?? null
+  const patient = fixedPatient ?? patients.find((p) => p.id === patientId) ?? null
   const isHomeo = patient?.department === 'homeopathic'
 
   function updateItem(index: number, key: keyof Item, value: string) {
@@ -74,21 +86,29 @@ export default function PrescriptionForm({ patients }: { patients: Patient[] }) 
       data: { user },
     } = await supabase.auth.getUser()
 
-    const { error: insertError } = await supabase.from('prescriptions').insert({
-      patient_id: patient.id,
-      department: patient.department,
-      items: cleanItems,
-      notes_en: notesEn || null,
-      notes_ur: notesUr || null,
-      prescribed_by: user?.id ?? null,
-    })
+    const tr = treatments.find((t) => t.id === treatmentId)
+    const { data: created, error: insertError } = await supabase
+      .from('prescriptions')
+      .insert({
+        patient_id: patient.id,
+        department: patient.department,
+        items: cleanItems,
+        notes_en: notesEn || null,
+        notes_ur: notesUr || null,
+        prescribed_by: user?.id ?? null,
+        treatment_id: tr?.id ?? null,
+        visit_id: tr?.lastVisitId ?? null,
+      })
+      .select('id')
+      .single()
 
     setSaving(false)
-    if (insertError) {
-      setError('Prescription save nahi hui, dobara koshish karein.')
+    if (insertError || !created) {
+      setError('Prescription save nahi hui: ' + (insertError?.message ?? ''))
       return
     }
 
+    setSavedId(created.id)
     setSavedFor(patient)
     router.refresh()
   }
@@ -98,7 +118,9 @@ export default function PrescriptionForm({ patients }: { patients: Patient[] }) 
     setItems([{ ...EMPTY_ITEM }])
     setNotesEn('')
     setNotesUr('')
-    setPatientId('')
+    setPatientId(fixedPatient?.id ?? '')
+    setTreatmentId('')
+    setSavedId(null)
   }
 
   const inputClass =
@@ -128,6 +150,15 @@ export default function PrescriptionForm({ patients }: { patients: Patient[] }) 
           >
             Send on WhatsApp
           </a>
+          {savedId && (
+            <a
+              href={`/admin/prescriptions/${savedId}/print`}
+              target="_blank"
+              className="rounded-full bg-clinic-teal px-5 py-2.5 text-sm font-semibold text-white"
+            >
+              Print
+            </a>
+          )}
           <button
             onClick={resetForm}
             className="rounded-full border border-clinic-teal px-5 py-2.5 text-sm font-semibold text-clinic-teal"
@@ -141,20 +172,37 @@ export default function PrescriptionForm({ patients }: { patients: Patient[] }) 
 
   return (
     <form onSubmit={handleSubmit} className="rounded-2xl border border-clinic-teal/10 bg-white p-6">
-      <label className="text-sm font-medium text-clinic-ink">Patient</label>
-      <select
-        required
-        value={patientId}
-        onChange={(e) => setPatientId(e.target.value)}
-        className={`mt-1 ${inputClass}`}
-      >
-        <option value="">Select patient...</option>
-        {patients.map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.mr_number}, {p.full_name} ({p.department})
-          </option>
-        ))}
-      </select>
+      {!fixedPatient && (
+        <>
+          <label className="text-sm font-medium text-clinic-ink">Patient</label>
+          <select
+            required
+            value={patientId}
+            onChange={(e) => setPatientId(e.target.value)}
+            className={`mt-1 ${inputClass}`}
+          >
+            <option value="">Select patient...</option>
+            {patients.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.mr_number}, {p.full_name} ({p.department})
+              </option>
+            ))}
+          </select>
+        </>
+      )}
+      {treatments.length > 0 && (
+        <div className="mb-2">
+          <label className="text-sm font-medium text-clinic-ink">Kis treatment ke saath (optional)</label>
+          <select value={treatmentId} onChange={(e) => setTreatmentId(e.target.value)} className={`mt-1 ${inputClass}`}>
+            <option value="">—</option>
+            {treatments.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {patient && (
         <>

@@ -10,19 +10,35 @@ export interface PatientPhoto {
   storage_path: string
   caption: string | null
   taken_on: string
+  category?: string | null
 }
 
 const BUCKET = 'patient-media'
 
-const MAX_PHOTOS = 3
+// Free storage ka khayal: har patient ki zyada se zyada itni files (har tasveer khud compress hoti hai, ~150KB)
+const MAX_PHOTOS = 15
+
+const CATEGORIES = [
+  { v: 'xray', l: 'X-ray' },
+  { v: 'photo', l: 'Photo' },
+  { v: 'document', l: 'Document' },
+  { v: 'report', l: 'Report' },
+  { v: 'lab', l: 'Lab' },
+  { v: 'consent', l: 'Consent' },
+]
+const catLabel = (v?: string | null) => CATEGORIES.find((c) => c.v === v)?.l ?? 'Photo'
 
 export default function PatientPhotoGallery({
   patientId,
   photos,
+  canDelete = false,
 }: {
   patientId: string
   photos: PatientPhoto[]
+  canDelete?: boolean
 }) {
+  const [category, setCategory] = useState('xray')
+  const [filter, setFilter] = useState('')
   const router = useRouter()
   const [uploading, setUploading] = useState(false)
   const [caption, setCaption] = useState('')
@@ -78,17 +94,19 @@ export default function PatientPhotoGallery({
 
       if (uploadError) throw uploadError
 
-      await supabase.from('patient_photos').insert({
+      const { error: insErr } = await supabase.from('patient_photos').insert({
         patient_id: patientId,
         storage_path: path,
         caption: caption.trim() || null,
         created_by: user?.id ?? null,
+        category,
       })
+      if (insErr) throw insErr
 
       setCaption('')
       router.refresh()
-    } catch {
-      setError('Upload nahi hui. Kya phase17.sql chalayi thi?')
+    } catch (err) {
+      setError('Upload nahi hui: ' + (err instanceof Error ? err.message : String((err as { message?: string })?.message ?? err)))
     } finally {
       setUploading(false)
       e.target.value = ''
@@ -107,14 +125,20 @@ export default function PatientPhotoGallery({
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="font-display text-lg font-semibold text-clinic-ink">Photos</h2>
+          <h2 className="font-display text-lg font-semibold text-clinic-ink">Documents aur X-rays</h2>
           <p className="text-sm text-clinic-ink/60">
-            Sirf staff dekh sakta hai. Upload karte hi khud compress ho jati hai.
-            Zyada se zyada {MAX_PHOTOS} photos ({photos.length}/{MAX_PHOTOS}).
+            Sirf staff dekh sakta hai. Tasveer khud compress hoti hai ({photos.length}/{MAX_PHOTOS}).
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <select value={category} onChange={(e) => setCategory(e.target.value)} className="rounded-lg border border-clinic-teal/20 px-2 py-2 text-sm">
+            {CATEGORIES.map((c) => (
+              <option key={c.v} value={c.v}>
+                {c.l}
+              </option>
+            ))}
+          </select>
           <input
             placeholder="Caption (optional)"
             value={caption}
@@ -128,7 +152,7 @@ export default function PatientPhotoGallery({
                 : 'bg-clinic-teal text-white'
             }`}
           >
-            {uploading ? 'Uploading...' : '+ Photo'}
+            {uploading ? 'Uploading...' : '+ Upload'}
             <input
               type="file"
               accept="image/*"
@@ -142,36 +166,56 @@ export default function PatientPhotoGallery({
 
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
 
+      {photos.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {[{ v: '', l: 'Sab' }, ...CATEGORIES].filter((c) => !c.v || photos.some((p) => (p.category ?? 'photo') === c.v)).map((c) => (
+            <button
+              key={c.v}
+              onClick={() => setFilter(c.v)}
+              className={`rounded-full px-3 py-1 text-xs font-semibold ${filter === c.v ? 'bg-clinic-teal text-white' : 'bg-clinic-mint text-clinic-teal'}`}
+            >
+              {c.l}
+            </button>
+          ))}
+        </div>
+      )}
+
       {photos.length === 0 ? (
         <p className="mt-4 rounded-2xl border border-dashed border-clinic-teal/20 bg-clinic-mint/40 p-6 text-center text-sm text-clinic-ink/60">
-          Koi photo nahi. Visit ke waqt daant ki tasveer, X-ray, ya progress photo lagayein.
+          Abhi kuch nahi. X-ray, report ya tasveer upload karein.
         </p>
       ) : (
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {photos.map((p) => (
+          {photos.filter((p) => !filter || (p.category ?? 'photo') === filter).map((p) => (
             <div key={p.id} className="group relative overflow-hidden rounded-xl bg-clinic-mint">
               {urls[p.id] ? (
+                <a href={urls[p.id]} target="_blank" rel="noopener noreferrer">
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={urls[p.id]}
                   alt={p.caption ?? 'Patient photo'}
                   className="aspect-square w-full object-cover"
                 />
+                </a>
               ) : (
                 <div className="flex aspect-square items-center justify-center text-xs text-clinic-ink/40">
                   Loading...
                 </div>
               )}
 
+              {canDelete && (
               <button
                 onClick={() => remove(p)}
                 className="absolute right-1 top-1 rounded-full bg-black/50 px-2 py-0.5 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100"
               >
                 ✕
               </button>
+              )}
 
               <div className="bg-white/90 p-1.5">
-                <p className="truncate text-[11px] text-clinic-ink/70">{p.caption ?? '—'}</p>
+                <p className="truncate text-[11px] text-clinic-ink/70">
+                  <span className="font-semibold text-clinic-teal">{catLabel(p.category)}</span> {p.caption ?? ''}
+                </p>
                 <p className="text-[10px] text-clinic-ink/40">
                   {new Date(p.taken_on).toLocaleDateString('en-GB')}
                 </p>

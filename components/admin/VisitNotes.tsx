@@ -11,14 +11,23 @@ export interface VisitNote {
   procedure: string | null
   notes: string | null
   next_visit: string | null
+  voided_at?: string | null
+  void_reason?: string | null
+  visit_no?: number | null
+  treatment_name?: string | null
 }
 
 export default function VisitNotes({
   patientId,
   notes,
+  allowAdd = false,
+  canCancel = true,
 }: {
   patientId: string
   notes: VisitNote[]
+  /** Naye visits ab treatment ke andar "Agla visit" se bante hain; yahan sirf list */
+  allowAdd?: boolean
+  canCancel?: boolean
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -59,7 +68,7 @@ export default function VisitNotes({
 
     setSaving(false)
     if (err) {
-      setError('Save nahi hua. Kya phase2.sql chalaya tha?')
+      setError('Save nahi hua: ' + err.message)
       return
     }
 
@@ -70,10 +79,29 @@ export default function VisitNotes({
     router.refresh()
   }
 
-  async function removeNote(id: string) {
-    if (!confirm('Ye visit note delete karein?')) return
+  // Note delete nahi hota: galti ho to wajah likh kar "Cancel" karte hain, record mehfooz rehta hai
+  const [cancelId, setCancelId] = useState<string | null>(null)
+  const [cancelReason, setCancelReason] = useState('')
+  const [cancelError, setCancelError] = useState('')
+
+  async function cancelNote() {
+    if (!cancelId) return
+    if (!cancelReason.trim()) {
+      setCancelError('Wajah likhna zaroori hai')
+      return
+    }
     const supabase = createClient()
-    await supabase.from('visit_notes').delete().eq('id', id)
+    const { error: err } = await supabase
+      .from('visit_notes')
+      .update({ voided_at: new Date().toISOString(), void_reason: cancelReason.trim() })
+      .eq('id', cancelId)
+    if (err) {
+      setCancelError('Cancel nahi hua: ' + err.message)
+      return
+    }
+    setCancelId(null)
+    setCancelReason('')
+    setCancelError('')
     router.refresh()
   }
 
@@ -86,15 +114,17 @@ export default function VisitNotes({
         <div>
           <h2 className="font-display text-lg font-semibold text-clinic-ink">Visit Notes</h2>
           <p className="text-sm text-clinic-ink/60">
-            A record of every visit and the next follow-up.
+            Har visit tareekh ke hisaab se. Naya visit treatment ke andar &quot;Agla visit&quot; se banta hai.
           </p>
         </div>
-        <button
-          onClick={() => setOpen(true)}
-          className="rounded-full bg-clinic-teal px-4 py-2 text-sm font-semibold text-white"
-        >
-          + Add Visit
-        </button>
+        {allowAdd && (
+          <button
+            onClick={() => setOpen(true)}
+            className="rounded-full bg-clinic-teal px-4 py-2 text-sm font-semibold text-white"
+          >
+            + Add Visit
+          </button>
+        )}
       </div>
 
       {open && (
@@ -178,21 +208,56 @@ export default function VisitNotes({
           </p>
         ) : (
           notes.map((n) => (
-            <div key={n.id} className="px-4 py-3">
+            <div key={n.id} className={`px-4 py-3 ${n.voided_at ? 'bg-red-50/40 opacity-70' : ''}`}>
+              {n.voided_at && (
+                <p className="mb-1 text-xs font-semibold text-red-700">
+                  Cancel (galti): {n.void_reason}
+                </p>
+              )}
+              {cancelId === n.id && (
+                <div className="mb-2 rounded-xl border border-red-200 bg-white p-3">
+                  <input
+                    autoFocus
+                    value={cancelReason}
+                    onChange={(e) => setCancelReason(e.target.value)}
+                    placeholder="Cancel ki wajah (zaroori)"
+                    className="w-full rounded-lg border border-red-200 px-3 py-1.5 text-sm outline-none"
+                  />
+                  {cancelError && <p className="mt-1 text-xs text-red-600">{cancelError}</p>}
+                  <div className="mt-2 flex gap-2">
+                    <button onClick={cancelNote} className="rounded-full bg-red-600 px-3 py-1 text-xs font-semibold text-white">
+                      Cancel kar do
+                    </button>
+                    <button onClick={() => setCancelId(null)} className="text-xs text-clinic-ink/60">
+                      Wapas
+                    </button>
+                  </div>
+                </div>
+              )}
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm font-medium text-clinic-ink">
+                  {n.visit_no ? (
+                    <span className="mr-2 rounded bg-clinic-teal/10 px-1.5 py-0.5 text-[11px] font-bold text-clinic-teal">V{n.visit_no}</span>
+                  ) : null}
+                  {n.treatment_name && n.treatment_name !== n.procedure ? `${n.treatment_name}: ` : ''}
                   {n.procedure ?? 'Visit'}
                 </p>
                 <div className="flex items-center gap-3">
                   <p className="text-xs text-clinic-ink/40">
                     {new Date(n.visit_date).toLocaleDateString('en-GB')}
                   </p>
-                  <button
-                    onClick={() => removeNote(n.id)}
-                    className="text-xs text-red-600 hover:underline"
-                  >
-                    Delete
-                  </button>
+                  {!n.voided_at && canCancel && (
+                    <button
+                      onClick={() => {
+                        setCancelId(n.id)
+                        setCancelReason('')
+                        setCancelError('')
+                      }}
+                      className="text-xs text-red-600 hover:underline"
+                    >
+                      Cancel note
+                    </button>
+                  )}
                 </div>
               </div>
               {n.notes && <p className="mt-1 text-sm text-clinic-ink/60">{n.notes}</p>}

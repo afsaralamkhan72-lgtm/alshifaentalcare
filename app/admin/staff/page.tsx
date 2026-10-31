@@ -1,7 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireAdmin } from '@/lib/auth'
-import { activateReceptionist, setStaffActive } from './actions'
+import PermissionPicker, { type PermGroup } from '@/components/admin/PermissionPicker'
+import { activateReceptionist, createStaff, setStaffActive } from './actions'
+import Link from 'next/link'
 
 const ROLE_LABEL: Record<string, string> = {
   admin: 'Doctor / Admin',
@@ -9,7 +11,12 @@ const ROLE_LABEL: Record<string, string> = {
   receptionist: 'Reception',
 }
 
-export default async function StaffPage() {
+export default async function StaffPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ err?: string; ok?: string }>
+}) {
+  const sp = await searchParams
   const me = await requireAdmin()
   const supabase = await createClient()
 
@@ -35,25 +42,57 @@ export default async function StaffPage() {
         .map((u) => ({ id: u.id, email: u.email ?? '(email nahi)' }))
   }
 
+  const [{ data: catalog }] = await Promise.all([
+    supabase.from('permission_catalog').select('code, label, grp, sort_order').order('sort_order'),
+  ])
+  const groups: PermGroup[] = []
+  for (const c of catalog ?? []) {
+    let g = groups.find((x) => x.grp === c.grp)
+    if (!g) groups.push((g = { grp: c.grp, items: [] }))
+    g.items.push({ code: c.code, label: c.label })
+  }
+  const receptionDefault = [
+    'patients.view', 'patients.create', 'patients.edit', 'appointments.view', 'appointments.manage',
+    'lab.view', 'lab.manage', 'inventory.view',
+  ]
+
   const inputClass =
     'rounded-lg border border-clinic-teal/30 px-3 py-1.5 text-sm outline-none focus:border-clinic-teal'
 
   return (
     <div>
-      <h1 className="font-display text-2xl font-semibold text-clinic-ink">Staff</h1>
+      <h1 className="font-display text-2xl font-semibold text-clinic-ink">Staff aur Permissions</h1>
       <p className="mt-1 text-sm text-clinic-ink/60">
-        Receptionist banane ka tareeqa: pehle Supabase → Authentication → Users mein email aur
-        password se user banayein, phir yahan us ke samne Activate dabayein.
+        Naya staff yahin se banayein, aur tick se tay karein ke wo kya dekh/kar sakta hai. Supabase mein jaane ki zaroorat nahi.
       </p>
+      {sp.ok && <p className="mt-3 rounded-lg bg-emerald-50 px-4 py-2 text-sm text-emerald-800">{sp.ok}</p>}
+      {sp.err && <p className="mt-3 rounded-lg bg-red-50 px-4 py-2 text-sm text-red-700">{sp.err}</p>}
 
-      <section className="mt-6">
-        <h2 className="font-display text-lg font-semibold text-clinic-ink">
-          Activate hone ka intezar
-        </h2>
-        {authError && <p className="mt-2 text-sm text-amber-700">{authError}</p>}
-        {pending.length === 0 && !authError ? (
-          <p className="mt-2 text-sm text-clinic-ink/50">Koi naya user nahi.</p>
-        ) : (
+      <section className="mt-6 rounded-2xl border border-clinic-teal/10 bg-white p-5">
+        <h2 className="font-display text-lg font-semibold text-clinic-ink">Naya staff account</h2>
+        <form action={createStaff} className="mt-3 grid gap-3">
+          <div className="flex flex-wrap gap-2">
+            <input name="full_name" required placeholder="Naam" className={inputClass} />
+            <input name="phone" placeholder="Phone (optional)" className={inputClass} />
+            <input name="email" type="email" required placeholder="Email (login)" className={inputClass} autoComplete="off" />
+            <input name="password" type="text" required minLength={8} placeholder="Password (8+)" className={inputClass} autoComplete="off" />
+            <select name="role" className={inputClass} defaultValue="receptionist">
+              <option value="receptionist">Reception / Assistant (permissions tick se)</option>
+              <option value="doctor">Doctor (clinical + paisa, sab)</option>
+            </select>
+          </div>
+          <PermissionPicker groups={groups} defaultChecked={receptionDefault} />
+          <div>
+            <button className="rounded-full bg-clinic-teal px-5 py-2 text-sm font-semibold text-white">Account banayein</button>
+            <span className="ml-3 text-xs text-clinic-ink/50">Doctor ke liye ticks ki zaroorat nahi. Password staff ko khud batayein.</span>
+          </div>
+        </form>
+      </section>
+
+      {(pending.length > 0 || authError) && (
+        <section className="mt-8">
+          <h2 className="font-display text-lg font-semibold text-clinic-ink">Supabase mein bane, abhi activate nahi</h2>
+          {authError && <p className="mt-2 text-sm text-amber-700">{authError}</p>}
           <div className="mt-3 grid gap-3">
             {pending.map((u) => (
               <form
@@ -71,8 +110,8 @@ export default async function StaffPage() {
               </form>
             ))}
           </div>
-        )}
-      </section>
+        </section>
+      )}
 
       <section className="mt-8">
         <h2 className="font-display text-lg font-semibold text-clinic-ink">Maujooda Staff</h2>
@@ -103,8 +142,12 @@ export default async function StaffPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">
+                    <Link href={`/admin/staff/${s.id}`} className="mr-4 text-xs font-semibold text-clinic-teal hover:underline">
+                      Permissions
+                    </Link>
                     {s.id !== me.id && (
-                      <form action={setStaffActive}>
+                      <form action={setStaffActive} className="inline">
+                        <input type="hidden" name="back" value="/admin/staff" />
                         <input type="hidden" name="id" value={s.id} />
                         <input type="hidden" name="active" value={s.is_active ? 'false' : 'true'} />
                         <button className="text-xs font-semibold text-clinic-teal hover:underline">

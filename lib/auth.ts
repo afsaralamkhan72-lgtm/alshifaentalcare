@@ -52,3 +52,25 @@ export async function requireAdmin(): Promise<StaffProfile> {
   if (profile.role !== 'admin') redirect('/admin/dashboard')
   return profile
 }
+
+/**
+ * Is staff member ki saari permissions (DB function my_permissions()). Admin/doctor ko sab milti hain,
+ * receptionist ko sirf wo jo Staff page par tick ki gayi hon. DB ke RLS rules yehi check karte hain,
+ * is liye ye sirf screen dikhane ke liye hai, asli hifazat database mein hai.
+ */
+export async function getPermissions(): Promise<string[]> {
+  const supabase = await createClient()
+  const { data } = await supabase.rpc('my_permissions')
+  return Array.isArray(data) ? (data as string[]) : []
+}
+
+export async function can(code: string): Promise<boolean> {
+  return (await getPermissions()).includes(code)
+}
+
+/** Page ke shuru mein: permission na ho to dashboard par wapas */
+export async function requirePerm(code: string): Promise<StaffProfile> {
+  const profile = await getStaffProfile()
+  if (!(await getPermissions()).includes(code)) redirect('/admin/dashboard')
+  return profile
+}

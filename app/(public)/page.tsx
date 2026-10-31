@@ -1,6 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
 import Hero from '@/components/public/Hero'
-import Ticker from '@/components/public/Ticker'
 import TrustStats from '@/components/public/TrustStats'
 import ServiceCard from '@/components/public/ServiceCard'
 import WhyChooseUs from '@/components/public/WhyChooseUs'
@@ -9,7 +8,6 @@ import HomeSections from '@/components/public/HomeSections'
 import ProcessAndFaq from '@/components/public/ProcessAndFaq'
 import ClinicShowcase from '@/components/public/ClinicShowcase'
 import Link from 'next/link'
-import { CLINIC, timingsLine } from '@/clinic.config'
 
 interface Service {
   id: string
@@ -19,14 +17,6 @@ interface Service {
   department: 'dental' | 'homeopathic'
 }
 
-const BASE_TICKER = [
-  `📞 ${CLINIC.phone.display}`,
-  '🦷 Dental & Homeopathic Care',
-  `📍 ${CLINIC.address.full}`,
-
-
-  '💬 Book instantly on WhatsApp',
-]
 
 async function getFeaturedServices(): Promise<Service[]> {
   try {
@@ -46,26 +36,11 @@ async function getFeaturedServices(): Promise<Service[]> {
 export default async function HomePage() {
   const services = await getFeaturedServices()
 
-  let closedDay = ''
-  try {
-    const supabase = await createClient()
-    const { data } = await supabase
-      .from('site_settings')
-      .select('value')
-      .eq('key', 'clinic_info')
-      .maybeSingle()
-    closedDay = ((data?.value ?? {}) as Record<string, string>).closed_day || ''
-  } catch {
-    // koi chutti set nahi
-  }
-
-  const tickerItems = [...BASE_TICKER, `🕐 ${timingsLine(closedDay)}`]
-
   return (
     <>
       <Hero />
       <DoctorIntro />
-      <Ticker items={tickerItems} />
+      {/* Ticker (emoji wali chalti patti) hata di: wahi phone/pata/timings neeche info cards aur footer mein hain */}
       <TrustStats />
 
       <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6">

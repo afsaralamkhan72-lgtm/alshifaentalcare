@@ -35,17 +35,24 @@ const MATERIALS = ['PFM', 'Zirconia', 'E-max', 'Full Metal', 'Acrylic', 'Flexibl
 export default function LabCaseForm({
   labs,
   patients,
+  fixedPatient,
+  treatments = [],
 }: {
   labs: LabOption[]
   patients: PatientOption[]
+  /** Patient profile se: patient pehle se chuna hua */
+  fixedPatient?: PatientOption
+  /** Is patient ki chalti treatments (lab case ko treatment se jorna) */
+  treatments?: { id: string; name: string; teeth: string[] }[]
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  const [patientId, setPatientId] = useState('')
-  const [pickedLabel, setPickedLabel] = useState('')
+  const [patientId, setPatientId] = useState(fixedPatient?.id ?? '')
+  const [pickedLabel, setPickedLabel] = useState(fixedPatient ? `${fixedPatient.mr_number}, ${fixedPatient.full_name}` : '')
+  const [treatmentId, setTreatmentId] = useState('')
   const [pq, setPq] = useState('')
   const [pResults, setPResults] = useState<PatientOption[]>(patients.slice(0, 8))
 
@@ -149,6 +156,7 @@ export default function LabCaseForm({
         due_date: dueDate || null,
         cost: cost ? Number(cost) : 0,
         created_by: user?.id ?? null,
+        treatment_id: treatmentId || null,
       })
       .select('id')
       .single()
@@ -156,7 +164,7 @@ export default function LabCaseForm({
     setSaving(false)
 
     if (err || !created) {
-      setError('Save nahi hua. Kya phase5.sql chalayi thi?')
+      setError('Save nahi hua' + (err ? ': ' + err.message : ''))
       return
     }
 
@@ -250,6 +258,7 @@ export default function LabCaseForm({
                 {patientId ? (
                   <div className="mt-1 flex items-center justify-between rounded-lg border border-clinic-teal/30 bg-clinic-mint/50 px-3 py-2 text-sm">
                     <span>{pickedLabel}</span>
+                    {!fixedPatient && (
                     <button
                       type="button"
                       onClick={() => {
@@ -260,6 +269,7 @@ export default function LabCaseForm({
                     >
                       Badlein
                     </button>
+                    )}
                   </div>
                 ) : (
                   <>
@@ -291,6 +301,29 @@ export default function LabCaseForm({
                   </>
                 )}
               </div>
+
+              {treatments.length > 0 && (
+                <div>
+                  <label className="text-sm font-medium text-clinic-ink">Kis treatment ka (optional)</label>
+                  <select
+                    value={treatmentId}
+                    onChange={(e) => {
+                      setTreatmentId(e.target.value)
+                      const t = treatments.find((x) => x.id === e.target.value)
+                      if (t && t.teeth.length && teeth.length === 0) setTeeth(t.teeth)
+                    }}
+                    className={inputClass}
+                  >
+                    <option value="">—</option>
+                    {treatments.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                        {t.teeth.length ? ` (${t.teeth.join(', ')})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* Teeth */}
               <div>

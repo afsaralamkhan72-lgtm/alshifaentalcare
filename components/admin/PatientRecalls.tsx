@@ -72,7 +72,7 @@ export default function PatientRecalls({
       setError(
         err.message.includes('duplicate')
           ? 'Is patient ka ye recall pehle se laga hua hai.'
-          : 'Save nahi hua. Kya phase6.sql chalayi thi?'
+          : 'Save nahi hua: ' + err.message
       )
       return
     }

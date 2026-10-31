@@ -33,6 +33,8 @@ export const CLINIC = {
   doctor: {
     name: env('CLINIC_DOCTOR', 'Dr. Muhammad Khalid Mahmood'),
     qualification: env('CLINIC_DOCTOR_QUALIFICATION', 'Dental Surgeon & Homeopathic Physician'),
+    /** PMDC / registration number: Vercel mein NEXT_PUBLIC_CLINIC_DOCTOR_REG dalein to prescription par chhapta hai */
+    registration: env('CLINIC_DOCTOR_REG', ''),
   },
 
   phone: {

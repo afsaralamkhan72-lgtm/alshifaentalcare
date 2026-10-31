@@ -1,3 +1,4 @@
+import { requirePerm } from '@/lib/auth'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import AppointmentBoard, { type Appointment } from '@/components/admin/AppointmentBoard'
@@ -14,6 +15,7 @@ export default async function AppointmentsPage({
 }: {
   searchParams: Promise<{ date?: string; status?: string }>
 }) {
+  await requirePerm('appointments.view')
   const params = await searchParams
   const date = params.date || todayKarachi()
   const status = params.status || 'all'
@@ -22,7 +24,7 @@ export default async function AppointmentsPage({
 
   let query = supabase
     .from('appointments')
-    .select('id, patient_name, phone, department, treatment_name, preferred_date, preferred_time, status, created_at')
+    .select('id, patient_name, phone, department, treatment_name, preferred_date, preferred_time, status, created_at, patient_id')
     .is('deleted_at', null)
     .eq('preferred_date', date)
     .order('preferred_time', { ascending: true })
