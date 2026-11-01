@@ -9,6 +9,7 @@ import { CLINIC } from '@/clinic.config'
 import { todayKarachi, fmtDate } from '@/lib/karachi'
 import WhatsAppMenu from './WhatsAppMenu'
 import { apptConfirmLink, apptReminderLink, apptRescheduleLink } from '@/lib/messages'
+import { mapTemplates, type Tpl } from '@/lib/messageTemplates'
 
 export interface Appointment {
   patient_id?: string | null
@@ -57,7 +58,7 @@ export default function AppointmentBoard({
   listOnly = false,
   emptyText = 'Is din koi appointment nahi hai.',
   preset = null,
-  buttonLabel = '+ Book Appointment',
+  buttonLabel = '+ Appointment',
 }: {
   appointments: Appointment[]
   showButton?: boolean
@@ -90,6 +91,10 @@ export default function AppointmentBoard({
   // Patient list se chuna jata hai (naam / phone dobara likhna nahi parta, appointment patient se jur jati hai)
   const [picked, setPicked] = useState<PatientPick | null>(preset)
   const [manual, setManual] = useState(false)
+  const [tpl, setTpl] = useState<Tpl>({})
+  useEffect(() => {
+    createClient().from('message_templates').select('key, body').then(({ data }) => setTpl(mapTemplates(data as { key: string; body: string }[] | null)))
+  }, [])
   const [pq, setPq] = useState('')
   const [found, setFound] = useState<PatientPick[]>([])
   useEffect(() => {
@@ -194,7 +199,7 @@ export default function AppointmentBoard({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6">
             <div className="flex items-center justify-between">
-              <p className="font-display text-lg font-semibold text-clinic-ink">Book Appointment</p>
+              <p className="font-display text-lg font-semibold text-clinic-ink">Appointment banayein</p>
               <button onClick={() => setOpen(false)} className="text-clinic-ink/40">
                 ✕
               </button>
@@ -293,7 +298,7 @@ export default function AppointmentBoard({
                 disabled={saving}
                 className="mt-2 rounded-full bg-clinic-teal px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
               >
-                {saving ? 'Saving...' : 'Save Appointment'}
+                {saving ? 'Save ho raha hai...' : 'Appointment save karein'}
               </button>
             </form>
           </div>
@@ -312,9 +317,9 @@ export default function AppointmentBoard({
         ) : (
           appointments.map((a) => {
             const waItems = [
-              { label: 'Confirm ka message', href: apptConfirmLink(a) },
-              { label: 'Yaad dehani (reminder)', href: apptReminderLink(a) },
-              { label: 'Nayi tareekh ka message', href: apptRescheduleLink(a) },
+              { label: 'Confirm ka message', href: apptConfirmLink(a, tpl) },
+              { label: 'Yaad dehani (reminder)', href: apptReminderLink(a, tpl) },
+              { label: 'Nayi tareekh ka message', href: apptRescheduleLink(a, tpl) },
             ]
 
             return (

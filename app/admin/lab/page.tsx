@@ -8,7 +8,7 @@ import { todayKarachi } from '@/lib/karachi'
 export default async function LabPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>
+  searchParams: Promise<{ q?: string; patient?: string; treatment?: string }>
 }) {
   await requirePerm('lab.view')
   const params = await searchParams
@@ -51,6 +51,18 @@ export default async function LabPage({
     )
   }
 
+  // Treatment se aaye to patient aur treatment pehle se chune hon
+  const uuid = /^[0-9a-f-]{36}$/i
+  let fixed: PatientOption | undefined
+  let patTreatments: { id: string; name: string; teeth: string[] }[] = []
+  if (params.patient && uuid.test(params.patient)) {
+    const [{ data: fp }, { data: ft }] = await Promise.all([
+      supabase.from('patients').select('id, full_name, mr_number').eq('id', params.patient).is('deleted_at', null).maybeSingle(),
+      supabase.from('patient_treatments').select('id, name, teeth').eq('patient_id', params.patient).in('status', ['planned', 'active', 'completed']).order('started_on', { ascending: false }).limit(30),
+    ])
+    if (fp) fixed = fp as PatientOption
+    patTreatments = ((ft ?? []) as { id: string; name: string; teeth: string[] | null }[]).map((t) => ({ id: t.id, name: t.name, teeth: t.teeth ?? [] }))
+  }
   const cases = casesRes.data ?? []
   const today = todayKarachi()
 
@@ -73,6 +85,9 @@ export default async function LabPage({
         <LabCaseForm
           labs={(labsRes.data ?? []) as LabOption[]}
           patients={(patientsRes.data ?? []) as PatientOption[]}
+          fixedPatient={fixed}
+          treatments={patTreatments}
+          defaultTreatmentId={fixed && params.treatment && uuid.test(params.treatment) ? params.treatment : undefined}
         />
       </div>
 

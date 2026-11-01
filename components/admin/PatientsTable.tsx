@@ -58,6 +58,7 @@ export default function PatientsTable({
 }) {
   const router = useRouter()
   const [openId, setOpenId] = useState<string | null>(null)
+  const [payErr, setPayErr] = useState('')
   const [summaries, setSummaries] = useState<Record<string, Summary>>({})
   const [loading, setLoading] = useState<string | null>(null)
 
@@ -229,7 +230,7 @@ export default function PatientsTable({
         })
         if (rpcErr) {
           setSaving(false)
-          window.alert(rpcErr.message)
+          setPayErr(rpcErr.message)
           return
         }
       } else if (due) {
@@ -273,6 +274,11 @@ export default function PatientsTable({
 
   return (
     <div className="grid gap-3">
+      {payErr && (
+        <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
+          Payment nahi hui: {payErr} <button onClick={() => setPayErr('')} className="ml-2 underline">theek hai</button>
+        </p>
+      )}
       {patients.map((p) => {
         const isOpen = openId === p.id
         const s = summaries[p.id]

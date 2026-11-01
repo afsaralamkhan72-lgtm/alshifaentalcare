@@ -16,6 +16,7 @@ export interface OldRecord {
   condition: string
   treatment_date: string
   created_at?: string | null
+  state?: string | null
 }
 
 const UR = ['18', '17', '16', '15', '14', '13', '12', '11']
@@ -32,7 +33,14 @@ const QUADS: { k: Quad; l: string; short: string; adult: string[]; milk: string[
 ]
 
 // Aam istemaal hone wale nishan pehle, baqi "Aur nishan" mein
-const COMMON = ['caries', 'filling', 'rct', 'crown', 'missing', 'extraction', 'fracture', 'mobility', 'implant', 'calculus']
+const COMMON = ['caries', 'filling', 'rct', 'crown', 'missing', 'extraction', 'fracture', 'implant', 'bridge', 'denture']
+// Masoorhon / perio ke nishan alag hissay mein
+const GUM = ['calculus', 'plaque', 'bleeding', 'pocket', 'recession', 'mobility', 'furcation']
+const STATES: { v: Mark['state']; l: string; hint: string }[] = [
+  { v: 'existing', l: 'Pehle se hai', hint: 'Jo muh mein ab maujood hai' },
+  { v: 'planned', l: 'Karna hai', hint: 'Jo aage karna hai' },
+  { v: 'completed', l: 'Aaj ho gaya', hint: 'Jo aaj hi kar diya' },
+]
 const SURFACES: { v: string; l: string }[] = [
   { v: 'M', l: 'M darmiyan ki taraf' },
   { v: 'O', l: 'O chabane ki sath' },
@@ -80,6 +88,7 @@ export default function ToothChart({
   const [narrow, setNarrow] = useState(false)
   const [quad, setQuad] = useState<Quad>('UR')
   const [more, setMore] = useState(false)
+  const [markState, setMarkState] = useState<Mark['state']>('existing')
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 639px)')
@@ -89,36 +98,37 @@ export default function ToothChart({
     return () => mq.removeEventListener('change', on)
   }, [])
 
-  const markOf = (t: string) => marks.find((m) => m.tooth === t)
+  // Aik daant par aik se zyada nishan ho sakte hain (jaise Filling + Mobility)
+  const marksOf = (t: string) => marks.filter((m) => m.tooth === t)
   const oldOf = (t: string) =>
     old
-      .filter((r) => r.tooth_number === t)
+      .filter((r) => r.tooth_number === t && r.state !== 'planned')
       .sort((a, b) => b.treatment_date.localeCompare(a.treatment_date) || (b.created_at ?? '').localeCompare(a.created_at ?? ''))[0]
 
   const toggle = (t: string) => onSelect(selected.includes(t) ? selected.filter((x) => x !== t) : [...selected, t])
 
   function apply(c: string) {
     if (!onMarks || selected.length === 0) return
-    const allHave = selected.every((t) => markOf(t)?.condition === c)
+    const same = (m: Mark, t: string) => m.tooth === t && m.condition === c
+    const allHave = selected.every((t) => marks.some((m) => same(m, t) && m.state === markState))
     if (allHave) {
-      // wohi nishan dobara dabane par hat jata hai
-      onMarks(marks.filter((m) => !selected.includes(m.tooth)))
+      // wohi nishan wahi halat mein dobara dabane par hat jata hai
+      onMarks(marks.filter((m) => !(selected.includes(m.tooth) && m.condition === c)))
       return
     }
-    const rest = marks.filter((m) => !selected.includes(m.tooth))
-    onMarks([
-      ...rest,
-      ...selected.map((tooth) => ({ tooth, condition: c, surfaces: markOf(tooth)?.surfaces ?? [], state: 'existing' as const })),
-    ])
+    const kept = marks.map((m) => (selected.includes(m.tooth) && m.condition === c ? { ...m, state: markState } : m))
+    const add = selected
+      .filter((t) => !marks.some((m) => same(m, t)))
+      .map((tooth) => ({ tooth, condition: c, surfaces: [] as string[], state: markState }))
+    onMarks([...kept, ...add])
+    setMarkState('existing') // agla nishan phir se "pehle se hai" se shuru (galti se purani halat na reh jaye)
   }
   function toggleSurface(s: string) {
     if (!onMarks) return
-    const on = selected.every((t) => markOf(t)?.surfaces.includes(s))
-    onMarks(
-      marks.map((m) =>
-        selected.includes(m.tooth) ? { ...m, surfaces: on ? m.surfaces.filter((x) => x !== s) : [...new Set([...m.surfaces, s])] } : m
-      )
-    )
+    const has = (m: Mark) => selected.includes(m.tooth) && SURFACE_CONDS.includes(m.condition)
+    const targets = marks.filter(has)
+    const on = targets.length > 0 && targets.every((m) => m.surfaces.includes(s))
+    onMarks(marks.map((m) => (has(m) ? { ...m, surfaces: on ? m.surfaces.filter((x) => x !== s) : [...new Set([...m.surfaces, s])] } : m)))
   }
 
   const showAdult = mode !== 'milk'
@@ -126,7 +136,8 @@ export default function ToothChart({
   const size = narrow ? 34 : 30
 
   function Tooth({ t, upper }: { t: string; upper: boolean }) {
-    const m = markOf(t)
+    const ms = marksOf(t)
+    const m = ms[0]
     const o = m ? undefined : oldOf(t)
     const cond = m?.condition ?? o?.condition
     const sel = selected.includes(t)
@@ -157,7 +168,16 @@ export default function ToothChart({
           size={size}
         />
         {!upper && <span className={`text-[11px] font-bold ${sel ? 'text-sky-700' : 'text-clinic-ink/70'}`}>{toothName(t)}</span>}
-        {m && m.surfaces.length > 0 && <span className="text-[9px] font-semibold text-clinic-teal">{m.surfaces.join('')}</span>}
+        {ms.some((x) => x.surfaces.length > 0) && <span className="text-[9px] font-semibold text-clinic-teal">{[...new Set(ms.flatMap((x) => x.surfaces))].join('')}</span>}
+        {ms.some((x) => x.state === 'planned') && <span title="Karna hai" className="text-[10px] leading-none text-amber-600">⏳</span>}
+        {ms.some((x) => x.state === 'completed') && <span title="Aaj ho gaya" className="text-[10px] font-bold leading-none text-emerald-600">✓</span>}
+        {ms.length > 1 && (
+          <span className="mt-0.5 flex gap-0.5">
+            {ms.slice(1, 4).map((x) => (
+              <span key={x.condition} title={x.condition} className="h-2 w-2 rounded-full border border-black/20" style={{ background: TOOTH_FILL[x.condition] ?? '#fff' }} />
+            ))}
+          </span>
+        )}
       </button>
     )
   }
@@ -253,8 +273,8 @@ export default function ToothChart({
   )
 
   // ---- Chart par jo nishan hain un ka rang-legend ----
-  const usedConds = [...new Set([...marks.map((m) => m.condition), ...old.filter((r) => !markOf(r.tooth_number)).map((r) => r.condition)])].filter((c) => c && c !== 'healthy')
-  const hasGhost = old.some((r) => !markOf(r.tooth_number))
+  const usedConds = [...new Set([...marks.map((m) => m.condition), ...old.filter((r) => !marksOf(r.tooth_number).length).map((r) => r.condition)])].filter((c) => c && c !== 'healthy')
+  const hasGhost = old.some((r) => !marksOf(r.tooth_number).length)
   const inc = selected.length > 0 && selected.every((t) => ['1', '2', '3'].includes(localNumber(t)) && !isPrimary(t))
 
   return (
@@ -315,9 +335,17 @@ export default function ToothChart({
       {!pickOnly && canEdit && selected.length > 0 && onMarks && (
         <div className="mt-3 grid gap-2 rounded-xl bg-clinic-mint/50 p-3">
           <p className="text-xs font-semibold text-clinic-ink/70">Chune hue daanton par nishan (zaroori nahi)</p>
-          <div className="flex flex-wrap gap-1.5">
-            {CONDITIONS.filter((c) => c.value !== 'healthy' && (more || COMMON.includes(c.value))).map((c) => {
-              const on = selected.every((t) => markOf(t)?.condition === c.value)
+          <div className="flex flex-wrap items-center gap-1.5 text-xs">
+            <span className="text-clinic-ink/60">Agla nishan:</span>
+            {STATES.map((st) => (
+              <button key={st.v} type="button" title={st.hint} onClick={() => setMarkState(st.v)} aria-pressed={markState === st.v} className={`rounded-full px-3 py-1 font-semibold ${markState === st.v ? 'bg-clinic-teal text-white' : 'border border-clinic-teal/25 bg-white text-clinic-ink/70'}`}>
+                {st.l}
+              </button>
+            ))}
+          </div>
+          {(() => {
+            const btn = (c: (typeof CONDITIONS)[number]) => {
+              const on = selected.every((t) => marks.some((m) => m.tooth === t && m.condition === c.value && m.state === markState))
               return (
                 <button
                   key={c.value}
@@ -330,17 +358,51 @@ export default function ToothChart({
                   {c.label}
                 </button>
               )
-            })}
-            <button type="button" onClick={() => setMore(!more)} className="rounded-full px-3 py-1.5 text-xs font-semibold text-clinic-teal underline">
-              {more ? 'Kam dikhayen' : 'Aur nishan'}
-            </button>
-          </div>
-          {selected.some((t) => SURFACE_CONDS.includes(markOf(t)?.condition ?? '')) && (
+            }
+            const rest = CONDITIONS.filter((c) => c.value !== 'healthy' && !COMMON.includes(c.value) && !GUM.includes(c.value))
+            return (
+              <>
+                <div>
+                  <p className="mb-1 text-[11px] font-semibold text-clinic-ink/55">Daant</p>
+                  <div className="flex flex-wrap gap-1.5">{CONDITIONS.filter((c) => COMMON.includes(c.value)).map(btn)}</div>
+                </div>
+                <div>
+                  <p className="mb-1 text-[11px] font-semibold text-clinic-ink/55">Masoorhe / gums</p>
+                  <div className="flex flex-wrap gap-1.5">{CONDITIONS.filter((c) => GUM.includes(c.value)).map(btn)}</div>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {more && rest.map(btn)}
+                  {selected.some((t) => marksOf(t).length > 0) && (
+                    <button type="button" onClick={() => onMarks(marks.filter((m) => !selected.includes(m.tooth)))} className="rounded-full px-3 py-1.5 text-xs font-semibold text-red-600 underline">
+                      Sab nishan hatao
+                    </button>
+                  )}
+                  <button type="button" onClick={() => setMore(!more)} className="rounded-full px-3 py-1.5 text-xs font-semibold text-clinic-teal underline">
+                    {more ? 'Kam dikhayen' : 'Aur nishan'}
+                  </button>
+                </div>
+                {selected.map((t) => {
+                  const o = marksOf(t).length === 0 ? oldOf(t) : undefined
+                  if (!o || o.condition === 'healthy') return null
+                  return (
+                    <p key={t} className="flex flex-wrap items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs text-clinic-ink/75">
+                      Pehle ka nishan {toothLabel(t)}: <b>{CONDITIONS.find((x) => x.value === o.condition)?.label ?? o.condition}</b> ({o.treatment_date})
+                      <button type="button" onClick={() => onMarks([...marks, { tooth: t, condition: 'healthy', surfaces: [], state: 'existing' }])} className="font-semibold text-clinic-teal underline">
+                        Ab nahi hai (theek hai)
+                      </button>
+                    </p>
+                  )
+                })}
+              </>
+            )
+          })()}
+          {selected.some((t) => marksOf(t).some((m) => SURFACE_CONDS.includes(m.condition))) && (
             <div className="flex flex-wrap items-center gap-1.5 text-xs">
               <span className="text-clinic-ink/60">Daant ka kaun sa hissa?</span>
               {SURFACES.map((s) => {
                 const label = s.v === 'O' && inc ? { v: 'O', l: 'I samne ki dhaar' } : s
-                const on = selected.every((t) => markOf(t)?.surfaces.includes(s.v))
+                const sm = marks.filter((m) => selected.includes(m.tooth) && SURFACE_CONDS.includes(m.condition))
+                const on = sm.length > 0 && sm.every((m) => m.surfaces.includes(s.v))
                 return (
                   <button key={s.v} type="button" onClick={() => toggleSurface(s.v)} aria-pressed={on} title={label.l} className={`rounded-full px-2.5 py-1 font-semibold ${on ? 'bg-clinic-teal text-white' : 'border border-clinic-teal/25 bg-white'}`}>
                     {label.l}

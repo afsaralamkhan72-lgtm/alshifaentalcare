@@ -127,7 +127,7 @@ export const CLINIC = {
  * Vercel par NEXT_PUBLIC_SITE_URL set kar dein, warna yahi use hoga.
  */
 export const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL || 'https://alshifaentalcare.vercel.app'
+  process.env.NEXT_PUBLIC_SITE_URL || 'https://alshifahomeoanddentalcare.com'
 
 /**
  * Google ko clinic ke baare mein batane wali maloomat (structured data).

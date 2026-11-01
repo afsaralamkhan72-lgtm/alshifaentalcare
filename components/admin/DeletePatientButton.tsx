@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
@@ -21,6 +21,17 @@ export default function DeletePatientButton({ patientId, patientName, mrNumber }
   const [typed, setTyped] = useState('')
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState('')
+  const [owing, setOwing] = useState(0)
+  // Baqaya wale patient ko hatane se pehle saaf warning
+  useEffect(() => {
+    if (!open) return
+    createClient()
+      .from('patient_balances')
+      .select('balance')
+      .eq('patient_id', patientId)
+      .maybeSingle()
+      .then(({ data }) => setOwing(Number((data as { balance?: number } | null)?.balance ?? 0)))
+  }, [open, patientId])
 
   const matches = typed.trim().toLowerCase() === patientName.trim().toLowerCase()
 
@@ -75,6 +86,11 @@ export default function DeletePatientButton({ patientId, patientName, mrNumber }
               </ul>
             </div>
 
+            {owing > 0 && (
+              <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm font-semibold text-amber-900">
+                Dhyan dein: is patient ka Rs. {owing.toLocaleString('en-US')} baqaya hai. Recycle bin mein jane se wo Dues list mein nahi dikhega. Pehle baqaya wasool karein ya soch samajh kar hatayein.
+              </p>
+            )}
             <label className="mt-4 block text-sm text-clinic-ink">
               Tasdeeq ke liye patient ka pura naam likhein:
             </label>
@@ -96,14 +112,14 @@ export default function DeletePatientButton({ patientId, patientName, mrNumber }
                 }}
                 className="rounded-full border border-clinic-teal/20 px-4 py-2 text-sm font-semibold text-clinic-ink/70"
               >
-                Cancel
+                Wapas
               </button>
               <button
                 onClick={handleDelete}
                 disabled={!matches || deleting}
                 className="rounded-full bg-red-600 px-5 py-2 text-sm font-semibold text-white disabled:opacity-40"
               >
-                {deleting ? 'Deleting...' : 'Move to Recycle Bin'}
+                {deleting ? 'Ho raha hai...' : 'Recycle bin mein bhejein'}
               </button>
             </div>
           </div>

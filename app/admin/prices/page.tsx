@@ -9,13 +9,13 @@ export default async function PricesPage() {
   const listQuery = (cols: string) =>
     supabase.from('treatment_catalog').select(cols).order('is_active', { ascending: false }).order('sort_order').order('name')
   const [catWith, counterRes, invRes] = await Promise.all([
-    listQuery('id, name, department, price, is_active, category, sort_order, applies_to'),
+    listQuery('id, name, department, price, is_active, category, sort_order, applies_to, price_note'),
     supabase.from('invoice_counter').select('prefix, next_no').eq('id', 1).maybeSingle(),
     supabase.from('inventory').select('id, item_name, unit').order('item_name'),
   ])
 
   // Naya column (applies_to) abhi database mein na ho (SQL baad mein chali) to purani list hi dikhao
-  const catRes = catWith.error ? await listQuery('id, name, department, price, is_active, category, sort_order') : catWith
+  const catRes = catWith.error ? await listQuery('id, name, department, price, is_active, category, sort_order') : catWith // (price_note na ho to purani list)
 
   if (catRes.error) {
     return (

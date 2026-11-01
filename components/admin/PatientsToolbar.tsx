@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import PatientExtraFields, { EXTRA_EMPTY, ageFrom, extraToDb, type Extra } from './PatientExtraFields'
 import { friendlyError } from '@/lib/errors'
+import { todayKarachi } from '@/lib/karachi'
 
 interface FormState {
   full_name: string
@@ -45,6 +46,12 @@ export default function PatientsToolbar({
   const [similar, setSimilar] = useState<{ id: string; full_name: string; phone: string; mr_number: string | null; age: number | null }[]>([])
   const [dupOk, setDupOk] = useState(false)
   const [extra, setExtra] = useState<Extra>(EXTRA_EMPTY)
+  const [allergy, setAllergy] = useState('')
+  const [thinner, setThinner] = useState(false)
+  const [seeNow, setSeeNow] = useState(true)
+  const [consent, setConsent] = useState(false)
+  const [cnic, setCnic] = useState('')
+  const [family, setFamily] = useState('')
   const ageNum = ageFrom(form.age, form.date_of_birth)
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
@@ -61,6 +68,12 @@ export default function PatientsToolbar({
     setSaving(true)
     setError('')
 
+    const phoneDigits = form.phone.replace(/[^0-9]/g, '')
+    if (phoneDigits.length < 10 || phoneDigits.length > 13) {
+      setSaving(false)
+      setError('Phone number poora likhein (jaise 0300-1234567). Warna WhatsApp message nahi ja sakega.')
+      return
+    }
     const supabase = createClient()
     if (!dupOk) {
       const { data: found } = await supabase.rpc('find_similar_patients', { p_name: form.full_name, p_phone: form.phone })
@@ -79,8 +92,22 @@ export default function PatientsToolbar({
       gender: form.gender || null,
       primary_doctor: form.primary_doctor || null,
       address: form.address || null,
+      // Zaroori sawal: doctor ko dikhane ke liye profile par nishani ban jati hai
+      notes: [allergy.trim() ? `Allergy: ${allergy.trim()}` : '', thinner ? 'Blood thinner leta/leti hai' : ''].filter(Boolean).join(' · ') || null,
     }
-    let { data: created, error: insertError } = await supabase.from('patients').insert({ ...base, ...extraToDb(extra) }).select('id').single()
+    // Family: kisi rishtedaar ka MR number ya phone likha ho to us se jor do
+    let familyOf: string | null = null
+    if (family.trim()) {
+      const f = family.trim().replace(/[%,()*\\"']/g, ' ')
+      const { data: rel } = await supabase.from('patients').select('id, family_of').is('deleted_at', null).or(`mr_number.eq.${f},phone.eq.${f}`).limit(1)
+      if (!rel || rel.length === 0) {
+        setSaving(false)
+        setError('Family wala patient nahi mila. MR number ya phone sahi likhein, ya khali chorein.')
+        return
+      }
+      familyOf = (rel[0] as { id: string; family_of: string | null }).family_of ?? (rel[0] as { id: string }).id
+    }
+    let { data: created, error: insertError } = await supabase.from('patients').insert({ ...base, ...extraToDb(extra), cnic: cnic.trim() || null, family_of: familyOf }).select('id').single()
     // Naye khane abhi database mein na hon (SQL baad mein chali) to purane tareeqe se save ho jaye
     if (insertError && (insertError.code === 'PGRST204' || /column/i.test(insertError.message))) {
       ;({ data: created, error: insertError } = await supabase.from('patients').insert(base).select('id').single())
@@ -96,6 +123,39 @@ export default function PatientsToolbar({
       await supabase.from('treating_doctors').insert({ name: form.primary_doctor.trim() })
     }
 
+    if (consent) await supabase.rpc('give_consent', { p_patient: created.id })
+    // Register ke saath hi "abhi doctor ko dikhana hai" -> aaj ki list mein "intezar mein"
+    if (seeNow) {
+      // Aaj isi phone ki appointment pehle se ho (jaise website booking) to nayi na banao, wahi "aa gaya" kar do
+      const tail = phoneDigits.slice(-7)
+      const { data: ex } = await supabase
+        .from('appointments')
+        .select('id')
+        .eq('preferred_date', todayKarachi())
+        .is('deleted_at', null)
+        .in('status', ['pending', 'confirmed'])
+        .ilike('phone', `%${tail}%`)
+        .limit(1)
+      if (ex && ex.length > 0) {
+        await supabase.from('appointments').update({ patient_id: created.id, status: 'arrived', arrived_at: new Date().toISOString() }).eq('id', (ex[0] as { id: string }).id)
+      } else {
+        await supabase.from('appointments').insert({
+          patient_name: form.full_name,
+          phone: form.phone,
+          department: form.department,
+          patient_id: created.id,
+          preferred_date: todayKarachi(),
+          status: 'arrived',
+          arrived_at: new Date().toISOString(),
+          source: 'walk-in',
+        })
+      }
+    }
+    setAllergy('')
+    setThinner(false)
+    setConsent(false)
+    setCnic('')
+    setFamily('')
     setForm(INITIAL)
     setExtra(EXTRA_EMPTY)
     setSimilar([])
@@ -110,14 +170,14 @@ export default function PatientsToolbar({
         onClick={() => setOpen(true)}
         className="rounded-full bg-clinic-teal px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-clinic-teal-light"
       >
-        + Add Patient
+        + Naya Patient
       </button>
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6">
             <div className="flex items-center justify-between">
-              <p className="font-display text-lg font-semibold text-clinic-ink">Add New Patient</p>
+              <p className="font-display text-lg font-semibold text-clinic-ink">Naya Patient register karein</p>
               <button onClick={() => setOpen(false)} className="text-clinic-ink/40 hover:text-clinic-ink">
                 ✕
               </button>
@@ -219,6 +279,34 @@ export default function PatientsToolbar({
                 </div>
               </details>
 
+              <div className="rounded-xl bg-red-50/60 p-3">
+                <p className="text-sm font-medium text-clinic-ink">Zaroori sawal (doctor ke liye)</p>
+                <input
+                  placeholder="Kisi dawa / cheez se allergy? (nahi to khali chorein)"
+                  value={allergy}
+                  onChange={(e) => setAllergy(e.target.value)}
+                  className="mt-2 w-full rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm outline-none focus:border-clinic-teal"
+                />
+                <label className="mt-2 flex items-center gap-2 text-sm text-clinic-ink/80">
+                  <input type="checkbox" checked={thinner} onChange={(e) => setThinner(e.target.checked)} className="h-4 w-4" />
+                  Khoon patla karne ki dawa (Aspirin / Warfarin) leta/leti hai
+                </label>
+              </div>
+
+              <label className="flex items-center gap-2 text-sm text-clinic-ink/80">
+                <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="h-4 w-4" />
+                Ilaaj ki ijazat (consent) le li gayi
+              </label>
+
+              <label className="flex items-center gap-2 text-sm text-clinic-ink/80">
+                <input type="checkbox" checked={seeNow} onChange={(e) => setSeeNow(e.target.checked)} className="h-4 w-4" />
+                Patient abhi doctor ko dikhana chahta hai (aaj ki &quot;intezar&quot; list mein daalein)
+              </label>
+
+              <div className="grid grid-cols-2 gap-3">
+                <input placeholder="CNIC (optional)" value={cnic} onChange={(e) => setCnic(e.target.value)} className="rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm outline-none focus:border-clinic-teal" />
+                <input placeholder="Family: rishtedaar ka MR / phone" value={family} onChange={(e) => setFamily(e.target.value)} className="rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm outline-none focus:border-clinic-teal" />
+              </div>
               <textarea
                 placeholder="Address (optional)"
                 value={form.address}
@@ -261,7 +349,7 @@ export default function PatientsToolbar({
                 disabled={saving}
                 className="mt-2 rounded-full bg-clinic-teal px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-clinic-teal-light disabled:opacity-60"
               >
-                {saving ? 'Saving...' : 'Save Patient'}
+                {saving ? 'Save ho raha hai...' : 'Patient save karein'}
               </button>
             </form>
           </div>

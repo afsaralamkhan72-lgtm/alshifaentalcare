@@ -94,14 +94,14 @@ export default function PatientEditModal({ patient }: PatientEditModalProps) {
         onClick={() => setOpen(true)}
         className="rounded-full border border-clinic-teal px-4 py-2 text-sm font-semibold text-clinic-teal transition-colors hover:bg-clinic-teal hover:text-white"
       >
-        Edit Patient
+        Patient ki tafseel badlein
       </button>
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6">
             <div className="flex items-center justify-between">
-              <p className="font-display text-lg font-semibold text-clinic-ink">Edit Patient</p>
+              <p className="font-display text-lg font-semibold text-clinic-ink">Patient ki tafseel badlein</p>
               <button onClick={() => setOpen(false)} className="text-clinic-ink/40 hover:text-clinic-ink">
                 ✕
               </button>

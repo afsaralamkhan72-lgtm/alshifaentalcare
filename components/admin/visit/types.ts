@@ -45,4 +45,5 @@ export interface CatalogOpt {
   department: string | null
   /** poora muh / jabda / har daant ki / aik dafa (puranay database mein khali) */
   applies_to?: 'tooth' | 'mouth' | 'jaw' | 'once' | null
+  price_note?: string | null
 }

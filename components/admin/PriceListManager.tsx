@@ -13,6 +13,7 @@ export interface CatalogRow {
   price: number
   is_active: boolean
   category?: string | null
+  price_note?: string | null
   applies_to?: 'tooth' | 'mouth' | 'jaw' | 'once' | null
 }
 
@@ -52,6 +53,7 @@ export default function PriceListManager({
   const [busy, setBusy] = useState(false)
   const [editing, setEditing] = useState<string | null>(null)
   const [editPrice, setEditPrice] = useState('')
+  const [editNote, setEditNote] = useState('')
   const [history, setHistory] = useState<Record<string, HistoryRow[]>>({})
   const [openHist, setOpenHist] = useState<string | null>(null)
   const [openMat, setOpenMat] = useState<string | null>(null)
@@ -91,7 +93,7 @@ export default function PriceListManager({
     const supabase = createClient()
     const { error } = await supabase
       .from('treatment_catalog')
-      .update({ price: Number(editPrice) })
+      .update({ price: Number(editPrice), price_note: editNote.trim() || null })
       .eq('id', id)
     setBusy(false)
     if (error) {
@@ -250,16 +252,17 @@ export default function PriceListManager({
                     {editing === r.id ? (
                       <span className="inline-flex items-center gap-2">
                         <input value={editPrice} onChange={(e) => setEditPrice(e.target.value)} type="number" min={0} className={`${inputClass} w-28`} autoFocus />
+                        <input value={editNote} onChange={(e) => setEditNote(e.target.value)} placeholder="Range / note (jaise 1,500–2,000)" className={`${inputClass} w-44`} />
                         <button onClick={() => savePrice(r.id)} disabled={busy} className="text-xs font-semibold text-clinic-teal">Save</button>
                         <button onClick={() => setEditing(null)} className="text-xs text-clinic-ink/50">Cancel</button>
                       </span>
                     ) : (
-                      <>Rs. {Number(r.price).toLocaleString()}</>
+                      <>Rs. {Number(r.price).toLocaleString()}{r.price_note ? <span className="block text-xs text-clinic-ink/50">{r.price_note}</span> : null}</>
                     )}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <span className="inline-flex gap-3 text-xs font-semibold text-clinic-teal">
-                      <button onClick={() => { setEditing(r.id); setEditPrice(String(r.price)) }}>Qeemat badlein</button>
+                      <button onClick={() => { setEditing(r.id); setEditPrice(String(r.price)); setEditNote(r.price_note ?? '') }}>Qeemat badlein</button>
                       <button onClick={() => showHistory(r.id)}>History</button>
                       <button onClick={() => setOpenMat(openMat === r.id ? null : r.id)}>Samaan</button>
                       <button onClick={() => toggleActive(r)}>{r.is_active ? 'Band' : 'Chalu'}</button>

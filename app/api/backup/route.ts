@@ -12,7 +12,7 @@ const TABLES = [
   'clinical_visits', 'visit_notes', 'dental_chart', 'prescriptions', 'appointments', 'appointment_history',
   'invoices', 'invoice_items', 'payments', 'transactions', 'day_closings', 'recalls', 'lab_cases', 'labs',
   'inventory', 'inventory_movements', 'medicines', 'treatment_catalog', 'treatment_materials', 'treating_doctors',
-  'patient_photos', 'staff_profiles', 'staff_permissions', 'staff_members', 'staff_ledger', 'clinic_options', 'site_settings',
+  'patient_photos', 'staff_profiles', 'staff_permissions', 'staff_members', 'staff_ledger', 'clinic_options', 'site_settings', 'treatment_stages', 'message_templates',
 ]
 
 /** Sirf Admin / Doctor (owner): poore data ki JSON copy download. Ye sirf ek sahulat hai; asal backup Supabase ke dashboard mein bhi rakhein. */

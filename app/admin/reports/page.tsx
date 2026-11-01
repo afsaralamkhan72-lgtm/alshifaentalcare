@@ -52,7 +52,7 @@ export default async function ReportsPage({
       .gte('preferred_date', from)
       .lte('preferred_date', to),
     // Kul baqaya: wohi jo Accounts aur Baqaya page par hai (purana aur naya system dono)
-    supabase.from('patient_balances').select('balance').gt('balance', 0),
+    supabase.from('patient_balances').select('patient_id, balance').gt('balance', 0),
     // Is mahine ke bills mein kaun si treatment kitni bani (bill ki raqam ke hisaab se)
     supabase.from('invoices').select('id').gte('invoice_date', from).lte('invoice_date', to).is('voided_at', null).limit(5000),
   ])
@@ -120,7 +120,14 @@ export default async function ReportsPage({
 
   const newPatients = patientsRes.data ?? []
   const appts = apptRes.data ?? []
-  const dueTotal = (balRes.data ?? []).reduce((s, r) => s + Number(r.balance), 0)
+  // Recycle bin wale patients ka baqaya Dues list mein nahi aata, is liye yahan bhi alag rakha (dono hisaab barabar)
+  const balRows = (balRes.data ?? []) as { patient_id: string; balance: number }[]
+  const { data: binRows } = balRows.length
+    ? await supabase.from('patients').select('id').not('deleted_at', 'is', null).in('id', balRows.map((r) => r.patient_id))
+    : { data: [] as { id: string }[] }
+  const binIds = new Set((binRows ?? []).map((r) => r.id))
+  const dueTotal = balRows.filter((r) => !binIds.has(r.patient_id)).reduce((s, r) => s + Number(r.balance), 0)
+  const binDue = balRows.filter((r) => binIds.has(r.patient_id)).reduce((s, r) => s + Number(r.balance), 0)
 
   const maxCat = categories[0]?.[1] ?? 1
 
@@ -184,6 +191,7 @@ export default async function ReportsPage({
           <p className="mt-1 font-display text-lg font-semibold text-amber-700">
             Rs. {dueTotal.toLocaleString()}
           </p>
+          {binDue > 0 && <p className="mt-1 text-[11px] text-amber-800">+ Rs. {binDue.toLocaleString()} recycle bin wale patients ka (Dues list mein nahi)</p>}
         </div>
       </div>
 

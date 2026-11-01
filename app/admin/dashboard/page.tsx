@@ -8,6 +8,7 @@ import { fmtDate, addDays } from '@/lib/karachi'
 import { getReminderDays } from '@/lib/reminders'
 import WhatsAppMenu from '@/components/admin/WhatsAppMenu'
 import { apptReminderLink } from '@/lib/messages'
+import { mapTemplates } from '@/lib/messageTemplates'
 import OwnerToday from '@/components/admin/OwnerToday'
 import { todayKarachi } from '@/lib/karachi'
 
@@ -525,6 +526,7 @@ async function TodayBoard({ perms }: { perms: string[] }) {
       ? supabase.from('clinical_visits').select('patient_id').eq('visit_date', today).eq('status', 'finished')
       : Promise.resolve({ data: null }),
   ])
+  const tpl = mapTemplates(((await supabase.from('message_templates').select('key, body')).data ?? []) as { key: string; body: string }[])
   const soon = (soonRes.data ?? []) as { id: string; patient_name: string; phone: string; treatment_name: string | null; preferred_date: string; preferred_time: string | null; patient_id: string | null; doctor: string | null }[]
   const activeCount = 'count' in activeRes ? activeRes.count : null
   const seenToday = visitsTodayRes.data
@@ -630,7 +632,7 @@ async function TodayBoard({ perms }: { perms: string[] }) {
                         {a.treatment_name ? ` · ${a.treatment_name}` : ''}
                       </span>
                     </span>
-                    <WhatsAppMenu items={[{ label: 'Yaad dehani (reminder)', href: apptReminderLink(a) }]} label="Reminder" />
+                    <WhatsAppMenu items={[{ label: 'Yaad dehani (reminder)', href: apptReminderLink(a, tpl) }]} label="Reminder" />
                   </div>
                 ))}
               </div>
@@ -666,6 +668,9 @@ async function TodayBoard({ perms }: { perms: string[] }) {
                   <span className="font-medium">{l.patients?.full_name ?? '—'}</span>
                   <span className="ml-1 text-xs text-clinic-ink/50">
                     {l.work_type} · {l.status === 'received' ? 'aa gaya, fit karna hai' : `due ${fmtDate(l.due_date)}`}
+                    {l.status !== 'received' && l.due_date && l.due_date < today && (
+                      <b className="ml-1 text-red-600">· {Math.round((new Date(today).getTime() - new Date(l.due_date).getTime()) / 86400000)} din late, lab se poochein</b>
+                    )}
                   </span>
                 </Link>
               ))}

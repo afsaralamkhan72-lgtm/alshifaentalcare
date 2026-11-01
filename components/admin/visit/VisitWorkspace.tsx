@@ -126,7 +126,7 @@ interface Props {
   hasPlanned?: boolean
   xraySlot?: ReactNode
   plansSlot?: ReactNode
-  pastRx?: { id: string; date: string; names: string }[]
+  pastRx?: { id: string; date: string; names: string; items?: { name: string; potency: string; dose: string; frequency: string; duration: string; instructions: string }[] }[]
   perms: { clinicalView: boolean; clinicalEdit: boolean; bill: boolean; collect: boolean; money: boolean; owner: boolean; rx: boolean }
 }
 
@@ -149,13 +149,31 @@ const SLOTS = (() => {
 const input = 'mt-1 w-full rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm outline-none focus:border-clinic-teal'
 const newKey = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : String(Date.now() + Math.random()))
 
-function Section({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
+function Section({ n, title, children, hint, collapsed }: { n: number; title: string; children: React.ReactNode; hint?: string; collapsed?: boolean }) {
+  const head = (
+    <>
+      <span className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-clinic-teal text-sm text-white">{n}</span>
+      {title}
+    </>
+  )
+  if (collapsed) {
+    return (
+      <section id={`s${n}`} className="scroll-mt-20 rounded-2xl border border-clinic-teal/10 bg-white p-4 sm:p-5">
+        <details>
+          <summary className="cursor-pointer font-display text-lg font-semibold text-clinic-ink">
+            {head}
+            <span className="ml-2 text-xs font-normal text-clinic-ink/50">(pehle bhari ja chuki hai, kholne ke liye dabayein)</span>
+          </summary>
+          <div className="mt-3">{children}</div>
+        </details>
+      </section>
+    )
+  }
   return (
     <section id={`s${n}`} className="scroll-mt-20 rounded-2xl border border-clinic-teal/10 bg-white p-4 sm:p-5">
-      <h2 className="mb-3 font-display text-lg font-semibold text-clinic-ink">
-        <span className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-clinic-teal text-sm text-white">{n}</span>
-        {title}
-      </h2>
+      <h2 className="font-display text-lg font-semibold text-clinic-ink">{head}</h2>
+      {hint && <p className="mb-3 mt-1 text-xs text-clinic-ink/55">{hint}</p>}
+      {!hint && <div className="mb-3" />}
       {children}
     </section>
   )
@@ -195,6 +213,8 @@ export default function VisitWorkspace(p: Props) {
   // doctor jis ke naam par aaj ka visit (income by doctor report isi se banti hai)
   const [doctor, setDoctor] = useState(v?.doctor ?? p.defaultDoctor ?? '')
   const [confirmDone, setConfirmDone] = useState<string | null>(null)
+  // RCT mukammal hone ke baad: agla qadam (crown) ka ishara
+  const [nextStep, setNextStep] = useState<{ id: string; name: string; teeth: string[] } | null>(null)
 
   // 2, 3 history
   const [medical, setMedical] = useState<Record<string, unknown>>(p.history.medical_history)
@@ -240,26 +260,40 @@ export default function VisitWorkspace(p: Props) {
   const draftKey = `alshifa-visit:${p.patient.id}:${todayKarachi()}`
   const [restored, setRestored] = useState(false)
   useEffect(() => {
-    try {
-      // Visit doosre device par khatam ho chuka ho to yahan ka purana draft wapas na aaye
-      if (p.finishedToday && !p.visit) {
-        localStorage.removeItem(draftKey)
-        setRestored(true)
-        return
+    const apply = (d: Record<string, unknown>) => {
+      if (Array.isArray(d.rows)) setRows(d.rows as TRow[])
+      if (d.old && typeof d.old === 'object') setOld(d.old as Record<string, OldRow>)
+      if (Array.isArray(d.lines)) setLines(d.lines as RxLine[])
+      if (typeof d.rxNotes === 'string') setRxNotes(d.rxNotes)
+      if (Array.isArray(d.extra)) setExtra(d.extra as typeof extra)
+      if (Array.isArray(d.sel)) setSel(d.sel as string[])
+      if (typeof d.paid === 'string') setPaid(d.paid)
+    }
+    ;(async () => {
+      let found = false
+      try {
+        // Visit doosre device par khatam ho chuka ho to yahan ka purana draft wapas na aaye
+        if (p.finishedToday && !p.visit) {
+          localStorage.removeItem(draftKey)
+          setRestored(true)
+          return
+        }
+        const raw = localStorage.getItem(draftKey)
+        if (raw) {
+          apply(JSON.parse(raw))
+          found = true
+        }
+      } catch {}
+      // Browser mein kuch na ho (naya device / browser saaf) to server par Save ki hui nakal
+      if (!found && p.visit?.id) {
+        try {
+          const { data } = await createClient().from('clinical_visits').select('draft_extra').eq('id', p.visit.id).maybeSingle()
+          const d = (data as { draft_extra?: Record<string, unknown> | null } | null)?.draft_extra
+          if (d && typeof d === 'object') apply(d)
+        } catch {}
       }
-      const raw = localStorage.getItem(draftKey)
-      if (raw) {
-        const d = JSON.parse(raw)
-        if (Array.isArray(d.rows)) setRows(d.rows)
-        if (d.old && typeof d.old === 'object') setOld(d.old)
-        if (Array.isArray(d.lines)) setLines(d.lines)
-        if (typeof d.rxNotes === 'string') setRxNotes(d.rxNotes)
-        if (Array.isArray(d.extra)) setExtra(d.extra)
-        if (Array.isArray(d.sel)) setSel(d.sel)
-        if (typeof d.paid === 'string') setPaid(d.paid)
-      }
-    } catch {}
-    setRestored(true)
+      setRestored(true)
+    })()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftKey])
   useEffect(() => {
@@ -278,6 +312,33 @@ export default function VisitWorkspace(p: Props) {
     setRows((rs) => rs.map((r) => (r.applies !== 'tooth' ? r : { ...r, teeth: fix(r.teeth), price: autoPrice(r, fix(r.teeth)) })))
   }
 
+  // Treatment likhne par chart par nishan khud: ho gayi to "aaj ho gaya", plan ho to "karna hai"
+  const condOf = (name: string): string | null => {
+    const n = name.toLowerCase()
+    if (/root canal|\brct\b|pulpectomy|pulpotomy/.test(n)) return 'rct'
+    if (/crown|veneer|post & core/.test(n)) return 'crown'
+    if (/bridge/.test(n)) return 'bridge'
+    if (/implant/.test(n)) return 'implant'
+    if (/extraction/.test(n)) return 'extraction'
+    if (/filling|gic|composite|amalgam/.test(n)) return 'filling'
+    return null
+  }
+  const chartOut = (): Mark[] => {
+    if (homeo) return []
+    const out = [...marks]
+    for (const r of rows) {
+      const c = condOf(r.name)
+      if (!c || r.applies !== 'tooth') continue
+      for (const t of r.teeth) if (!out.some((m) => m.tooth === t && m.condition === c)) out.push({ tooth: t, condition: c, surfaces: [], state: r.planned ? 'planned' : 'completed' })
+    }
+    for (const t of p.treatments) {
+      const c = condOf(t.name)
+      if (!c || !old[t.id]?.tick) continue
+      for (const tt of t.teeth) if (!out.some((m) => m.tooth === tt && m.condition === c)) out.push({ tooth: tt, condition: c, surfaces: [], state: 'completed' })
+    }
+    return out
+  }
+
   const data = () => ({
     complaint: { items: cItems, other: cOther, duration: cDur, severity: cSev, location: cLoc },
     findings,
@@ -287,7 +348,7 @@ export default function VisitWorkspace(p: Props) {
     next_treatment_id: nextDate ? nextT : '',
     ...(doctor ? { doctor } : {}), // khali bhejne se RPC ka khud ka (login doctor) wala naam mit jata
     history: { medical_history: medical, dental_history: dental },
-    chart: homeo ? [] : marks,
+    chart: chartOut(),
   })
 
   const meds = useMemo(() => {
@@ -320,6 +381,31 @@ export default function VisitWorkspace(p: Props) {
   const updRow = (key: string, patch: Partial<TRow>) => setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)))
   const updOld = (id: string, patch: Partial<OldRow>) => setOld((o) => ({ ...o, [id]: { ...{ tick: false, notes: '', price: '' }, ...o[id], ...patch } }))
 
+  // Chart ke nishan se doctor ko suggestion: doctor dabaye to hi judta hai
+  const SUGGEST: Record<string, { dx?: string; tx?: string }> = {
+    caries: { dx: 'Dental caries', tx: 'Composite Filling' },
+    calculus: { dx: 'Calculus / Tartar', tx: 'Scaling & Polishing' },
+    plaque: { dx: 'Plaque', tx: 'Scaling & Polishing' },
+    fracture: { dx: 'Fractured tooth', tx: 'Porcelain Fused to Metal Crown (PFM)' },
+    mobility: { dx: 'Tooth mobility' },
+    missing: { dx: 'Missing tooth' },
+    periapical: { dx: 'Periapical periodontitis' },
+    extraction: { tx: 'Simple Extraction' },
+  }
+  function addDx(text: string, teeth: string[]) {
+    setDiags((ds) => (ds.some((d) => d.text.toLowerCase() === text.toLowerCase()) ? ds.map((d) => (d.text.toLowerCase() === text.toLowerCase() ? { ...d, teeth: [...new Set([...(d.teeth ?? []), ...teeth])] } : d)) : [...ds, { text, teeth }]))
+  }
+  function addTx(name: string, teeth: string[]) {
+    const c = p.catalog.find((x) => x.name.toLowerCase() === name.toLowerCase())
+    const applies: Applies = c?.applies_to ?? 'tooth'
+    const t = applies === 'tooth' ? teeth : []
+    const mats: Record<string, string> = {}
+    if (c) for (const m of p.materials[c.id] ?? []) mats[m.inventory_id] = String(m.default_qty)
+    const row: TRow = { key: newKey(), name, catalog_id: c?.id ?? null, teeth: t, price: String(c?.price ?? ''), planned: true, notes: '', mats, applies, unit: applies === 'tooth' && c ? c.price : null, manual: false, jaw: '' }
+    row.price = autoPrice(row, t)
+    setRows((rs) => [...rs, row])
+  }
+
   function pickCatalog(r: TRow, name: string) {
     const c = p.catalog.find((x) => x.name.toLowerCase() === name.trim().toLowerCase())
     const mats: Record<string, string> = {}
@@ -338,11 +424,13 @@ export default function VisitWorkspace(p: Props) {
   }
   async function completeTreatment(id: string) {
     setMsg(null)
+    const doneT = p.treatments.find((x) => x.id === id)
     const { error } = await createClient().rpc('set_treatment_status', { p_treatment_id: id, p_status: 'completed' })
     setConfirmDone(null)
     if (error) return setMsg({ ok: false, t: friendlyError(error.message) })
     setOld((o) => ({ ...o, [id]: { tick: false, notes: '', price: '' } }))
     setMsg({ ok: true, t: 'Treatment mukammal likh di gayi.' })
+    if (doneT && /root canal|\brct\b|pulpectomy/i.test(doneT.name)) setNextStep({ id: doneT.id, name: doneT.name, teeth: doneT.teeth })
     router.refresh()
   }
 
@@ -374,9 +462,12 @@ export default function VisitWorkspace(p: Props) {
     setMsg(null)
     const id = await ensureVisit()
     if (!id) return setBusy('')
-    const { error } = await createClient().rpc('save_clinical_visit', { p_id: id, p_data: data() })
+    const sb = createClient()
+    const { error } = await sb.rpc('save_clinical_visit', { p_id: id, p_data: data() })
+    // Treatment / dawa / bill ki qataren bhi server par (doosre device par bhi wapas aayengi); SQL na chali ho to chup chaap chor do
+    if (!error) await sb.rpc('save_visit_draft_extra', { p_id: id, p_extra: { rows, old, lines, rxNotes, extra, sel, paid } })
     setBusy('')
-    setMsg(error ? { ok: false, t: friendlyError(error.message) } : { ok: true, t: 'Save ho gaya (history, takleef, muaina, chart, diagnosis, agli appointment). Treatment, dawa aur bill "Finish Visit" par.' })
+    setMsg(error ? { ok: false, t: friendlyError(error.message) } : { ok: true, t: 'Save ho gaya (sab kuch: history, takleef, muaina, chart, diagnosis, treatment, dawa aur bill ki qataren). Bill ki raqam aur dawa "Finish Visit" par final hoti hai.' })
   }
 
   async function finish() {
@@ -576,19 +667,19 @@ export default function VisitWorkspace(p: Props) {
           )}
           {p.consentAt && <p className="px-1 text-xs text-clinic-ink/50">✓ Ijazat (consent) li ja chuki hai — {fmtDate(p.consentAt.slice(0, 10))}</p>}
           {/* 2. MEDICAL HISTORY */}
-          <Section n={secNo()} title="Medical History">
+          <Section n={secNo()} title="Sehat ki history (Medical History)" collapsed={!p.isFirstVisit} hint="Allergy, sugar, BP, dil ki bimari, blood thinner. Pehli visit par zaroor bharein.">
             <HistoryFields column="medical_history" data={medical} onChange={setMedical} canEdit={canEdit} />
           </Section>
 
           {/* 3. DENTAL HISTORY */}
           {!homeo && (
-            <Section n={secNo()} title="Dental History">
+            <Section n={secNo()} title="Daanton ki pichli history (Dental History)" collapsed={!p.isFirstVisit}>
               <HistoryFields column="dental_history" data={dental} onChange={setDental} canEdit={canEdit} />
             </Section>
           )}
 
           {/* 4. CHIEF COMPLAINT */}
-          <Section n={secNo()} title="Chief Complaint (takleef)">
+          <Section n={secNo()} title="Takleef (Chief Complaint)" hint="Patient ko kya takleef hai, kab se.">
             <fieldset disabled={!canEdit} className="grid gap-3">
               <div className="flex flex-wrap gap-2">
                 {complaintList.map((c) => (
@@ -636,7 +727,7 @@ export default function VisitWorkspace(p: Props) {
           </Section>
 
           {/* 5. CLINICAL EXAMINATION */}
-          <Section n={secNo()} title="Clinical Examination (muaina)">
+          <Section n={secNo()} title="Muaina (Examination)" hint="Doctor ka muaina: masoorhe, muh, jabda.">
             <fieldset disabled={!canEdit} className="grid gap-3 sm:grid-cols-3">
               {FINDINGS.map((f) => (
                 <div key={f.k}>
@@ -651,6 +742,32 @@ export default function VisitWorkspace(p: Props) {
           {!homeo && (
             <Section n={secNo()} title="Dental Chart">
               <ToothChart age={p.patient.age} selected={sel} onSelect={pickTeeth} marks={marks} onMarks={setMarks} old={p.chartRecords} canEdit={canEdit} />
+              {canEdit && (() => {
+                const groups = Object.keys(SUGGEST)
+                  .map((cond) => ({ cond, teeth: marks.filter((m) => m.condition === cond).map((m) => m.tooth), ...SUGGEST[cond] }))
+                  .filter((g) => g.teeth.length > 0)
+                if (groups.length === 0) return null
+                return (
+                  <div className="mt-3 grid gap-1.5 rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs">
+                    <p className="font-semibold text-sky-900">Chart se suggestion (dabane par hi judega, aap badal sakte hain)</p>
+                    {groups.map((g) => (
+                      <div key={g.cond} className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-clinic-ink/70">{g.teeth.map(toothLabel).join(', ')}:</span>
+                        {g.dx && (
+                          <button type="button" onClick={() => addDx(g.dx!, g.teeth)} className="rounded-full border border-sky-300 bg-white px-2.5 py-1 font-semibold text-sky-800">
+                            Dx jorein: {g.dx}
+                          </button>
+                        )}
+                        {g.tx && (
+                          <button type="button" onClick={() => addTx(g.tx!, g.teeth)} className="rounded-full border border-clinic-teal/40 bg-white px-2.5 py-1 font-semibold text-clinic-teal">
+                            Plan jorein: {g.tx}
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )
+              })()}
             </Section>
           )}
 
@@ -691,12 +808,12 @@ export default function VisitWorkspace(p: Props) {
           </Section>
 
           {/* 9. TREATMENT */}
-          <Section n={secNo()} title="Treatment">
+          <Section n={secNo()} title="Aaj ka kaam aur Plan (Treatment)" hint="Jo aaj hua wo Aaj ho gayi, jo aage karna hai wo Plan rakhein.">
             <datalist id="cat-list">
               {p.catalog
                 .filter((c) => (homeo ? c.department !== 'dental' : c.department !== 'homeopathic'))
                 .map((c) => (
-                  <option key={c.id} value={c.name} />
+                  <option key={c.id} value={c.name} label={c.price_note ? `${c.name} (${c.price_note})` : undefined} />
                 ))}
             </datalist>
             <div className="grid gap-3">
@@ -715,6 +832,11 @@ export default function VisitWorkspace(p: Props) {
                           {p.perms.money && t.status === 'active' && t.balance > 0 && <span className="text-xs text-red-600">baqaya {money(t.balance)}</span>}
                           <span className="text-xs text-clinic-ink/50">— {t.status === 'planned' ? 'aaj shuru karein' : 'aaj ka visit'}</span>
                         </label>
+                        {t.status !== 'planned' && /crown|bridge|denture|veneer|post|retainer|night guard|inlay|onlay/i.test(t.name) && (
+                          <a href={`/admin/lab?patient=${p.patient.id}&treatment=${t.id}`} target="_blank" className="mt-2 inline-block text-xs font-semibold text-clinic-teal underline">
+                            Lab ke liye bhejein →
+                          </a>
+                        )}
                         {canEdit && t.status === 'active' && (
                           <div className="mt-2 text-xs">
                             {confirmDone === t.id ? (
@@ -746,6 +868,27 @@ export default function VisitWorkspace(p: Props) {
                 </div>
               )}
 
+              {nextStep && canEdit && (
+                <div className="grid gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                  <p className="font-semibold">Agla qadam: {nextStep.name} ke baad aam tor par Crown lagta hai{nextStep.teeth.length ? ` (daant ${nextStep.teeth.map(toothLabel).join(', ')})` : ''}.</p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRows([...rows, { key: newKey(), name: '', catalog_id: null, teeth: [...nextStep.teeth], price: '', planned: true, notes: `${nextStep.name} ke baad crown`, mats: {}, applies: 'tooth', unit: null, manual: false, jaw: '' }])
+                        setNextStep(null)
+                      }}
+                      className="rounded-full bg-clinic-teal px-4 py-1.5 text-xs font-semibold text-white"
+                    >
+                      Crown plan mein jorein
+                    </button>
+                    <a href={`/admin/lab?patient=${p.patient.id}&treatment=${nextStep.id}`} target="_blank" className="rounded-full border border-clinic-teal px-4 py-1.5 text-xs font-semibold text-clinic-teal">
+                      Seedha lab ke liye tayyar karein
+                    </a>
+                    <button type="button" onClick={() => setNextStep(null)} className="text-xs underline">Abhi nahi</button>
+                  </div>
+                </div>
+              )}
               {rows.map((r) => (
                 <div key={r.key} className="grid gap-2 rounded-xl border border-clinic-teal/20 p-3">
                   <div className="grid gap-2 sm:grid-cols-[1fr_9rem_auto]">
@@ -928,7 +1071,26 @@ export default function VisitWorkspace(p: Props) {
                 {p.pastRx!.map((r) => (
                   <li key={r.id} className="flex items-center justify-between gap-2 py-1.5">
                     <span className="min-w-0 truncate"><span className="text-xs text-clinic-ink/50">{fmtDate(r.date)}</span> {r.names}</span>
-                    <a href={`/admin/prescriptions/${r.id}/print`} target="_blank" className="shrink-0 text-xs font-semibold text-clinic-teal">Print</a>
+                    <span className="flex shrink-0 gap-3">
+                      {canEdit && (r.items ?? []).length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setLines((ls) => [
+                              ...ls,
+                              ...(r.items ?? []).map((it) => {
+                                const m = p.medicines.find((x) => x.name.toLowerCase() === it.name.toLowerCase())
+                                return { key: newKey(), medicine_id: m?.id ?? null, name: it.name, strength: m?.strength ?? '', potency: it.potency, dose: it.dose, frequency: it.frequency, duration: it.duration, instructions: it.instructions, mode: 'rx' as const, qty: '1', price: m?.price ?? 0, available: m?.available ?? false }
+                              }),
+                            ])
+                          }
+                          className="text-xs font-semibold text-emerald-700"
+                        >
+                          Yahi dawa dobara
+                        </button>
+                      )}
+                      <a href={`/admin/prescriptions/${r.id}/print`} target="_blank" className="text-xs font-semibold text-clinic-teal">Print</a>
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -939,7 +1101,7 @@ export default function VisitWorkspace(p: Props) {
 
           {/* 11. BILL */}
           {p.perms.money && (
-            <Section n={secNo()} title="Bill / Paisa">
+            <Section n={secNo()} title="Bill / Paisa (reception ye hissa bhare)">
               <div className="grid gap-2 text-sm">
                 {treatTotal > 0 && (
                   <p className="flex justify-between">
@@ -1020,7 +1182,7 @@ export default function VisitWorkspace(p: Props) {
           )}
 
           {/* 12. NEXT APPOINTMENT */}
-          <Section n={secNo()} title="Agli Appointment">
+          <Section n={secNo()} title="Aage kya (agli appointment / recall)">
             <fieldset disabled={!canEdit} className="grid gap-3 sm:grid-cols-3">
               <div>
                 <label className="text-xs font-medium text-clinic-ink/70">Tareekh</label>

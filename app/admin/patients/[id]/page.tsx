@@ -10,13 +10,16 @@ import DeletePatientButton from '@/components/admin/DeletePatientButton'
 import VisitWorkspace, { type VisitRow, type MedOpt } from '@/components/admin/visit/VisitWorkspace'
 import type { CatalogOpt, MaterialOpt, TItem, TVisit } from '@/components/admin/visit/types'
 import PatientPhotoGallery, { type PatientPhoto } from '@/components/admin/PatientPhotoGallery'
+import TreatmentCards, { type Stage, type LabLite } from '@/components/admin/TreatmentCards'
 import TreatmentPlanCard, { type Installment, type Plan } from '@/components/admin/TreatmentPlanCard'
 import { todayKarachi, money, fmtDate } from '@/lib/karachi'
 import { toBalance, type PatientBalance } from '@/lib/ledger'
 import WhatsAppMenu from '@/components/admin/WhatsAppMenu'
 import { effectiveApplies } from '@/lib/applies'
 import AppointmentBoard from '@/components/admin/AppointmentBoard'
-import { apptReminderLink, generalLink, paymentReminderLink } from '@/lib/messages'
+import { apptReminderLink, generalLink, paymentReminderLink, messageLink } from '@/lib/messages'
+import { mapTemplates, renderTemplate, salaamLine } from '@/lib/messageTemplates'
+import { SITE_URL } from '@/clinic.config'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -144,6 +147,30 @@ export default async function PatientDetailPage({ params, searchParams }: Props)
       ? supabase.from('lab_cases').select('id, work_type, status, due_date').eq('patient_id', id).is('deleted_at', null).in('status', ['pending', 'sent', 'in_progress', 'received'])
       : Promise.resolve({ data: [], error: null }),
   ])
+  const tplRes = await supabase.from('message_templates').select('key, body')
+  const tpl = mapTemplates(tplRes.data as { key: string; body: string }[] | null)
+  const stRes = canMoney
+    ? await supabase.from('patient_treatments').select('name, teeth, price, status').eq('patient_id', id).neq('status', 'cancelled').order('started_on', { ascending: true }).limit(40)
+    : { data: [] as { name: string; teeth: string[] | string | null; price: number | null; status: string }[] }
+  const stLines = ((stRes.data ?? []) as { name: string; teeth: string[] | string | null; price: number | null; status: string }[])
+    .map((t, i) => `${i + 1}. ${t.name}${t.teeth && String(t.teeth).length ? ` (${Array.isArray(t.teeth) ? t.teeth.join(', ') : t.teeth})` : ''}${t.price ? ` - Rs. ${Number(t.price).toLocaleString('en-US')}` : ''}`)
+    .join('\n')
+  const pf = { full_name: patient.full_name, phone: patient.phone, gender: patient.gender as string | null }
+  // Aaj ki halat (intezar -> doctor -> bill -> ho gaya) aur family
+  const [stApptRes, stCvRes, famRes] = await Promise.all([
+    can('appointments.view') ? supabase.from('appointments').select('id').eq('patient_id', id).eq('preferred_date', today).eq('status', 'arrived').is('deleted_at', null).limit(1) : Promise.resolve({ data: [] }),
+    canClinical ? supabase.from('clinical_visits').select('status, invoice_id').eq('patient_id', id).eq('visit_date', today) : Promise.resolve({ data: [] }),
+    supabase.from('patients').select('id, full_name, mr_number').is('deleted_at', null).neq('id', id).or(`family_of.eq.${id}${patient.family_of ? `,id.eq.${patient.family_of},family_of.eq.${patient.family_of}` : ''}`).limit(8),
+  ])
+  const cvToday = (stCvRes.data ?? []) as { status: string; invoice_id: string | null }[]
+  const todayStatus = cvToday.some((c) => c.status === 'finished')
+    ? { t: 'Aaj ka visit ho gaya', c: 'bg-emerald-100 text-emerald-800' }
+    : cvToday.some((c) => c.status === 'draft')
+      ? { t: 'Aaj doctor ke paas (visit chal rahi hai)', c: 'bg-sky-100 text-sky-800' }
+      : (stApptRes.data ?? []).length > 0
+        ? { t: 'Aaj intezar mein (aa gaya hai)', c: 'bg-amber-100 text-amber-800' }
+        : null
+  const family = (famRes.data ?? []) as { id: string; full_name: string; mr_number: string | null }[]
   const openLabs = (labRes.data ?? []) as { id: string; work_type: string | null; status: string; due_date: string | null }[]
   const balance: PatientBalance | null = balRes.data ? toBalance(balRes.data as Record<string, string | number | null>) : null
   // Appointment purane data mein phone se judi hoti thi; dusre patient ki na aaye is liye phone wali sirf tab jab patient_id khali ho
@@ -219,9 +246,17 @@ export default async function PatientDetailPage({ params, searchParams }: Props)
                 size="md"
                 items={[
                   { label: 'Seedha chat kholein', href: wa },
-                  ...(nextAppt ? [{ label: 'Appointment reminder', href: apptReminderLink({ ...nextAppt, patient_name: patient.full_name, phone: patient.phone }) }] : []),
+                  ...(nextAppt ? [{ label: 'Appointment reminder', href: apptReminderLink({ ...nextAppt, patient_name: patient.full_name, phone: patient.phone, gender: patient.gender }, tpl) }] : []),
                   ...(canMoney && balance && balance.balance > 0
-                    ? [{ label: 'Payment reminder (baqaya)', href: paymentReminderLink({ full_name: patient.full_name, phone: patient.phone, balance: balance.balance }) }]
+                    ? [{ label: 'Payment reminder (baqaya)', href: paymentReminderLink({ ...pf, balance: balance.balance }, tpl) }]
+                    : []),
+                  { label: 'Visit ke baad shukriya', href: messageLink('visit_thanks', pf, {}, tpl) },
+                  { label: 'Follow-up ka message', href: messageLink('followup', pf, {}, tpl) },
+                  { label: 'Recall (Scaling / Check-up)', href: messageLink('recall', pf, { treatment: 'Scaling / Check-up' }, tpl) },
+                  { label: 'Appointment par nahi aaye', href: messageLink('missed', pf, {}, tpl) },
+                  { label: 'Lab ka kaam tayyar', href: messageLink('lab_ready', pf, { treatment: openLabs.find((l) => l.status === 'received')?.work_type ?? 'kaam' }, tpl) },
+                  ...(canMoney && patient.portal_code
+                    ? [{ label: `Payment Statement (${patient.full_name} · ${patient.phone})`, href: messageLink('statement', pf, { balance: Number(balance?.balance ?? 0).toLocaleString('en-US'), treatments: stLines || '-', link: `${SITE_URL}/portal/${patient.portal_code}`, code: patient.portal_code }, tpl) }]
                     : []),
                   { label: 'Aam message', href: generalLink({ full_name: patient.full_name, phone: patient.phone }) },
                 ]}
@@ -254,6 +289,20 @@ export default async function PatientDetailPage({ params, searchParams }: Props)
             ))}
         </dl>
 
+        {todayStatus && <p className={`mt-2 inline-block rounded-full px-3 py-1 text-xs font-semibold ${todayStatus.c}`}>{todayStatus.t}</p>}
+        {family.length > 0 && (
+          <p className="mt-2 text-xs text-clinic-ink/70">
+            Family:{' '}
+            {family.map((f, i) => (
+              <span key={f.id}>
+                {i > 0 && ', '}
+                <Link href={`/admin/patients/${f.id}`} className="font-semibold text-clinic-teal hover:underline">
+                  {f.full_name}
+                </Link>
+              </span>
+            ))}
+          </p>
+        )}
         {openLabs.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-1.5">
             {openLabs.map((l) => (
@@ -288,7 +337,13 @@ export default async function PatientDetailPage({ params, searchParams }: Props)
 
       {canClinical && (
         <Suspense fallback={null}>
-          <HistorySection patient={patient} history={history} canClinical={canClinical} />
+          <TreatmentCardsSlot patientId={patient.id} canMoney={canMoney} canEdit={can('clinical.edit')} canLab={can('lab.view')} />
+        </Suspense>
+      )}
+
+      {canClinical && (
+        <Suspense fallback={null}>
+          <HistorySection patient={patient} history={history} canClinical={canClinical} canMoney={canMoney} canRx={can('prescriptions.view')} />
         </Suspense>
       )}
 
@@ -314,7 +369,26 @@ type PatientRow = {
   portal_code?: string | null
 }
 
-async function HistorySection({ patient, history, canClinical }: { patient: PatientRow; history: Record<string, unknown> | null; canClinical: boolean }) {
+async function TreatmentCardsSlot({ patientId, canMoney, canEdit, canLab }: { patientId: string; canMoney: boolean; canEdit: boolean; canLab: boolean }) {
+  const supabase = await createClient()
+  const treatments = await getTreatments(patientId)
+  const [labRes, stRes] = await Promise.all([
+    canLab ? supabase.from('lab_cases').select('id, treatment_id, work_type, status, due_date').eq('patient_id', patientId).is('deleted_at', null) : Promise.resolve({ data: [] }),
+    supabase.from('treatment_stages').select('id, treatment_id, label, sort_order, done_on').eq('patient_id', patientId),
+  ])
+  return (
+    <TreatmentCards
+      patientId={patientId}
+      treatments={treatments}
+      labs={(labRes.data ?? []) as LabLite[]}
+      stages={('error' in stRes && stRes.error ? [] : stRes.data ?? []) as Stage[]}
+      canMoney={canMoney}
+      canEdit={canEdit}
+    />
+  )
+}
+
+async function HistorySection({ patient, history, canClinical, canMoney, canRx }: { patient: PatientRow; history: Record<string, unknown> | null; canClinical: boolean; canMoney: boolean; canRx: boolean }) {
   const supabase = await createClient()
   const { data } = canClinical
     ? await supabase
@@ -329,6 +403,32 @@ async function HistorySection({ patient, history, canClinical }: { patient: Pati
   type CV = { id: string; visit_date: string; complaint: { items?: string[]; other?: string; duration?: string }; diagnoses: { text: string; teeth?: string[] }[]; doctor: string | null }
   const visits = (data ?? []) as CV[]
   if (visits.length === 0 && !history) return null
+
+  // Har visit ki poori tasveer: kya kaam hua, bill/mila/baqaya, prescription, tasveerein
+  const ids = visits.map((v) => v.id)
+  const [vnRes, invRes, rxRes, phRes] = ids.length
+    ? await Promise.all([
+        supabase.from('visit_notes').select('clinical_visit_id, procedure, patient_treatments(name, teeth)').in('clinical_visit_id', ids).is('voided_at', null),
+        canMoney ? supabase.from('invoices').select('clinical_visit_id, total, paid_amount, status').in('clinical_visit_id', ids).neq('status', 'void') : Promise.resolve({ data: [] }),
+        canRx ? supabase.from('prescriptions').select('id, clinical_visit_id').in('clinical_visit_id', ids) : Promise.resolve({ data: [] }),
+        supabase.from('patient_photos').select('clinical_visit_id').in('clinical_visit_id', ids),
+      ])
+    : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }]
+  const done = new Map<string, string[]>()
+  for (const n of (vnRes.data ?? []) as unknown as { clinical_visit_id: string; procedure: string | null; patient_treatments: { name: string; teeth: string[] | null } | null }[]) {
+    const t = n.patient_treatments
+    const label = t ? `${t.name}${t.teeth?.length ? ` (${t.teeth.join(', ')})` : ''}` : n.procedure
+    if (label) done.set(n.clinical_visit_id, [...(done.get(n.clinical_visit_id) ?? []), label])
+  }
+  const money = new Map<string, { total: number; paid: number }>()
+  for (const i of (invRes.data ?? []) as { clinical_visit_id: string; total: number; paid_amount: number }[]) {
+    const m = money.get(i.clinical_visit_id) ?? { total: 0, paid: 0 }
+    money.set(i.clinical_visit_id, { total: m.total + Number(i.total), paid: m.paid + Number(i.paid_amount) })
+  }
+  const rxBy = new Map(((rxRes.data ?? []) as { id: string; clinical_visit_id: string }[]).map((r) => [r.clinical_visit_id, r.id]))
+  const photoN = new Map<string, number>()
+  for (const f of (phRes.data ?? []) as { clinical_visit_id: string }[]) photoN.set(f.clinical_visit_id, (photoN.get(f.clinical_visit_id) ?? 0) + 1)
+  const rs = (n: number) => `Rs. ${Number(n).toLocaleString('en-US')}`
 
   return (
     <div className="grid gap-3">
@@ -355,10 +455,25 @@ async function HistorySection({ patient, history, canClinical }: { patient: Pati
                     {v.complaint?.duration ? <span className="text-clinic-ink/50"> ({v.complaint.duration})</span> : null}
                   </p>
                   {(v.diagnoses ?? []).length > 0 && <p className="text-xs text-clinic-teal">Dx: {(v.diagnoses ?? []).map((d) => d.text + (d.teeth?.length ? ` (${d.teeth.join(', ')})` : '')).join(' · ')}</p>}
+                  {(done.get(v.id) ?? []).length > 0 && <p className="text-xs text-clinic-ink/80">Kaam: {(done.get(v.id) ?? []).join(' · ')}</p>}
+                  {money.get(v.id) && (
+                    <p className="text-xs text-clinic-ink/70">
+                      Bill {rs(money.get(v.id)!.total)} · Mila {rs(money.get(v.id)!.paid)}
+                      {money.get(v.id)!.total - money.get(v.id)!.paid > 0 && <span className="text-red-600"> · Baqaya {rs(money.get(v.id)!.total - money.get(v.id)!.paid)}</span>}
+                    </p>
+                  )}
+                  {(photoN.get(v.id) ?? 0) > 0 && <p className="text-xs text-clinic-ink/60">Tasveerein: {photoN.get(v.id)}</p>}
                 </div>
-                <Link href={`/admin/visits/${v.id}/print`} target="_blank" className="text-xs font-semibold text-clinic-teal hover:underline">
-                  Record / PDF
-                </Link>
+                <div className="flex flex-col items-end gap-1">
+                  <Link href={`/admin/visits/${v.id}/print`} target="_blank" className="text-xs font-semibold text-clinic-teal hover:underline">
+                    Record / PDF
+                  </Link>
+                  {rxBy.get(v.id) && (
+                    <Link href={`/admin/prescriptions/${rxBy.get(v.id)}/print`} target="_blank" className="text-xs font-semibold text-clinic-teal hover:underline">
+                      Prescription
+                    </Link>
+                  )}
+                </div>
               </li>
             ))}
           </ul>
@@ -396,7 +511,7 @@ async function WorkspaceSection({
           .eq('patient_id', patient.id)
           .order('treatment_date', { ascending: false })
       : Promise.resolve({ data: [] }),
-    supabase.from('treatment_catalog').select('id, name, price, category, department, applies_to').eq('is_active', true).order('sort_order').order('name'),
+    supabase.from('treatment_catalog').select('id, name, price, category, department, applies_to, price_note').eq('is_active', true).order('sort_order').order('name'),
     supabase.from('treating_doctors').select('name').eq('is_active', true).order('name'),
     can('clinical.edit') ? supabase.from('treatment_materials').select('treatment_id, inventory_id, default_qty, inventory(item_name, unit)') : Promise.resolve({ data: [] }),
     can('clinical.view')
@@ -432,10 +547,11 @@ async function WorkspaceSection({
   if (!optRes.error) for (const o of (optRes.data ?? []) as { kind: keyof typeof opts; label: string }[]) opts[o.kind]?.push(o.label)
   const isFirstVisit = cvCnt.count === 0 && vnCnt.count === 0
   const hasPlanned = treatments.some((t) => t.status === 'planned')
-  const pastRx = ((rxRes.data ?? []) as { id: string; items: { name_en?: string; name_ur?: string }[] | null; prescribed_date: string }[]).map((r) => ({
+  const pastRx = ((rxRes.data ?? []) as { id: string; items: { name_en?: string; name_ur?: string; potency?: string; dosage?: string; frequency?: string; duration?: string; instructions?: string }[] | null; prescribed_date: string }[]).map((r) => ({
     id: r.id,
     date: r.prescribed_date,
     names: (r.items ?? []).map((it) => it.name_en || it.name_ur).filter(Boolean).join(' · '),
+    items: (r.items ?? []).map((it) => ({ name: it.name_en || it.name_ur || '', potency: it.potency ?? '', dose: it.dosage ?? '', frequency: it.frequency ?? '', duration: it.duration ?? '', instructions: it.instructions ?? '' })).filter((it) => it.name),
   }))
   const materials: Record<string, MaterialOpt[]> = {}
   for (const m of (matRes.data ?? []) as unknown as { treatment_id: string; inventory_id: string; default_qty: number; inventory: { item_name: string; unit: string | null } | null }[]) {

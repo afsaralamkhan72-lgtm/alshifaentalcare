@@ -4,8 +4,8 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { buildWhatsAppLink } from '@/lib/whatsapp'
-import { CLINIC } from '@/clinic.config'
+import { useTemplates } from '@/lib/useTemplates'
+import { messageLink } from '@/lib/messages'
 import { todayKarachi } from '@/lib/karachi'
 
 export interface DueRow {
@@ -41,6 +41,7 @@ export default function DuesList({
   tone?: 'overdue' | 'today'
 }) {
   const router = useRouter()
+  const tpl = useTemplates()
   const [busyId, setBusyId] = useState<string | null>(null)
   const [collecting, setCollecting] = useState<string | null>(null)
   const [received, setReceived] = useState('')
@@ -154,24 +155,12 @@ export default function DuesList({
             ? `${window.location.origin}/portal/${p.portal_code}`
             : ''
 
-        const link = buildWhatsAppLink({
-          phoneOverride: p.phone,
-          customMessage: [
-            `Assalam o Alaikum ${p.full_name},`,
-            '',
-            row.treatment_name
-              ? `Aap ke ${row.treatment_name} ka baqaya Rs. ${Number(row.balance_due).toLocaleString()} hai.`
-              : `Aap ka baqaya Rs. ${Number(row.balance_due).toLocaleString()} hai.`,
-            row.due_date ? `Due date: ${fmt(row.due_date)}` : '',
-            ...(p.portal_code
-              ? ['', 'Apna record dekhein:', portalUrl, `Code: ${p.portal_code}`]
-              : []),
-            '',
-            `${CLINIC.name} · ${CLINIC.phone.display}`,
-          ]
-            .filter(Boolean)
-            .join('\n'),
-        })
+        const link = messageLink(
+          'baqaya',
+          { full_name: p.full_name, phone: p.phone },
+          { balance: Number(row.balance_due).toLocaleString('en-US') },
+          tpl
+        ) + (p.portal_code ? encodeURIComponent(`\n\nApna record dekhein:\n${portalUrl}\nCode: ${p.portal_code}`) : '')
 
         return (
           <div key={row.id} className={`rounded-2xl border bg-white p-4 ${border}`}>

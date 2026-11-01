@@ -83,6 +83,15 @@ export default async function PortalRecordPage({
       ? { visit_date: newV.visit_date, next_visit: newV.next_date as string | null }
       : oldV
 
+  // Pichli prescriptions (sirf isi patient ki, taza 3)
+  const { data: rxRows } = await supabase
+    .from('prescriptions')
+    .select('prescribed_date, items')
+    .eq('patient_id', patient.id)
+    .order('prescribed_date', { ascending: false })
+    .limit(3)
+  const rxList = (rxRows ?? []) as { prescribed_date: string; items: { name_en?: string; name_ur?: string; potency?: string; dosage?: string; frequency?: string; duration?: string; instructions?: string }[] | null }[]
+
   // Instalments across all plans
   let installments: { amount: number; paid_amount: number; due_date: string; paid_date: string | null }[] = []
   if (plans.length > 0) {
@@ -278,8 +287,34 @@ export default async function PortalRecordPage({
         </a>
       </div>
 
+      {rxList.length > 0 && (
+        <section className="mt-8">
+          <h2 className="font-display text-lg font-semibold text-clinic-ink">Meri dawaiyan (prescription)</h2>
+          <div className="mt-3 grid gap-3">
+            {rxList.map((r, i) => (
+              <div key={i} className="rounded-2xl border border-clinic-teal/10 bg-white p-4">
+                <p className="text-xs text-clinic-ink/50">{fmt(r.prescribed_date)}</p>
+                <ul className="mt-2 grid gap-2 text-sm">
+                  {(r.items ?? []).map((it, j) => (
+                    <li key={j}>
+                      <span className="font-semibold text-clinic-ink">{it.name_en || it.name_ur}</span>
+                      {it.potency ? <span className="text-clinic-teal"> {it.potency}</span> : null}
+                      <span className="block text-xs text-clinic-ink/60">
+                        {[it.dosage, it.frequency, it.duration].filter(Boolean).join(' · ')}
+                        {it.instructions ? ` — ${it.instructions}` : ''}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] text-clinic-ink/40">Dawa doctor ke bataye hisaab se hi lein. Sawal ho to clinic par raabta karein.</p>
+        </section>
+      )}
+
       <p className="mt-8 text-xs text-clinic-ink/40">
-        Treatment aur prescription ki tafseel ke liye clinic par raabta karein.
+        Treatment ki tafseel ke liye clinic par raabta karein.
       </p>
     </Shell>
   )

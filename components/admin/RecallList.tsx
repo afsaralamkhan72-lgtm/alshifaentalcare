@@ -5,7 +5,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
-import { CLINIC } from '@/clinic.config'
+import { useTemplates } from '@/lib/useTemplates'
+import { messageLink } from '@/lib/messages'
 import { todayKarachi } from '@/lib/karachi'
 
 export interface RecallRow {
@@ -38,6 +39,9 @@ export default function RecallList({
 }) {
   const router = useRouter()
   const [busyId, setBusyId] = useState<string | null>(null)
+  const tpl = useTemplates()
+  // Kaunsa message bhejna hai (recall ya follow-up ya...)
+  const [msgKey, setMsgKey] = useState<Record<string, string>>({})
 
   /** Patient came in, push the next due date forward by the interval */
   async function markDone(r: RecallRow) {
@@ -113,21 +117,7 @@ export default function RecallList({
         const p = r.patients
         if (!p) return null
 
-        const link = buildWhatsAppLink({
-          phoneOverride: p.phone,
-          customMessage: [
-            `Assalam o Alaikum ${p.full_name},`,
-            '',
-            `Aap ka ${r.recall_type} due ho gaya hai${
-              r.last_done ? ` (pichli baar ${fmt(r.last_done)})` : ''
-            }.`,
-            `Baraye meherbani appointment ke liye raabta karein.`,
-            '',
-            CLINIC.name,
-            CLINIC.doctor.name,
-            `${CLINIC.address.full} · ${CLINIC.phone.display}`,
-          ].join('\n'),
-        })
+        const link = messageLink(msgKey[r.id] ?? 'recall', { full_name: p.full_name, phone: p.phone }, { treatment: r.recall_type }, tpl)
 
         return (
           <div
@@ -171,6 +161,16 @@ export default function RecallList({
             </div>
 
             <div className="mt-3 flex flex-wrap gap-2 border-t border-clinic-teal/10 pt-3">
+              <select
+                value={msgKey[r.id] ?? 'recall'}
+                onChange={(e) => setMsgKey({ ...msgKey, [r.id]: e.target.value })}
+                className="rounded-full border border-clinic-teal/30 bg-white px-2 py-1.5 text-xs"
+                aria-label="Kaunsa message"
+              >
+                <option value="recall">Recall message</option>
+                <option value="followup">Follow-up message</option>
+                <option value="missed">Nahi aaye</option>
+              </select>
               <a
                 href={link}
                 target="_blank"
@@ -178,7 +178,7 @@ export default function RecallList({
                 onClick={() => logReminder(r)}
                 className="rounded-full bg-whatsapp px-3 py-1.5 text-xs font-semibold text-white"
               >
-                Send Reminder
+                Message bhejein
               </a>
               <a
                 href={`tel:${p.phone.replace(/[^0-9+]/g, '')}`}

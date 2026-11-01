@@ -1,8 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { buildWhatsAppLink } from '@/lib/whatsapp'
-import { CLINIC } from '@/clinic.config'
+import { useTemplates } from '@/lib/useTemplates'
+import { messageLink } from '@/lib/messages'
 
 export interface DormantPatient {
   id: string
@@ -13,6 +13,7 @@ export interface DormantPatient {
 }
 
 export default function DormantList({ patients }: { patients: DormantPatient[] }) {
+  const tpl = useTemplates()
   if (patients.length === 0) {
     return (
       <div className="mt-3 rounded-2xl border border-dashed border-clinic-teal/20 bg-clinic-mint/40 px-4 py-6 text-center text-sm text-clinic-ink/50">
@@ -24,20 +25,7 @@ export default function DormantList({ patients }: { patients: DormantPatient[] }
   return (
     <div className="mt-3 divide-y divide-clinic-teal/10 rounded-2xl border border-clinic-teal/10 bg-white">
       {patients.map((p) => {
-        const link = buildWhatsAppLink({
-          phoneOverride: p.phone,
-          customMessage: [
-            `Assalam o Alaikum ${p.full_name},`,
-            '',
-            `Kaafi arse se aap ki clinic par tashreef aawari nahi hui. Umeed hai aap khairiyat se hain.`,
-            `Dant ka routine check-up har chhe mahine baad zaroori hota hai.`,
-            `Appointment ke liye is number par raabta karein.`,
-            '',
-            CLINIC.name,
-            CLINIC.doctor.name,
-            `${CLINIC.address.full} · ${CLINIC.phone.display}`,
-          ].join('\n'),
-        })
+        const link = messageLink('recall', { full_name: p.full_name, phone: p.phone }, { treatment: 'Routine Check-up' }, tpl)
 
         return (
           <div key={p.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">

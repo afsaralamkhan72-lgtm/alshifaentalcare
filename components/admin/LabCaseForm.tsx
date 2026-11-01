@@ -81,7 +81,7 @@ export default function LabCaseForm({
   const [labWhatsapp, setLabWhatsapp] = useState('')
   const [saveLab, setSaveLab] = useState(true)
 
-  const [workType, setWorkType] = useState('')
+  const [workType, setWorkType] = useState(() => WORK_TYPES.find((w) => startT && new RegExp(w.split(' ')[0], 'i').test(startT.name)) ?? '')
   const [teeth, setTeeth] = useState<string[]>(treatments.find((t) => t.id === defaultTreatmentId)?.teeth ?? [])
   const [shade, setShade] = useState('')
   const [material, setMaterial] = useState('')

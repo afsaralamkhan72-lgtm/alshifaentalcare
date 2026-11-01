@@ -75,7 +75,7 @@ export const TOOTH_FILL: Record<string, string> = {
   caries: '#FCA5A5',
   filling: '#93C5FD',
   rct: '#C4B5FD',
-  crown: '#FCD34D',
+  crown: '#F59E0B',
   bridge: '#5EEAD4',
   implant: '#86EFAC',
   scaling: '#A5F3FC',
@@ -90,7 +90,7 @@ export const TOOTH_FILL: Record<string, string> = {
   implant_planning: '#BEF264',
   recession: '#F0ABFC',
   furcation: '#FDE047',
-  plaque: '#FCD34D',
+  plaque: '#FFEDD5',
   calculus: '#CA8A04',
   other: '#FBCFA3',
 }

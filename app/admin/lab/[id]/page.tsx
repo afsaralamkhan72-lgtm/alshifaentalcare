@@ -9,6 +9,9 @@ import { getPermissions, requirePerm } from '@/lib/auth'
 import ClinicLogo from '@/components/ClinicLogo'
 import { toothLabel } from '@/lib/teeth'
 import { CLINIC } from '@/clinic.config'
+import LabPatientNotify from '@/components/admin/LabPatientNotify'
+import { messageLink } from '@/lib/messages'
+import { mapTemplates } from '@/lib/messageTemplates'
 
 interface LabCase {
   id: string
@@ -64,8 +67,18 @@ export default async function LabOrderPage({ params }: { params: Promise<{ id: s
   const perms = await getPermissions()
   const [{ data: files }, { data: tr }] = await Promise.all([
     supabase.from('patient_photos').select('id, storage_path, caption, category').eq('lab_case_id', c.id).order('created_at'),
-    c.treatment_id ? supabase.from('patient_treatments').select('name').eq('id', c.treatment_id).maybeSingle() : Promise.resolve({ data: null }),
+    c.treatment_id ? supabase.from('patient_treatments').select('name, price').eq('id', c.treatment_id).maybeSingle() : Promise.resolve({ data: null }),
   ])
+
+  const [{ data: ph }, { data: nt }, { data: tplRows }] = await Promise.all([
+    c.patient_id ? supabase.from('patients').select('phone').eq('id', c.patient_id).maybeSingle() : Promise.resolve({ data: null }),
+    supabase.from('lab_cases').select('patient_notified_at').eq('id', c.id).maybeSingle(),
+    supabase.from('message_templates').select('key, body'),
+  ])
+  const waLink =
+    patient && ph?.phone
+      ? messageLink('lab_ready', { full_name: patient.full_name, phone: ph.phone as string, gender: patient.gender }, { treatment: c.work_type ?? 'kaam' }, mapTemplates(tplRows as { key: string; body: string }[] | null))
+      : null
 
   return (
     <div>
@@ -82,6 +95,15 @@ export default async function LabOrderPage({ params }: { params: Promise<{ id: s
 
       <div className="mt-3">
         <LabReports caseId={c.id} patientId={c.patient_id} treatmentId={c.treatment_id} files={(files ?? []) as MediaItem[]} canUpload={perms.includes('lab.manage')} />
+        {c.status === 'received' && c.patient_id && (
+          <LabPatientNotify caseId={c.id} patientId={c.patient_id} patient={patient && ph?.phone ? { name: patient.full_name, phone: ph.phone as string, department: 'dental' } : null} workType={c.work_type} waLink={waLink} notifiedAt={((nt as { patient_notified_at?: string | null } | null)?.patient_notified_at) ?? null} />
+        )}
+        {tr && Number((tr as { price?: number }).price ?? 0) > 0 && perms.includes('billing.view') && (
+          <p className="mb-4 rounded-xl border border-clinic-teal/10 bg-white p-3 text-sm text-clinic-ink/80 print:hidden">
+            Is treatment ({(tr as { name: string }).name}) ki qeemat Rs. {Number((tr as { price: number }).price).toLocaleString('en-US')} · lab ka kharcha Rs. {Number(c.cost ?? 0).toLocaleString('en-US')} ·{' '}
+            <b>bachat Rs. {(Number((tr as { price: number }).price) - Number(c.cost ?? 0)).toLocaleString('en-US')}</b>
+          </p>
+        )}
         <LabMoney caseId={c.id} status={c.status} cost={Number(c.cost ?? 0)} labPaid={Number(c.lab_paid ?? 0)} />
         <LabOrderActions
           caseNumber={c.case_number ?? ''}

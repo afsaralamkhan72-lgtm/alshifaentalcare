@@ -6,6 +6,7 @@ import ReminderSetting from '@/components/admin/ReminderSetting'
 import { getReminderDays } from '@/lib/reminders'
 import ClinicOptionsManager, { type OptRow } from '@/components/admin/ClinicOptionsManager'
 import BackupPanel from '@/components/admin/BackupPanel'
+import MessageTemplatesManager from '@/components/admin/MessageTemplatesManager'
 import { OPTION_KINDS } from '@/lib/clinicOptions'
 
 const SECTIONS = [
@@ -13,6 +14,7 @@ const SECTIONS = [
   { k: 'homeopathic', l: 'Homeopathic dawaiyan' },
   { k: 'prices', l: 'Treatment prices' },
   { k: 'lists', l: 'Takleef / Diagnosis list' },
+  { k: 'messages', l: 'Messages (WhatsApp)' },
   { k: 'backup', l: 'Backup (data ki copy)' },
   { k: 'other', l: 'Reminder' },
 ]
@@ -23,7 +25,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const sp = await searchParams
   const s = SECTIONS.some((x) => x.k === sp.s) ? (sp.s as string) : 'dental'
   const supabase = await createClient()
-  const [{ data: meds, error }, days, optRes, bkRes] = await Promise.all([
+  const [{ data: meds, error }, days, optRes, msgRes, bkRes] = await Promise.all([
     s === 'dental' || s === 'homeopathic'
       ? supabase
           .from('medicines')
@@ -34,6 +36,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       : Promise.resolve({ data: [], error: null }),
     getReminderDays(),
     s === 'lists' ? supabase.from('clinic_options').select('id, kind, label').order('kind').order('sort_order').order('label') : Promise.resolve({ data: [], error: null }),
+    s === 'messages' ? supabase.from('message_templates').select('key, body') : Promise.resolve({ data: [], error: null }),
     s === 'backup' ? supabase.from('site_settings').select('value').eq('key', 'last_backup_at').maybeSingle() : Promise.resolve({ data: null }),
   ])
 
@@ -77,6 +80,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             </div>
           )}
           {s === 'lists' && <ClinicOptionsManager kinds={OPTION_KINDS} rows={(optRes.data ?? []) as OptRow[]} missing={Boolean(optRes.error)} />}
+          {s === 'messages' && <MessageTemplatesManager rows={(msgRes.data ?? []) as { key: string; body: string }[]} missing={Boolean(msgRes.error)} />}
           {s === 'backup' && <BackupPanel last={(bkRes.data as { value?: unknown } | null)?.value ? String((bkRes.data as { value: unknown }).value) : null} />}
           {s === 'other' && <ReminderSetting days={days} />}
         </div>
