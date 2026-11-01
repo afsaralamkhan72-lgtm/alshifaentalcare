@@ -20,6 +20,18 @@ export default async function InventoryPage() {
   const profile = await getStaffProfile()
   const canManage = isOwnerRole(profile.role)
   const items = await getInventory()
+  // Pichle 30 din ka istemal dekh kar andaza: stock kitne din chalega
+  const forecast: Record<string, number> = {}
+  if (canManage) {
+    const since = new Date(Date.now() - 30 * 86_400_000).toISOString()
+    const { data: mv } = await (await createClient()).from('inventory_movements').select('inventory_id, qty_change').eq('kind', 'usage').gte('created_at', since)
+    const used = new Map<string, number>()
+    for (const m of mv ?? []) used.set(m.inventory_id as string, (used.get(m.inventory_id as string) ?? 0) + Math.abs(Number(m.qty_change)))
+    for (const i of items) {
+      const u = used.get(i.id) ?? 0
+      if (u > 0 && Number(i.quantity) > 0) forecast[i.id] = Number(i.quantity) / (u / 30)
+    }
+  }
 
   const lowStock = items.filter((i) => Number(i.quantity) <= Number(i.reorder_level))
   const expiringSoon = items.filter((i) => {
@@ -70,7 +82,7 @@ export default async function InventoryPage() {
       )}
 
       <div className="mt-6">
-        <InventoryManager items={items} canManage={canManage} />
+        <InventoryManager items={items} canManage={canManage} forecast={forecast} />
       </div>
     </div>
   )

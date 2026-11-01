@@ -2,22 +2,24 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requireAnyPerm } from '@/lib/auth'
 import StatCard from '@/components/admin/StatCard'
+import { todayKarachi } from '@/lib/karachi'
 
+const pad = (n: number) => String(n).padStart(2, '0')
+
+// Mahine ki pehli aur aakhri tareekh (string se, server ke time-zone se bilkul azaad)
 function monthBounds(month: string) {
   const [y, m] = month.split('-').map(Number)
-  const start = new Date(y, m - 1, 1)
-  const end = new Date(y, m, 0)
-  return {
-    from: start.toISOString().slice(0, 10),
-    to: end.toISOString().slice(0, 10),
-  }
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate()
+  return { from: `${y}-${pad(m)}-01`, to: `${y}-${pad(m)}-${pad(last)}` }
 }
 
 function shiftMonth(month: string, delta: number) {
   const [y, m] = month.split('-').map(Number)
-  const d = new Date(y, m - 1 + delta, 1)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  const d = new Date(Date.UTC(y, m - 1 + delta, 1))
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}`
 }
+
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
 export default async function ReportsPage({
   searchParams,
@@ -26,13 +28,13 @@ export default async function ReportsPage({
 }) {
   await requireAnyPerm('reports.view')
   const params = await searchParams
-  const now = new Date()
-  const month = params.month || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  // Default mahina Karachi ki aaj ki tareekh se (server UTC mein ho to bhi)
+  const month = /^\d{4}-\d{2}$/.test(params.month ?? '') ? (params.month as string) : todayKarachi().slice(0, 7)
   const { from, to } = monthBounds(month)
 
   const supabase = await createClient()
 
-  const [txRes, patientsRes, apptRes, plansRes] = await Promise.all([
+  const [txRes, patientsRes, apptRes, balRes, invRes] = await Promise.all([
     supabase
       .from('transactions')
       .select('type, category, amount, payment_method, treating_doctor, patient_id')
@@ -42,15 +44,33 @@ export default async function ReportsPage({
       .from('patients')
       .select('department, created_at')
       .is('deleted_at', null)
-      .gte('created_at', from)
-      .lte('created_at', `${to}T23:59:59`),
+      .gte('created_at', `${from}T00:00:00+05:00`)
+      .lte('created_at', `${to}T23:59:59+05:00`),
     supabase
       .from('appointments')
       .select('status')
       .gte('preferred_date', from)
       .lte('preferred_date', to),
-    supabase.from('treatment_plans').select('total_cost, advance_paid, status'),
+    // Kul baqaya: wohi jo Accounts aur Baqaya page par hai (purana aur naya system dono)
+    supabase.from('patient_balances').select('balance').gt('balance', 0),
+    // Is mahine ke bills mein kaun si treatment kitni bani (bill ki raqam ke hisaab se)
+    supabase.from('invoices').select('id').gte('invoice_date', from).lte('invoice_date', to).is('voided_at', null).limit(5000),
   ])
+  const invIds = (invRes.data ?? []).map((i) => i.id as string)
+  const byTreat = new Map<string, { total: number; count: number }>()
+  for (let i = 0; i < invIds.length; i += 200) {
+    const { data: its } = await supabase.from('invoice_items').select('name, qty, line_total').in('invoice_id', invIds.slice(i, i + 200))
+    for (const it of its ?? []) {
+      const nm = String(it.name ?? '').trim()
+      if (!nm) continue
+      const row = byTreat.get(nm) ?? { total: 0, count: 0 }
+      row.total += Number(it.line_total) || 0
+      row.count += Number(it.qty) || 1
+      byTreat.set(nm, row)
+    }
+  }
+  const treatRows = [...byTreat.entries()].map(([name, v]) => ({ name, ...v })).sort((a, b) => b.total - a.total).slice(0, 12)
+  const maxTreat = treatRows[0]?.total || 1
 
   const tx = txRes.data ?? []
 
@@ -100,21 +120,17 @@ export default async function ReportsPage({
 
   const newPatients = patientsRes.data ?? []
   const appts = apptRes.data ?? []
-  const plans = plansRes.data ?? []
-
-  const activePlanValue = plans
-    .filter((p) => p.status === 'active')
-    .reduce((s, p) => s + Number(p.total_cost) - Number(p.advance_paid), 0)
+  const dueTotal = (balRes.data ?? []).reduce((s, r) => s + Number(r.balance), 0)
 
   const maxCat = categories[0]?.[1] ?? 1
 
-  const label = new Date(from).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+  const label = `${MONTHS[Number(month.split('-')[1]) - 1]} ${month.split('-')[0]}`
 
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="font-display text-2xl font-semibold text-clinic-ink">Monthly Report</h1>
+          <h1 className="font-display text-2xl font-semibold text-clinic-ink">Mahine ki Report</h1>
           <p className="mt-1 text-sm text-clinic-ink/60">{label}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -122,57 +138,82 @@ export default async function ReportsPage({
             href={`/admin/reports?month=${shiftMonth(month, -1)}`}
             className="rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm"
           >
-            ← Previous
+            ← Pichla
           </Link>
           <Link
             href={`/admin/reports?month=${shiftMonth(month, 1)}`}
             className="rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm"
           >
-            Next →
+            Agla →
           </Link>
         </div>
       </div>
 
       <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label="Income" value={`Rs. ${income.toLocaleString()}`} accent="green" />
-        <StatCard label="Expenses" value={`Rs. ${expense.toLocaleString()}`} accent="red" />
+        <StatCard label="Income (wasooli)" value={`Rs. ${income.toLocaleString()}`} accent="green" />
+        <StatCard label="Kharche" value={`Rs. ${expense.toLocaleString()}`} accent="red" />
         <StatCard
-          label="Net Profit"
+          label="Munafa"
           value={`Rs. ${(income - expense).toLocaleString()}`}
           accent={income - expense >= 0 ? 'teal' : 'red'}
         />
-        <StatCard label="New Patients" value={String(newPatients.length)} accent="teal" />
+        <StatCard label="Naye patients" value={String(newPatients.length)} accent="teal" />
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <div className="rounded-2xl border border-clinic-teal/10 bg-white p-4">
-          <p className="text-xs text-clinic-ink/50">Dental Patients</p>
+          <p className="text-xs text-clinic-ink/50">Dental patients</p>
           <p className="mt-1 font-display text-lg font-semibold text-clinic-ink">
             {newPatients.filter((p) => p.department === 'dental').length}
           </p>
         </div>
         <div className="rounded-2xl border border-clinic-teal/10 bg-white p-4">
-          <p className="text-xs text-clinic-ink/50">Homeopathic Patients</p>
+          <p className="text-xs text-clinic-ink/50">Homeopathic patients</p>
           <p className="mt-1 font-display text-lg font-semibold text-clinic-ink">
             {newPatients.filter((p) => p.department === 'homeopathic').length}
           </p>
         </div>
         <div className="rounded-2xl border border-clinic-teal/10 bg-white p-4">
-          <p className="text-xs text-clinic-ink/50">Appointments Completed</p>
+          <p className="text-xs text-clinic-ink/50">Appointments (poori / kul)</p>
           <p className="mt-1 font-display text-lg font-semibold text-clinic-ink">
             {appts.filter((a) => a.status === 'completed').length} / {appts.length}
           </p>
         </div>
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-          <p className="text-xs text-amber-700/70">Outstanding (active plans)</p>
+          <p className="text-xs text-amber-700/70">Kul baqaya (patients se lena hai)</p>
           <p className="mt-1 font-display text-lg font-semibold text-amber-700">
-            Rs. {activePlanValue.toLocaleString()}
+            Rs. {dueTotal.toLocaleString()}
           </p>
         </div>
       </div>
 
       <section className="mt-8 rounded-2xl border border-clinic-teal/10 bg-white p-6">
-        <p className="font-display font-semibold text-clinic-ink">Doctor-wise Earnings</p>
+        <p className="font-display font-semibold text-clinic-ink">Treatment ke hisaab se kaam (bill)</p>
+        <p className="mt-1 text-sm text-clinic-ink/60">Is mahine ke bills mein kaun si treatment kitni hui aur kitne ki bani.</p>
+        {treatRows.length === 0 ? (
+          <p className="mt-4 text-sm text-clinic-ink/50">Is mahine koi bill nahi bana.</p>
+        ) : (
+          <div className="mt-4 grid gap-3">
+            {treatRows.map((t) => (
+              <div key={t.name}>
+                <div className="flex flex-wrap justify-between gap-2 text-sm">
+                  <span className="font-medium text-clinic-ink">{t.name}</span>
+                  <span className="text-clinic-ink">
+                    Rs. {t.total.toLocaleString()}
+                    <span className="ml-2 text-xs text-clinic-ink/60">{t.count} baar</span>
+                  </span>
+                </div>
+                <div className="mt-1 h-2 overflow-hidden rounded-full bg-clinic-mint">
+                  <div className="h-full rounded-full bg-clinic-teal" style={{ width: `${Math.max(4, (t.total / maxTreat) * 100)}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="mt-8 rounded-2xl border border-clinic-teal/10 bg-white p-6">
+        <p className="font-display font-semibold text-clinic-ink">Doctor ke hisaab se income</p>
         <p className="mt-1 text-sm text-clinic-ink/60">
           Kis doctor ne kitna kamaya aur kitne patients dekhe.
         </p>
@@ -207,7 +248,7 @@ export default async function ReportsPage({
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
         {/* Income by category with simple bars */}
         <div className="rounded-2xl border border-clinic-teal/10 bg-white p-6">
-          <p className="font-display font-semibold text-clinic-ink">Income by Category</p>
+          <p className="font-display font-semibold text-clinic-ink">Income, category ke hisaab se</p>
           {categories.length === 0 ? (
             <p className="mt-4 text-sm text-clinic-ink/50">Is mahine koi income record nahi hui.</p>
           ) : (
@@ -234,7 +275,7 @@ export default async function ReportsPage({
 
         {/* Expenses */}
         <div className="rounded-2xl border border-clinic-teal/10 bg-white p-6">
-          <p className="font-display font-semibold text-clinic-ink">Expenses by Category</p>
+          <p className="font-display font-semibold text-clinic-ink">Kharche, category ke hisaab se</p>
           {expenseCats.length === 0 ? (
             <p className="mt-4 text-sm text-clinic-ink/50">Is mahine koi expense record nahi hua.</p>
           ) : (

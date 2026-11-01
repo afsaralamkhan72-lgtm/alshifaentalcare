@@ -146,7 +146,7 @@ async function getDashboardStats(month: string, canSeeMoney: boolean) {
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string }>
+  searchParams: Promise<{ month?: string; denied?: string }>
 }) {
   const params = await searchParams
   const currentMonth = todayKarachi().slice(0, 7)
@@ -165,6 +165,28 @@ export default async function DashboardPage({
         </div>
       </div>
 
+      {params.denied && (
+        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Aap ko ye page kholne ki ijazat nahi. Zaroorat ho to Admin se &quot;Staff aur Permissions&quot; mein ijazat lagwayein.
+        </div>
+      )}
+      {canSeeMoney && (
+        <Suspense fallback={null}>
+          <BackupReminder />
+        </Suspense>
+      )}
+      <div className="mt-4 flex flex-wrap gap-2">
+        {perms.includes('patients.create') && (
+          <Link href="/admin/patients?new=1" className="rounded-full bg-clinic-teal px-4 py-2 text-sm font-semibold text-white">+ Naya patient</Link>
+        )}
+        {perms.includes('appointments.view') && (
+          <Link href="/admin/appointments" className="rounded-full border border-clinic-teal/40 px-4 py-2 text-sm font-semibold text-clinic-teal">Appointments</Link>
+        )}
+        {perms.includes('billing.view') && (
+          <Link href="/admin/dues" className="rounded-full border border-clinic-teal/40 px-4 py-2 text-sm font-semibold text-clinic-teal">Payment lein</Link>
+        )}
+        <Link href="/admin/patients" className="rounded-full border border-clinic-teal/40 px-4 py-2 text-sm font-semibold text-clinic-teal">Patient talash</Link>
+      </div>
       <Suspense fallback={<SectionLoading />}>
         <TodayBoard perms={perms} />
       </Suspense>
@@ -173,15 +195,47 @@ export default async function DashboardPage({
           <OwnerToday />
         </Suspense>
       )}
-      <Suspense fallback={<SectionLoading label="Mahine ka jaiza load ho raha hai..." />}>
-        <MonthSection month={month} currentMonth={currentMonth} canSeeMoney={canSeeMoney} />
-      </Suspense>
+      {canSeeMoney ? (
+        <Suspense fallback={<SectionLoading label="Mahine ka jaiza load ho raha hai..." />}>
+          <MonthSection month={month} currentMonth={currentMonth} canSeeMoney={canSeeMoney} />
+        </Suspense>
+      ) : (
+        <Suspense fallback={null}>
+          <StockAlerts />
+        </Suspense>
+      )}
     </div>
   )
 }
 
 function SectionLoading({ label = 'Load ho raha hai...' }: { label?: string }) {
   return <div className="mt-6 animate-pulse rounded-2xl border border-clinic-teal/10 bg-white p-6 text-sm text-clinic-ink/40">{label}</div>
+}
+
+async function BackupReminder() {
+  const sb = await createClient()
+  const { data } = await sb.from('site_settings').select('value').eq('key', 'last_backup_at').maybeSingle()
+  const last = data?.value ? String(data.value) : null
+  const days = last ? Math.floor((Date.parse(todayKarachi()) - Date.parse(last)) / 86_400_000) : null
+  if (days !== null && days <= 7) return null
+  return (
+    <Link href="/admin/settings?s=backup" className="mt-4 block rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+      {days === null ? 'Data ki copy (backup) abhi tak nahi li gayi.' : `Aakhri backup ${days} din pehle liya tha.`} <span className="font-semibold underline">Abhi lein →</span>
+    </Link>
+  )
+}
+
+async function StockAlerts() {
+  const sb = await createClient()
+  const { data } = await sb.from('inventory').select('item_name, quantity, reorder_level, is_active')
+  const low = (data ?? []).filter((r) => r.is_active !== false && Number(r.quantity) <= Number(r.reorder_level))
+  if (low.length === 0) return null
+  return (
+    <Link href="/admin/inventory" className="mt-6 block rounded-2xl border border-red-200 bg-red-50 p-4">
+      <p className="text-sm font-semibold text-red-700">{low.length} samaan khatam hone wala hai</p>
+      <p className="mt-1 text-xs text-red-600">{low.slice(0, 6).map((i) => `${i.item_name} (${Number(i.quantity)})`).join(', ')}</p>
+    </Link>
+  )
 }
 
 async function MonthSection({ month, currentMonth, canSeeMoney }: { month: string; currentMonth: string; canSeeMoney: boolean }) {
@@ -248,13 +302,13 @@ async function MonthSection({ month, currentMonth, canSeeMoney }: { month: strin
       </div>
 
       <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-5">
-        <StatCard label="Total Patients" value={stats.totalPatients} />
-        <StatCard label="Dental Patients" value={stats.dentalCount} accent="teal" />
-        <StatCard label="Homeopathic Patients" value={stats.homeoCount} accent="amber" />
+        <StatCard label="Kul patients" value={stats.totalPatients} />
+        <StatCard label="Dental patients" value={stats.dentalCount} accent="teal" />
+        <StatCard label="Homeopathic patients" value={stats.homeoCount} accent="amber" />
         {canSeeMoney && (
           <>
-            <StatCard label={`Income (${monthLabel})`} value={`Rs. ${stats.income.toLocaleString()}`} accent="green" />
-            <StatCard label={`Expenses (${monthLabel})`} value={`Rs. ${stats.expense.toLocaleString()}`} accent="red" />
+            <StatCard label={`Wasooli (${monthLabel})`} value={`Rs. ${stats.income.toLocaleString()}`} accent="green" />
+            <StatCard label={`Kharche (${monthLabel})`} value={`Rs. ${stats.expense.toLocaleString()}`} accent="red" />
           </>
         )}
       </div>
@@ -284,7 +338,7 @@ async function MonthSection({ month, currentMonth, canSeeMoney }: { month: strin
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
         <section className="rounded-2xl border border-clinic-teal/10 bg-white p-6">
           <p className="font-display font-semibold text-clinic-ink">
-            Kaunsa Treatment Zyada Chal Raha Hai
+            Kaun si treatment zyada ho rahi hai
           </p>
           <p className="mt-1 text-sm text-clinic-ink/60">{monthLabel}</p>
 
@@ -321,7 +375,7 @@ async function MonthSection({ month, currentMonth, canSeeMoney }: { month: strin
         </section>
 
         <section className="rounded-2xl border border-clinic-teal/10 bg-white p-6">
-          <p className="font-display font-semibold text-clinic-ink">Income Kis Department Se</p>
+          <p className="font-display font-semibold text-clinic-ink">Wasooli kis department se</p>
           <p className="mt-1 text-sm text-clinic-ink/60">{monthLabel}</p>
 
           <div className="mt-4 grid gap-3">
@@ -418,14 +472,14 @@ async function TodayBoard({ perms }: { perms: string[] }) {
   const canAppt = perms.includes('appointments.view')
   const canLab = perms.includes('lab.view')
   const days = await getReminderDays()
-  const [todayRes, missedRes, labRes, soonRes, activeRes, visitsTodayRes] = await Promise.all([
+  const [todayRes, missedRes, labRes, soonRes, activeRes, visitsTodayRes, cvTodayRes] = await Promise.all([
     canAppt
       ? supabase
           .from('appointments')
           .select('id, patient_name, phone, treatment_name, preferred_time, status, patient_id')
           .is('deleted_at', null)
           .eq('preferred_date', today)
-          .in('status', ['pending', 'confirmed', 'completed'])
+          .in('status', ['pending', 'confirmed', 'arrived', 'completed'])
           .order('preferred_time', { ascending: true })
       : Promise.resolve({ data: [] }),
     canAppt
@@ -466,10 +520,16 @@ async function TodayBoard({ perms }: { perms: string[] }) {
     perms.includes('clinical.view')
       ? supabase.from('visit_notes').select('patient_id').eq('visit_date', today).is('voided_at', null)
       : Promise.resolve({ data: null }),
+    // Nayi visit (jis mein sirf muaina / prescription ho aur treatment na ho) bhi gini jaye
+    perms.includes('clinical.view')
+      ? supabase.from('clinical_visits').select('patient_id').eq('visit_date', today).eq('status', 'finished')
+      : Promise.resolve({ data: null }),
   ])
   const soon = (soonRes.data ?? []) as { id: string; patient_name: string; phone: string; treatment_name: string | null; preferred_date: string; preferred_time: string | null; patient_id: string | null; doctor: string | null }[]
   const activeCount = 'count' in activeRes ? activeRes.count : null
-  const seenToday = visitsTodayRes.data ? new Set((visitsTodayRes.data as { patient_id: string }[]).map((v) => v.patient_id)).size : null
+  const seenToday = visitsTodayRes.data
+    ? new Set([...(visitsTodayRes.data as { patient_id: string }[]), ...((cvTodayRes.data ?? []) as { patient_id: string }[])].map((v) => v.patient_id)).size
+    : null
   const todays = (todayRes.data ?? []) as { id: string; patient_name: string; phone: string; treatment_name: string | null; preferred_time: string | null; status: string; patient_id: string | null }[]
   const missed = (missedRes.data ?? []) as { id: string; patient_name: string; phone: string; treatment_name: string | null; preferred_date: string; patient_id: string | null }[]
   const labs = ((labRes.data ?? []) as unknown as { id: string; case_number: string | null; work_type: string | null; lab_name: string; due_date: string | null; status: string; patients: { full_name: string } | null }[])
@@ -524,6 +584,21 @@ async function TodayBoard({ perms }: { perms: string[] }) {
             <p className="font-display font-semibold text-clinic-ink">Aaj ki appointments ({todays.length})</p>
             <Link href="/admin/appointments" className="text-xs font-semibold text-clinic-teal">Sab →</Link>
           </div>
+          {todays.some((a) => a.status === 'arrived') && (
+            <div className="mt-3 rounded-xl border border-sky-200 bg-sky-50 p-3">
+              <p className="text-xs font-semibold text-sky-800">Intezar mein ({todays.filter((a) => a.status === 'arrived').length})</p>
+              <div className="mt-1 grid gap-1 text-sm">
+                {todays.filter((a) => a.status === 'arrived').map((a) => (
+                  <p key={a.id}>
+                    {who(a)} <span className="text-xs text-clinic-ink/50">{[a.preferred_time, a.treatment_name].filter(Boolean).join(' · ')}</span>
+                    {a.patient_id && (
+                      <Link href={`/admin/patients/${a.patient_id}`} className="ml-2 text-xs font-semibold text-clinic-teal">Visit shuru →</Link>
+                    )}
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
           {todays.length === 0 ? (
             <p className="mt-3 text-sm text-clinic-ink/50">Aaj koi appointment nahi.</p>
           ) : (
@@ -534,8 +609,8 @@ async function TodayBoard({ perms }: { perms: string[] }) {
                     {who(a)}
                     <span className="ml-2 text-xs text-clinic-ink/50">{[a.preferred_time, a.treatment_name].filter(Boolean).join(' · ')}</span>
                   </span>
-                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${a.status === 'completed' ? 'bg-emerald-50 text-emerald-700' : a.status === 'pending' ? 'bg-amber-50 text-amber-700' : 'bg-clinic-mint text-clinic-teal'}`}>
-                    {a.status === 'completed' ? 'Aa gaye' : a.status === 'pending' ? 'Request' : 'Aana hai'}
+                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${a.status === 'completed' ? 'bg-emerald-50 text-emerald-700' : a.status === 'arrived' ? 'bg-sky-50 text-sky-700' : a.status === 'pending' ? 'bg-amber-50 text-amber-700' : 'bg-clinic-mint text-clinic-teal'}`}>
+                    {a.status === 'completed' ? 'Dekh liye' : a.status === 'arrived' ? 'Intezar mein' : a.status === 'pending' ? 'Request' : 'Aana hai'}
                   </span>
                 </div>
               ))}

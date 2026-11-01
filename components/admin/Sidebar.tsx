@@ -40,9 +40,9 @@ const GROUPS: NavGroup[] = [
     title: 'Aur',
     items: [
       { href: '/admin/prescriptions', label: 'Prescriptions', roles: ALL, perm: 'prescriptions.view' },
-      { href: '/admin/recall', label: 'Recall (checkup yaad)', roles: ALL, perm: 'clinical.view' },
+      { href: '/admin/recall', label: 'Recall', roles: ALL, perm: 'clinical.view' },
       { href: '/admin/inventory', label: 'Stock', roles: ALL, perm: 'inventory.view' },
-      { href: '/admin/settings', label: 'Settings (dawaiyan, qeematein)', roles: ALL, perm: 'settings.manage' },
+      { href: '/admin/settings', label: 'Settings', roles: ALL, perm: 'settings.manage' },
     ],
   },
   {

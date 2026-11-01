@@ -44,15 +44,17 @@ export default async function PortalRecordPage({
 
   const today = todayKarachi()
 
-  const [plansRes, apptRes, visitRes] = await Promise.all([
+  const [plansRes, apptRes, visitRes, cvRes] = await Promise.all([
     supabase
       .from('treatment_plans')
       .select('id, title, total_cost, advance_paid, monthly_amount, duration_months')
       .eq('patient_id', patient.id),
+    // Sirf isi patient ki appointments (ghar ke doosre log jo wahi phone istemal karte hain unki nahi).
+    // Purani appointments jo patient se jurri nahi (patient_id khali) un ke liye phone se milana jari.
     supabase
       .from('appointments')
       .select('treatment_name, preferred_date, preferred_time, status')
-      .eq('phone', patient.phone)
+      .or(`patient_id.eq.${patient.id},and(patient_id.is.null,phone.eq."${String(patient.phone).replace(/"/g, '')}")`)
       .is('deleted_at', null)
       .order('preferred_date', { ascending: false })
       .limit(5),
@@ -62,11 +64,24 @@ export default async function PortalRecordPage({
       .eq('patient_id', patient.id)
       .order('visit_date', { ascending: false })
       .limit(1),
+    supabase
+      .from('clinical_visits')
+      .select('visit_date, next_date')
+      .eq('patient_id', patient.id)
+      .eq('status', 'finished')
+      .order('visit_date', { ascending: false })
+      .limit(1),
   ])
 
   const plans = plansRes.data ?? []
   const appointments = apptRes.data ?? []
-  const lastVisit = visitRes.data?.[0] ?? null
+  // Purani (visit_notes) aur nayi (clinical_visits) dono mein se jo taza ho
+  const oldV = visitRes.data?.[0] ?? null
+  const newV = cvRes.data?.[0] ?? null
+  const lastVisit =
+    newV && (!oldV || newV.visit_date >= oldV.visit_date)
+      ? { visit_date: newV.visit_date, next_visit: newV.next_date as string | null }
+      : oldV
 
   // Instalments across all plans
   let installments: { amount: number; paid_amount: number; due_date: string; paid_date: string | null }[] = []

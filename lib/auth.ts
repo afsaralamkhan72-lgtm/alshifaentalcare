@@ -56,14 +56,14 @@ export function isOwnerRole(role: StaffProfile['role']): boolean {
 /** Billing / invoice / baqaya jaise pages: reception ko /admin/dashboard par wapas bhej do */
 export async function requireOwner(): Promise<StaffProfile> {
   const profile = await getStaffProfile()
-  if (!isOwnerRole(profile.role)) redirect('/admin/dashboard')
+  if (!isOwnerRole(profile.role)) redirect('/admin/dashboard?denied=1')
   return profile
 }
 
 /** Use on pages that only role=admin should reach (e.g. Edit Website / CMS) */
 export async function requireAdmin(): Promise<StaffProfile> {
   const profile = await getStaffProfile()
-  if (profile.role !== 'admin') redirect('/admin/dashboard')
+  if (profile.role !== 'admin') redirect('/admin/dashboard?denied=1')
   return profile
 }
 
@@ -83,7 +83,7 @@ export async function can(code: string): Promise<boolean> {
 /** Page ke shuru mein: permission na ho to dashboard par wapas */
 export async function requirePerm(code: string): Promise<StaffProfile> {
   const profile = await getStaffProfile()
-  if (!(await getPermissions()).includes(code)) redirect('/admin/dashboard')
+  if (!(await getPermissions()).includes(code)) redirect('/admin/dashboard?denied=1')
   return profile
 }
 
@@ -92,6 +92,6 @@ export async function requireAnyPerm(...codes: string[]): Promise<StaffProfile> 
   const profile = await getStaffProfile()
   if (isOwnerRole(profile.role)) return profile
   const perms = await getPermissions()
-  if (!codes.some((c) => perms.includes(c))) redirect('/admin/dashboard')
+  if (!codes.some((c) => perms.includes(c))) redirect('/admin/dashboard?denied=1')
   return profile
 }

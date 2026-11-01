@@ -5,9 +5,13 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { fmtDate, money, todayKarachi, addDays } from '@/lib/karachi'
 import { toothLabel } from '@/lib/teeth'
-import type { CatalogOpt, MaterialOpt, TItem } from '../TreatmentsPanel'
+import type { CatalogOpt, MaterialOpt, TItem } from './types'
 import ToothChart, { type Mark } from './ToothChart'
 import HistoryFields from './HistoryFields'
+import { friendlyError } from '@/lib/errors'
+import { COMPLAINTS, HOMEO_COMPLAINTS, DIAG_SUGGEST } from '@/lib/clinicOptions'
+import { CLINIC } from '@/clinic.config'
+import { toInternationalPKNumber } from '@/lib/whatsapp'
 
 /* ------------------------------------------------------------------ */
 export interface VisitRow {
@@ -82,7 +86,17 @@ interface TRow {
   planned: boolean
   notes: string
   mats: Record<string, string>
+  /** kaise lagti hai: har daant ki / poora muh / jabda / aik dafa */
+  applies: Applies
+  /** har daant ki qeemat (list se); price = unit x daanton ki ginti, jab tak doctor khud qeemat na badle */
+  unit: number | null
+  manual: boolean
+  jaw: '' | 'Upar' | 'Neeche' | 'Upar aur Neeche'
 }
+type Applies = 'tooth' | 'mouth' | 'jaw' | 'once'
+const APPLIES_LABEL: Record<Applies, string> = { tooth: 'Har daant ki', mouth: 'Poora muh', jaw: 'Jabda', once: 'Aik dafa' }
+const autoPrice = (r: { applies: Applies; unit: number | null; manual: boolean; price: string }, teeth: string[]) =>
+  r.applies === 'tooth' && r.unit != null && !r.manual ? String(r.unit * Math.max(1, teeth.length)) : r.price
 /** Pehle se chalti / plan wali treatment: aaj ka visit */
 interface OldRow {
   tick: boolean
@@ -104,25 +118,24 @@ interface Props {
   defaultDoctor: string | null
   medicines: MedOpt[]
   balance: number
+  /** pehli dafa ijazat (consent) kab li gayi; null = abhi nahi */
+  consentAt?: string | null
+  /** Settings se aayi hui chips ki list (khali ho to default) */
+  opts?: { complaint: string[]; homeo_complaint: string[]; diagnosis: string[] }
+  isFirstVisit?: boolean
+  hasPlanned?: boolean
   xraySlot?: ReactNode
   plansSlot?: ReactNode
   pastRx?: { id: string; date: string; names: string }[]
   perms: { clinicalView: boolean; clinicalEdit: boolean; bill: boolean; collect: boolean; money: boolean; owner: boolean; rx: boolean }
 }
 
-const COMPLAINTS = ['Toothache', 'Sensitivity', 'Swelling', 'Bleeding gums', 'Missing tooth', 'Broken tooth', 'Difficulty chewing', 'Cosmetic concern', 'Follow-up', 'Other']
-const HOMEO_COMPLAINTS = ['Bukhar', 'Sar dard', 'Khansi / zukam', 'Pait ki takleef', 'Jild (skin)', 'Allergy', 'Jor ka dard', 'Neend', 'Follow-up', 'Other']
 const DURATIONS = ['Aaj se', '2-3 din', '1 hafta', '2 hafte', '1 mahina', '1 mahine se zyada']
 const SEVERITY = ['Halka', 'Darmiyana', 'Shadeed']
 const FINDINGS = [
   { k: 'extraoral', l: 'Extraoral (chehra, jabra)' },
   { k: 'intraoral', l: 'Intraoral aur soft tissue (munh ke andar)' },
   { k: 'periodontal', l: 'Periodontal (masoorhe)' },
-]
-const DIAG_SUGGEST = [
-  'Dental caries', 'Reversible pulpitis', 'Irreversible pulpitis', 'Pulp necrosis', 'Periapical abscess', 'Periapical periodontitis',
-  'Gingivitis', 'Chronic periodontitis', 'Fractured tooth', 'Impacted tooth', 'Missing tooth', 'Dentine hypersensitivity',
-  'Retained root', 'Malocclusion', 'Pericoronitis', 'Attrition / abrasion',
 ]
 const SLOTS = (() => {
   const out: string[] = []
@@ -176,8 +189,12 @@ export default function VisitWorkspace(p: Props) {
   const visitId = useRef<string | null>(v?.id ?? null)
   const [busy, setBusy] = useState<'' | 'save' | 'finish'>('')
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null)
-  const [showForm, setShowForm] = useState(!p.finishedToday)
+  const [showForm, setShowForm] = useState(!p.finishedToday || p.visit !== null)
   const [done, setDone] = useState<{ visit_id: string; prescription_id: string | null; hasInvoice: boolean } | null>(null)
+
+  // doctor jis ke naam par aaj ka visit (income by doctor report isi se banti hai)
+  const [doctor, setDoctor] = useState(v?.doctor ?? p.defaultDoctor ?? '')
+  const [confirmDone, setConfirmDone] = useState<string | null>(null)
 
   // 2, 3 history
   const [medical, setMedical] = useState<Record<string, unknown>>(p.history.medical_history)
@@ -212,12 +229,24 @@ export default function VisitWorkspace(p: Props) {
   const [nextDate, setNextDate] = useState(v?.next_date ?? '')
   const [nextTime, setNextTime] = useState(v?.next_time ?? '')
   const [nextT, setNextT] = useState(v?.next_treatment_id ?? '')
+  // Recall (dobara bulana): 3 / 6 / 12 mahine
+  const hasScaling = () => rows.some((r) => /scal|polish/i.test(r.name))
+  const [recallM, setRecallM] = useState<string>('')
+  const [recallTouched, setRecallTouched] = useState(false)
+  const recallEff = recallTouched ? recallM : hasScaling() ? '6' : ''
+  const [consent, setConsent] = useState(Boolean(p.consentAt))
 
   // Browser mein baqi form ki nakal (Save ke baad bhi treatment / dawa / bill ki qataren wapas aa jayen). Finish par saaf.
   const draftKey = `alshifa-visit:${p.patient.id}:${todayKarachi()}`
   const [restored, setRestored] = useState(false)
   useEffect(() => {
     try {
+      // Visit doosre device par khatam ho chuka ho to yahan ka purana draft wapas na aaye
+      if (p.finishedToday && !p.visit) {
+        localStorage.removeItem(draftKey)
+        setRestored(true)
+        return
+      }
       const raw = localStorage.getItem(draftKey)
       if (raw) {
         const d = JSON.parse(raw)
@@ -231,6 +260,7 @@ export default function VisitWorkspace(p: Props) {
       }
     } catch {}
     setRestored(true)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftKey])
   useEffect(() => {
     if (!restored || done) return
@@ -245,7 +275,7 @@ export default function VisitWorkspace(p: Props) {
     const fix = (teeth: string[] | undefined) => [...(teeth ?? []).filter((t) => next.includes(t)), ...added]
     setSel(next)
     setDiags((ds) => ds.map((d) => ({ ...d, teeth: fix(d.teeth) })))
-    setRows((rs) => rs.map((r) => ({ ...r, teeth: fix(r.teeth) })))
+    setRows((rs) => rs.map((r) => (r.applies !== 'tooth' ? r : { ...r, teeth: fix(r.teeth), price: autoPrice(r, fix(r.teeth)) })))
   }
 
   const data = () => ({
@@ -255,6 +285,7 @@ export default function VisitWorkspace(p: Props) {
     next_date: nextDate || '',
     next_time: nextDate ? nextTime : '',
     next_treatment_id: nextDate ? nextT : '',
+    ...(doctor ? { doctor } : {}), // khali bhejne se RPC ka khud ka (login doctor) wala naam mit jata
     history: { medical_history: medical, dental_history: dental },
     chart: homeo ? [] : marks,
   })
@@ -293,9 +324,29 @@ export default function VisitWorkspace(p: Props) {
     const c = p.catalog.find((x) => x.name.toLowerCase() === name.trim().toLowerCase())
     const mats: Record<string, string> = {}
     if (c) for (const m of p.materials[c.id] ?? []) mats[m.inventory_id] = String(m.default_qty)
-    updRow(r.key, { name, catalog_id: c?.id ?? null, price: c ? String(c.price) : r.price, mats: c ? mats : {} })
+    if (!c) return updRow(r.key, { name, catalog_id: null, mats: {} })
+    const applies: Applies = c.applies_to ?? 'tooth'
+    const teeth = applies === 'tooth' ? (r.teeth.length ? r.teeth : [...sel]) : []
+    const next = { applies, unit: applies === 'tooth' ? c.price : null, manual: false, price: String(c.price) }
+    updRow(r.key, { name, catalog_id: c.id, mats, teeth, applies, unit: next.unit, manual: false, price: autoPrice(next, teeth) })
+  }
+  function setRowTeeth(r: TRow, t: string[]) {
+    updRow(r.key, { teeth: t, price: autoPrice(r, t) })
+  }
+  function setRowApplies(r: TRow, a: Applies) {
+    updRow(r.key, { applies: a, teeth: a === 'tooth' ? (r.teeth.length ? r.teeth : [...sel]) : [], jaw: a === 'jaw' ? r.jaw : '', unit: a === 'tooth' ? r.unit : null })
+  }
+  async function completeTreatment(id: string) {
+    setMsg(null)
+    const { error } = await createClient().rpc('set_treatment_status', { p_treatment_id: id, p_status: 'completed' })
+    setConfirmDone(null)
+    if (error) return setMsg({ ok: false, t: friendlyError(error.message) })
+    setOld((o) => ({ ...o, [id]: { tick: false, notes: '', price: '' } }))
+    setMsg({ ok: true, t: 'Treatment mukammal likh di gayi.' })
+    router.refresh()
   }
 
+  const consultCat = p.catalog.find((c) => /consult|check-?up/i.test(c.name) && (homeo ? c.department !== 'dental' : c.department !== 'homeopathic')) ?? null
   const medTotal = lines.filter((l) => l.mode === 'dispense').reduce((s, l) => s + (Number(l.qty) || 0) * (Number(l.price) || 0), 0)
   const extraTotal = extra.reduce((s, e) => s + (Number(e.amount) || 0), 0)
   const treatTotal =
@@ -310,7 +361,7 @@ export default function VisitWorkspace(p: Props) {
     if (visitId.current) return visitId.current
     const { data: id, error } = await createClient().rpc('open_clinical_visit', { p_patient_id: p.patient.id })
     if (error || !id) {
-      setMsg({ ok: false, t: error?.message ?? 'Visit nahi khul saka' })
+      setMsg({ ok: false, t: friendlyError(error?.message ?? 'Visit nahi khul saka') })
       return null
     }
     visitId.current = id as string
@@ -325,7 +376,7 @@ export default function VisitWorkspace(p: Props) {
     if (!id) return setBusy('')
     const { error } = await createClient().rpc('save_clinical_visit', { p_id: id, p_data: data() })
     setBusy('')
-    setMsg(error ? { ok: false, t: error.message } : { ok: true, t: 'Save ho gaya (history, takleef, muaina, chart, diagnosis, agli appointment). Treatment, dawa aur bill "Finish Visit" par.' })
+    setMsg(error ? { ok: false, t: friendlyError(error.message) } : { ok: true, t: 'Save ho gaya (history, takleef, muaina, chart, diagnosis, agli appointment). Treatment, dawa aur bill "Finish Visit" par.' })
   }
 
   async function finish() {
@@ -337,6 +388,11 @@ export default function VisitWorkspace(p: Props) {
     setMsg(null)
     const id = await ensureVisit()
     if (!id) return setBusy('')
+    let consentWarn = ''
+    if (consent && !p.consentAt && canEdit) {
+      const { error: cErr } = await createClient().rpc('give_consent', { p_patient: p.patient.id })
+      if (cErr) consentWarn = 'Ijazat (consent) save nahi hui (naya SQL chalana baqi ho sakta hai). '
+    }
     const rx = lines.length
       ? {
           category: rxCat,
@@ -360,10 +416,10 @@ export default function VisitWorkspace(p: Props) {
       ...rows.map((r) => ({
         name: r.name.trim(),
         catalog_id: r.catalog_id,
-        teeth: r.teeth,
+        teeth: r.applies === 'tooth' ? r.teeth : [],
         price: p.perms.bill ? Number(r.price) || 0 : 0,
         planned: r.planned,
-        notes: r.notes,
+        notes: [r.applies === 'jaw' && r.jaw ? `Jabda: ${r.jaw}` : '', r.notes].filter(Boolean).join(' — '),
         condition: null as string | null,
       })),
       ...live
@@ -388,17 +444,29 @@ export default function VisitWorkspace(p: Props) {
     })
     if (error) {
       setBusy('')
-      return setMsg({ ok: false, t: error.message })
+      return setMsg({ ok: false, t: friendlyError(error.message) })
     }
     // Samaan stock se kaatein (visit mukammal ho chuka; stock kam ho to sirf warning)
     const usage = rows
       .filter((r) => !r.planned)
       .flatMap((r) => Object.entries(r.mats).map(([inventory_id, q]) => ({ inventory_id, qty: Number(q) || 0, treatment_id: r.catalog_id })))
       .filter((u) => u.qty > 0)
-    let warn = ''
+    let warn = consentWarn
+    if (recallEff && canEdit) {
+      const months = Number(recallEff)
+      const type = hasScaling() ? 'Scaling & Polishing' : 'Routine Check-up'
+      const sb = createClient()
+      const nd = new Date(todayKarachi() + 'T00:00:00')
+      nd.setMonth(nd.getMonth() + months)
+      const nextDue = `${nd.getFullYear()}-${String(nd.getMonth() + 1).padStart(2, '0')}-${String(nd.getDate()).padStart(2, '0')}`
+      const { data: ex } = await sb.from('recalls').select('id').eq('patient_id', p.patient.id).eq('recall_type', type).eq('status', 'active').maybeSingle()
+      const row = { interval_months: months, last_done: todayKarachi(), next_due: nextDue, reminders_sent: 0, last_reminded: null }
+      const { error: rErr } = ex ? await sb.from('recalls').update(row).eq('id', ex.id) : await sb.from('recalls').insert({ patient_id: p.patient.id, recall_type: type, status: 'active', ...row })
+      if (rErr) warn += 'Recall save nahi hua: ' + friendlyError(rErr.message) + ' '
+    }
     if (usage.length > 0) {
       const { error: sErr } = await createClient().rpc('record_usage', { p_items: usage, p_patient_id: p.patient.id, p_invoice_id: null, p_note: 'Visit', p_key: finishKey.current + ':stk' })
-      if (sErr) warn = 'Visit mukammal, magar samaan stock se nahi kata: ' + sErr.message
+      if (sErr) warn += 'Visit mukammal, magar samaan stock se nahi kata: ' + sErr.message
     }
     try {
       localStorage.removeItem(draftKey)
@@ -411,7 +479,11 @@ export default function VisitWorkspace(p: Props) {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  const complaintList = homeo ? HOMEO_COMPLAINTS : COMPLAINTS
+  const complaintList = (homeo ? p.opts?.homeo_complaint : p.opts?.complaint)?.length ? (homeo ? p.opts!.homeo_complaint : p.opts!.complaint) : homeo ? HOMEO_COMPLAINTS : COMPLAINTS
+  const diagList = p.opts?.diagnosis?.length ? p.opts.diagnosis : DIAG_SUGGEST
+  // Section numbers jo asal mein dikhte hain unhi ke hisaab se (homeopathy mein 3 aur 6 nahi hote)
+  let secNoCount = 1
+  const secNo = () => ++secNoCount
   const fin = done ? { id: done.visit_id, prescription_id: done.prescription_id, hasInvoice: done.hasInvoice } : p.finishedToday
 
   /* ---------- sirf bill dekhne wale (reception) ---------- */
@@ -435,12 +507,27 @@ export default function VisitWorkspace(p: Props) {
                 Prescription PDF
               </a>
             )}
+            {p.patient.phone && (
+              <a
+                href={`https://wa.me/${toInternationalPKNumber(p.patient.phone)}?text=${encodeURIComponent(`Assalam o Alaikum ${p.patient.full_name}, aaj aap ne ${CLINIC.name} mein visit ki. Shukriya! Koi bhi sawal ho to humein batayein.`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-full bg-whatsapp px-5 py-2.5 font-semibold text-white"
+              >
+                WhatsApp
+              </a>
+            )}
             {fin.hasInvoice && p.perms.money && (
               <a href={`/admin/visits/${fin.id}/invoice`} target="_blank" className="rounded-full bg-clinic-teal px-5 py-2.5 font-semibold text-white">
                 Invoice PDF
               </a>
             )}
           </div>
+          {p.hasPlanned && p.perms.money && (
+            <a href={`/admin/patients/${p.patient.id}/estimate`} target="_blank" className="mt-3 inline-block text-xs font-semibold text-clinic-teal underline">
+              Treatment plan ka estimate (print)
+            </a>
+          )}
           {!showForm && !done && (
             <button type="button" onClick={() => setShowForm(true)} className="mt-3 text-xs font-semibold text-clinic-teal underline">
               Aaj dobara naya visit shuru karein
@@ -456,20 +543,52 @@ export default function VisitWorkspace(p: Props) {
 
       {showForm && !done && (
         <>
+          {(p.doctors.length > 0 || doctor) && (
+            <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-clinic-teal/10 bg-white px-4 py-3 text-sm">
+              <label htmlFor="visit-doctor" className="font-semibold text-clinic-ink/70">
+                Doctor (aaj ka visit)
+              </label>
+              <select
+                id="visit-doctor"
+                value={doctor}
+                disabled={!canEdit}
+                onChange={(e) => setDoctor(e.target.value)}
+                className="rounded-lg border border-clinic-teal/25 px-3 py-1.5 text-sm outline-none focus:border-clinic-teal"
+              >
+                <option value="">— chunein —</option>
+                {[...new Set([...(doctor ? [doctor] : []), ...p.doctors])].map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+              <span className="text-xs text-clinic-ink/50">Isi ke naam par income report banti hai.</span>
+            </div>
+          )}
+          {!p.consentAt && canEdit && (
+            <label className="flex items-start gap-2 rounded-2xl border border-clinic-teal/15 bg-white px-4 py-3 text-sm">
+              <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 h-5 w-5" />
+              <span>
+                <span className="font-semibold text-clinic-ink">Ijazat (consent) li gayi</span>
+                <span className="block text-xs text-clinic-ink/60">Patient ne treatment aur record rakhne ki ijazat de di hai. Ye sirf aik dafa likhni hoti hai.</span>
+              </span>
+            </label>
+          )}
+          {p.consentAt && <p className="px-1 text-xs text-clinic-ink/50">✓ Ijazat (consent) li ja chuki hai — {fmtDate(p.consentAt.slice(0, 10))}</p>}
           {/* 2. MEDICAL HISTORY */}
-          <Section n={2} title="Medical History">
+          <Section n={secNo()} title="Medical History">
             <HistoryFields column="medical_history" data={medical} onChange={setMedical} canEdit={canEdit} />
           </Section>
 
           {/* 3. DENTAL HISTORY */}
           {!homeo && (
-            <Section n={3} title="Dental History">
+            <Section n={secNo()} title="Dental History">
               <HistoryFields column="dental_history" data={dental} onChange={setDental} canEdit={canEdit} />
             </Section>
           )}
 
           {/* 4. CHIEF COMPLAINT */}
-          <Section n={4} title="Chief Complaint (takleef)">
+          <Section n={secNo()} title="Chief Complaint (takleef)">
             <fieldset disabled={!canEdit} className="grid gap-3">
               <div className="flex flex-wrap gap-2">
                 {complaintList.map((c) => (
@@ -517,7 +636,7 @@ export default function VisitWorkspace(p: Props) {
           </Section>
 
           {/* 5. CLINICAL EXAMINATION */}
-          <Section n={5} title="Clinical Examination (muaina)">
+          <Section n={secNo()} title="Clinical Examination (muaina)">
             <fieldset disabled={!canEdit} className="grid gap-3 sm:grid-cols-3">
               {FINDINGS.map((f) => (
                 <div key={f.k}>
@@ -530,13 +649,13 @@ export default function VisitWorkspace(p: Props) {
 
           {/* 6. DENTAL CHART */}
           {!homeo && (
-            <Section n={6} title="Dental Chart">
+            <Section n={secNo()} title="Dental Chart">
               <ToothChart age={p.patient.age} selected={sel} onSelect={pickTeeth} marks={marks} onMarks={setMarks} old={p.chartRecords} canEdit={canEdit} />
             </Section>
           )}
 
           {/* 7. X-RAY */}
-          <Section n={7} title="X-ray / Investigation">
+          <Section n={secNo()} title="X-ray / Investigation">
             <div className="mb-3">
               <label className="text-xs font-medium text-clinic-ink/70">X-ray / report mein kya nazar aaya</label>
               <textarea rows={2} disabled={!canEdit} value={findings.radiographic ?? ''} onChange={(e) => setFindings({ ...findings, radiographic: e.target.value })} placeholder="Caries, bone loss, periapical ..." className={input} />
@@ -545,9 +664,9 @@ export default function VisitWorkspace(p: Props) {
           </Section>
 
           {/* 8. DIAGNOSIS */}
-          <Section n={8} title="Diagnosis">
+          <Section n={secNo()} title="Diagnosis">
             <datalist id="diag-list">
-              {DIAG_SUGGEST.map((d) => (
+              {diagList.map((d) => (
                 <option key={d} value={d} />
               ))}
             </datalist>
@@ -572,7 +691,7 @@ export default function VisitWorkspace(p: Props) {
           </Section>
 
           {/* 9. TREATMENT */}
-          <Section n={9} title="Treatment">
+          <Section n={secNo()} title="Treatment">
             <datalist id="cat-list">
               {p.catalog
                 .filter((c) => (homeo ? c.department !== 'dental' : c.department !== 'homeopathic'))
@@ -596,6 +715,25 @@ export default function VisitWorkspace(p: Props) {
                           {p.perms.money && t.status === 'active' && t.balance > 0 && <span className="text-xs text-red-600">baqaya {money(t.balance)}</span>}
                           <span className="text-xs text-clinic-ink/50">— {t.status === 'planned' ? 'aaj shuru karein' : 'aaj ka visit'}</span>
                         </label>
+                        {canEdit && t.status === 'active' && (
+                          <div className="mt-2 text-xs">
+                            {confirmDone === t.id ? (
+                              <span className="inline-flex flex-wrap items-center gap-2 rounded-lg bg-amber-50 px-2 py-1.5 text-amber-900">
+                                Kya ye treatment poori ho gayi?
+                                <button type="button" onClick={() => completeTreatment(t.id)} className="rounded-full bg-emerald-600 px-3 py-1 font-semibold text-white">
+                                  Haan, mukammal
+                                </button>
+                                <button type="button" onClick={() => setConfirmDone(null)} className="text-clinic-ink/60 underline">
+                                  Nahi
+                                </button>
+                              </span>
+                            ) : (
+                              <button type="button" onClick={() => setConfirmDone(t.id)} className="font-semibold text-emerald-700 underline">
+                                Ye treatment mukammal ho gayi
+                              </button>
+                            )}
+                          </div>
+                        )}
                         {o?.tick && (
                           <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_9rem]">
                             <input value={o.notes} onChange={(e) => updOld(t.id, { notes: e.target.value })} placeholder="Aaj kya kiya (note)" className="rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm" />
@@ -612,12 +750,51 @@ export default function VisitWorkspace(p: Props) {
                 <div key={r.key} className="grid gap-2 rounded-xl border border-clinic-teal/20 p-3">
                   <div className="grid gap-2 sm:grid-cols-[1fr_9rem_auto]">
                     <input list="cat-list" value={r.name} onChange={(e) => pickCatalog(r, e.target.value)} placeholder="Treatment (list se chunein ya likhein)" className="rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm" />
-                    {p.perms.bill ? <input type="number" min={0} value={r.price} onChange={(e) => updRow(r.key, { price: e.target.value })} placeholder="Qeemat Rs." className="rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm" /> : <span />}
+                    {p.perms.bill ? <input type="number" min={0} value={r.price} onChange={(e) => updRow(r.key, { price: e.target.value, manual: true })} placeholder="Qeemat Rs." className="rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm" /> : <span />}
                     <button type="button" onClick={() => setRows(rows.filter((x) => x.key !== r.key))} className="text-sm text-red-600">
                       hatao
                     </button>
                   </div>
-                  {!homeo && <TeethChips all={sel} picked={r.teeth} onChange={(t) => updRow(r.key, { teeth: t })} />}
+                  {!homeo && (
+                    <div className="grid gap-1.5">
+                      <div className="flex flex-wrap items-center gap-2 text-xs">
+                        <span className="text-clinic-ink/60">Kaise lagti hai:</span>
+                        {(Object.keys(APPLIES_LABEL) as Applies[]).map((a) => (
+                          <button
+                            key={a}
+                            type="button"
+                            onClick={() => setRowApplies(r, a)}
+                            aria-pressed={r.applies === a}
+                            className={`rounded-full px-2.5 py-1 font-semibold ${r.applies === a ? 'bg-clinic-teal text-white' : 'border border-clinic-teal/25 text-clinic-ink/70'}`}
+                          >
+                            {APPLIES_LABEL[a]}
+                          </button>
+                        ))}
+                      </div>
+                      {r.applies === 'tooth' && (
+                        <>
+                          <TeethChips all={sel} picked={r.teeth} onChange={(t) => setRowTeeth(r, t)} />
+                          {sel.length === 0 && <p className="text-[11px] text-amber-700">Upar chart se daant chunein, phir yahan khud aa jayenge.</p>}
+                          {r.unit != null && !r.manual && r.teeth.length > 1 && (
+                            <p className="text-[11px] text-clinic-ink/60">
+                              Har daant {money(r.unit)} × {r.teeth.length} daant = {money(r.unit * r.teeth.length)}
+                            </p>
+                          )}
+                        </>
+                      )}
+                      {r.applies === 'jaw' && (
+                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                          <span className="text-clinic-ink/60">Kaun sa jabda:</span>
+                          {(['Upar', 'Neeche', 'Upar aur Neeche'] as const).map((j) => (
+                            <button key={j} type="button" onClick={() => updRow(r.key, { jaw: r.jaw === j ? '' : j })} aria-pressed={r.jaw === j} className={`rounded-full px-2.5 py-1 font-semibold ${r.jaw === j ? 'bg-clinic-teal text-white' : 'border border-clinic-teal/25 text-clinic-ink/70'}`}>
+                              {j}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {(r.applies === 'mouth' || r.applies === 'once') && <p className="text-[11px] text-clinic-ink/55">{r.applies === 'mouth' ? 'Poore muh ka kaam, daant chunne ki zaroorat nahi.' : 'Aik dafa ka charge, daant chunne ki zaroorat nahi.'}</p>}
+                    </div>
+                  )}
                   <div className="flex flex-wrap items-center gap-2 text-sm">
                     <button type="button" onClick={() => updRow(r.key, { planned: false })} className={`rounded-full px-3 py-1 text-xs font-semibold ${!r.planned ? 'bg-emerald-600 text-white' : 'border border-clinic-ink/20 text-clinic-ink/60'}`}>
                       Aaj ho gayi
@@ -642,9 +819,20 @@ export default function VisitWorkspace(p: Props) {
                 </div>
               ))}
               {canEdit && (
-                <button type="button" onClick={() => setRows([...rows, { key: newKey(), name: '', catalog_id: null, teeth: [...sel], price: '', planned: false, notes: '', mats: {} }])} className="justify-self-start rounded-full border border-clinic-teal/30 px-4 py-1.5 text-sm font-semibold text-clinic-teal">
+                <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={() => setRows([...rows, { key: newKey(), name: '', catalog_id: null, teeth: [...sel], price: '', planned: false, notes: '', mats: {}, applies: 'tooth', unit: null, manual: false, jaw: '' }])} className="justify-self-start rounded-full border border-clinic-teal/30 px-4 py-1.5 text-sm font-semibold text-clinic-teal">
                   + Treatment
                 </button>
+                {consultCat && !rows.some((r) => r.catalog_id === consultCat.id) && (
+                  <button
+                    type="button"
+                    onClick={() => setRows([...rows, { key: newKey(), name: consultCat.name, catalog_id: consultCat.id, teeth: [], price: String(consultCat.price), planned: false, notes: '', mats: {}, applies: 'once', unit: null, manual: false, jaw: '' }])}
+                    className={`rounded-full px-4 py-1.5 text-sm font-semibold ${p.isFirstVisit ? 'bg-clinic-teal text-white' : 'border border-clinic-teal/30 text-clinic-teal'}`}
+                  >
+                    + {consultCat.name} fee {p.isFirstVisit ? '(pehli visit)' : ''}
+                  </button>
+                )}
+                </div>
               )}
               {live.length === 0 && rows.length === 0 && <p className="text-xs text-clinic-ink/50">Abhi koi treatment nahi. Zaroorat ho to &quot;+ Treatment&quot; dabayein.</p>}
             </div>
@@ -652,7 +840,7 @@ export default function VisitWorkspace(p: Props) {
 
           {/* 10. PRESCRIPTION */}
           {p.perms.rx && (
-            <Section n={10} title="Prescription (optional)">
+            <Section n={secNo()} title="Prescription (optional)">
           <div className="flex flex-wrap items-center gap-2">
             {(['dental', 'homeopathic'] as const).map((c) => (
               <button key={c} type="button" onClick={() => setRxCat(c)} className={`rounded-full px-4 py-1.5 text-sm font-semibold ${rxCat === c ? 'bg-clinic-teal text-white' : 'border border-clinic-teal/25 text-clinic-ink/70'}`}>
@@ -751,7 +939,7 @@ export default function VisitWorkspace(p: Props) {
 
           {/* 11. BILL */}
           {p.perms.money && (
-            <Section n={11} title="Bill / Paisa">
+            <Section n={secNo()} title="Bill / Paisa">
               <div className="grid gap-2 text-sm">
                 {treatTotal > 0 && (
                   <p className="flex justify-between">
@@ -832,7 +1020,7 @@ export default function VisitWorkspace(p: Props) {
           )}
 
           {/* 12. NEXT APPOINTMENT */}
-          <Section n={12} title="Agli Appointment">
+          <Section n={secNo()} title="Agli Appointment">
             <fieldset disabled={!canEdit} className="grid gap-3 sm:grid-cols-3">
               <div>
                 <label className="text-xs font-medium text-clinic-ink/70">Tareekh</label>
@@ -869,6 +1057,18 @@ export default function VisitWorkspace(p: Props) {
                 </select>
               </div>
             </fieldset>
+            {!homeo || true ? (
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+                <label htmlFor="recall-sel" className="font-semibold text-clinic-ink/70">Dobara bulana (recall)</label>
+                <select id="recall-sel" disabled={!canEdit} value={recallEff} onChange={(e) => { setRecallTouched(true); setRecallM(e.target.value) }} className="rounded-lg border border-clinic-teal/25 px-3 py-1.5 text-sm">
+                  <option value="">— nahi —</option>
+                  <option value="3">3 mahine baad</option>
+                  <option value="6">6 mahine baad</option>
+                  <option value="12">12 mahine baad</option>
+                </select>
+                <span className="text-xs text-clinic-ink/50">{hasScaling() && !recallTouched ? 'Scaling hai, is liye 6 mahine khud chun liya.' : 'Recall list mein khud ban jata hai.'}</span>
+              </div>
+            ) : null}
           </Section>
 
           {/* SAVE / FINISH */}

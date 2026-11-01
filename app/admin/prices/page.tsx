@@ -6,16 +6,16 @@ export default async function PricesPage() {
   await requireAnyPerm('settings.manage')
   const supabase = await createClient()
 
-  const [catRes, counterRes, invRes] = await Promise.all([
-    supabase
-      .from('treatment_catalog')
-      .select('id, name, department, price, is_active, category, sort_order')
-      .order('is_active', { ascending: false })
-      .order('sort_order')
-      .order('name'),
+  const listQuery = (cols: string) =>
+    supabase.from('treatment_catalog').select(cols).order('is_active', { ascending: false }).order('sort_order').order('name')
+  const [catWith, counterRes, invRes] = await Promise.all([
+    listQuery('id, name, department, price, is_active, category, sort_order, applies_to'),
     supabase.from('invoice_counter').select('prefix, next_no').eq('id', 1).maybeSingle(),
     supabase.from('inventory').select('id, item_name, unit').order('item_name'),
   ])
+
+  // Naya column (applies_to) abhi database mein na ho (SQL baad mein chali) to purani list hi dikhao
+  const catRes = catWith.error ? await listQuery('id, name, department, price, is_active, category, sort_order') : catWith
 
   if (catRes.error) {
     return (
@@ -39,7 +39,8 @@ export default async function PricesPage() {
       </p>
       <PriceListManager
         inventory={(invRes.data ?? []) as { id: string; item_name: string; unit: string | null }[]}
-        rows={(catRes.data ?? []).map((r) => ({ ...r, price: Number(r.price) })) as CatalogRow[]}
+        rows={((catRes.data ?? []) as unknown as CatalogRow[]).map((r) => ({ ...r, price: Number(r.price) }))}
+        hasAppliesTo={!catWith.error}
         nextInvoice={counterRes.data ? { prefix: counterRes.data.prefix, next_no: counterRes.data.next_no } : null}
       />
     </div>

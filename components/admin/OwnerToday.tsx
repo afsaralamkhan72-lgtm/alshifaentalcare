@@ -14,20 +14,15 @@ interface Summary {
   late_entries: number
 }
 
-/** Sirf doctor/admin ke dashboard par: aaj ka cash, closing ki halat, lab/staff ko dena, taza activity */
+/** Sirf doctor/admin ke dashboard par: aaj ka cash, closing ki halat, lab/staff ko dena (activity ki technical list hata di, wo Audit Log mein hai) */
 export default async function OwnerToday() {
   const supabase = await createClient()
   const { data: s } = await supabase.rpc('day_summary')
   const sum = (s ?? null) as Summary | null
 
-  const [labRes, staffRes, actRes, lastCloseRes] = await Promise.all([
+  const [labRes, staffRes, lastCloseRes] = await Promise.all([
     supabase.from('lab_cases').select('cost, lab_paid').is('deleted_at', null).gt('cost', 0),
     supabase.from('staff_balances').select('balance'),
-    supabase
-      .from('audit_log')
-      .select('id, created_at, actor_name, action, table_name, new_data, old_data')
-      .order('created_at', { ascending: false })
-      .limit(8),
     supabase.from('day_closings').select('close_date').order('close_date', { ascending: false }).limit(1),
   ])
 
@@ -81,31 +76,6 @@ export default async function OwnerToday() {
         </div>
       </section>
 
-      {(actRes.data ?? []).length > 0 && (
-        <section className="rounded-2xl border border-clinic-teal/10 bg-white p-5 lg:col-span-3">
-          <div className="flex items-center justify-between">
-            <p className="font-display font-semibold text-clinic-ink">Taza activity</p>
-            <Link href="/admin/audit" className="text-xs text-clinic-teal underline">Poora Audit Log</Link>
-          </div>
-          <div className="mt-3 divide-y divide-clinic-teal/10 text-sm">
-            {(actRes.data ?? []).map((r) => {
-              const d = (r.new_data ?? r.old_data ?? {}) as Record<string, unknown>
-              const label = String(d.full_name ?? d.treatment_name ?? d.title ?? d.item_name ?? d.invoice_number ?? '')
-              return (
-                <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-1.5">
-                  <span className="text-clinic-ink/80">
-                    <span className="font-medium">{r.actor_name ?? 'System'}</span> · {r.action} · {r.table_name}
-                    {label ? ` · ${label}` : ''}
-                  </span>
-                  <span className="text-xs text-clinic-ink/40">
-                    {new Date(r.created_at).toLocaleString('en-GB', { timeZone: 'Asia/Karachi', hour12: true })}
-                  </span>
-                </div>
-              )
-            })}
-          </div>
-        </section>
-      )}
     </div>
   )
 }

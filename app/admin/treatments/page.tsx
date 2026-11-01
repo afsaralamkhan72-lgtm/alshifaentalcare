@@ -16,7 +16,7 @@ const FILTERS = [
 export default async function TreatmentsPage({ searchParams }: { searchParams: Promise<{ f?: string; q?: string }> }) {
   const staff = await getStaffProfile()
   const perms = await getPermissions()
-  if (!perms.includes('clinical.view') && !perms.includes('billing.view')) redirect('/admin/dashboard')
+  if (!perms.includes('clinical.view') && !perms.includes('billing.view')) redirect('/admin/dashboard?denied=1')
   const canMoney = isOwnerRole(staff.role) || perms.includes('billing.view')
   const sp = await searchParams
   const f = FILTERS.some((x) => x.k === sp.f) ? (sp.f as string) : 'active'

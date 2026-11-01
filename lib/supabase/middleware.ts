@@ -23,7 +23,18 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
+  // Login ki jaanch. Naye Supabase mein getClaims() token ko khud (bina network call ke) jaanchta hai;
+  // purane project ya purani library mein khud-ba-khud wohi purana getUser() chalta hai (is se kuch kamzor nahi hota).
+  // Asal hifazat database (RLS) aur layout ka my_staff() pehle ki tarah karte hain.
+  let user: unknown = null
+  const auth = supabase.auth as unknown as { getClaims?: () => Promise<{ data: { claims?: { sub?: string } } | null; error: unknown }> }
+  if (typeof auth.getClaims === 'function') {
+    const { data, error } = await auth.getClaims()
+    user = !error && data?.claims?.sub ? data.claims.sub : null
+  } else {
+    const { data } = await supabase.auth.getUser()
+    user = data.user
+  }
 
   // Guard: only logged-in staff (admin/doctor/receptionist) can reach /admin/*
   if (request.nextUrl.pathname.startsWith('/admin') && !user) {

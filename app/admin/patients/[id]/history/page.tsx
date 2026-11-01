@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { requirePerm } from '@/lib/auth'
 import PatientHistorySummary from '@/components/admin/PatientHistorySummary'
 import HistoryPrintButton from '@/components/admin/HistoryPrintButton'
 
@@ -15,6 +16,7 @@ export default async function PatientHistoryPage({
   const { view } = await searchParams
   // Purana 9-step wizard hata diya: form ab patient page ke step 2 mein hai
   if (view !== 'summary') redirect(`/admin/patients/${id}#s2`)
+  await requirePerm('clinical.view') // reception ke liye clinical history band
   const supabase = await createClient()
 
   const { data: patient } = await supabase

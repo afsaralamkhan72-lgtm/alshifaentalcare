@@ -10,7 +10,7 @@ export default async function AccountsPage() {
   const perms = await getPermissions()
   const owner = isOwnerRole(staff.role)
   const can = (p: string) => owner || perms.includes(p)
-  if (!can('billing.view') && !can('reports.view') && !can('expenses.manage')) redirect('/admin/dashboard')
+  if (!can('billing.view') && !can('reports.view') && !can('expenses.manage')) redirect('/admin/dashboard?denied=1')
 
   const supabase = await createClient()
   const today = todayKarachi()

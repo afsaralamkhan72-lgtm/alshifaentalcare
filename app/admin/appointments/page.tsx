@@ -4,7 +4,6 @@ import { createClient } from '@/lib/supabase/server'
 import AppointmentBoard, { type Appointment } from '@/components/admin/AppointmentBoard'
 import { todayKarachi, addDays } from '@/lib/karachi'
 import { getReminderDays } from '@/lib/reminders'
-import ReminderSetting from '@/components/admin/ReminderSetting'
 import { getStaffProfile, isOwnerRole } from '@/lib/auth'
 
 const SELECT = 'id, patient_name, phone, department, treatment_name, preferred_date, preferred_time, status, created_at, patient_id, doctor, source'
@@ -79,7 +78,6 @@ export default async function AppointmentsPage({
         <div className="mt-4">
           <AppointmentBoard appointments={(rows ?? []) as Appointment[]} listOnly showButton={false} emptyText="Is list mein koi appointment nahi." />
         </div>
-        {isOwnerRole(staff.role) && <ReminderSetting days={days} />}
       </div>
     )
   }
@@ -112,6 +110,7 @@ export default async function AppointmentsPage({
     all: allDay?.length ?? 0,
     pending: allDay?.filter((a) => a.status === 'pending').length ?? 0,
     confirmed: allDay?.filter((a) => a.status === 'confirmed').length ?? 0,
+    arrived: allDay?.filter((a) => a.status === 'arrived').length ?? 0,
     completed: allDay?.filter((a) => a.status === 'completed').length ?? 0,
   }
 
@@ -171,7 +170,7 @@ export default async function AppointmentsPage({
 
       {/* Status filter tabs */}
       <div className="mt-4 flex flex-wrap gap-2">
-        {(['all', 'pending', 'confirmed', 'completed'] as const).map((s) => (
+        {(['all', 'pending', 'confirmed', 'arrived', 'completed'] as const).map((s) => (
           <Link
             key={s}
             href={`/admin/appointments?view=day&date=${date}&status=${s}`}
@@ -181,7 +180,7 @@ export default async function AppointmentsPage({
                 : 'bg-white text-clinic-ink/60 border border-clinic-teal/10'
             }`}
           >
-            {s} ({counts[s]})
+            {s === 'arrived' ? 'intezar' : s} ({counts[s]})
           </Link>
         ))}
       </div>

@@ -15,7 +15,7 @@ import SheetPrintButton from '@/components/admin/SheetPrintButton'
 export default async function PatientStatementPage({ params }: { params: Promise<{ id: string }> }) {
   const staff = await getStaffProfile()
   const perms = await getPermissions()
-  if (!isOwnerRole(staff.role) && !perms.includes('billing.view')) redirect('/admin/dashboard')
+  if (!isOwnerRole(staff.role) && !perms.includes('billing.view')) redirect('/admin/dashboard?denied=1')
   const { id } = await params
   const supabase = await createClient()
 

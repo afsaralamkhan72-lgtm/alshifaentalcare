@@ -1,14 +1,17 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import PatientExtraFields, { EXTRA_EMPTY, ageFrom, extraToDb, type Extra } from './PatientExtraFields'
+import { friendlyError } from '@/lib/errors'
 
 interface FormState {
   full_name: string
   phone: string
   department: 'dental' | 'homeopathic'
   age: string
+  date_of_birth: string
   gender: string
   primary_doctor: string
   address: string
@@ -19,6 +22,7 @@ const INITIAL: FormState = {
   phone: '',
   department: 'dental',
   age: '',
+  date_of_birth: '',
   gender: '',
   primary_doctor: '',
   address: '',
@@ -31,12 +35,17 @@ export default function PatientsToolbar({
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('new') === '1') setOpen(true)
+  }, [])
   const [form, setForm] = useState<FormState>(INITIAL)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   // Pehle se register? (same phone ya same naam) -> pehle dikhao, phir bhi naya chahiye to "Naya hi banao"
   const [similar, setSimilar] = useState<{ id: string; full_name: string; phone: string; mr_number: string | null; age: number | null }[]>([])
   const [dupOk, setDupOk] = useState(false)
+  const [extra, setExtra] = useState<Extra>(EXTRA_EMPTY)
+  const ageNum = ageFrom(form.age, form.date_of_birth)
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -61,23 +70,25 @@ export default function PatientsToolbar({
         return
       }
     }
-    const { data: created, error: insertError } = await supabase
-      .from('patients')
-      .insert({
-        full_name: form.full_name,
-        phone: form.phone,
-        department: form.department,
-        age: form.age ? Number(form.age) : null,
-        gender: form.gender || null,
-        primary_doctor: form.primary_doctor || null,
-        address: form.address || null,
-      })
-      .select('id')
-      .single()
+    const base = {
+      full_name: form.full_name,
+      phone: form.phone,
+      department: form.department,
+      age: ageNum,
+      date_of_birth: form.date_of_birth || null,
+      gender: form.gender || null,
+      primary_doctor: form.primary_doctor || null,
+      address: form.address || null,
+    }
+    let { data: created, error: insertError } = await supabase.from('patients').insert({ ...base, ...extraToDb(extra) }).select('id').single()
+    // Naye khane abhi database mein na hon (SQL baad mein chali) to purane tareeqe se save ho jaye
+    if (insertError && (insertError.code === 'PGRST204' || /column/i.test(insertError.message))) {
+      ;({ data: created, error: insertError } = await supabase.from('patients').insert(base).select('id').single())
+    }
 
     setSaving(false)
     if (insertError || !created) {
-      setError('Patient save nahi hua: ' + (insertError?.message ?? ''))
+      setError('Patient save nahi hua: ' + friendlyError(insertError?.message))
       return
     }
 
@@ -86,6 +97,7 @@ export default function PatientsToolbar({
     }
 
     setForm(INITIAL)
+    setExtra(EXTRA_EMPTY)
     setSimilar([])
     setDupOk(false)
     setOpen(false)
@@ -103,7 +115,7 @@ export default function PatientsToolbar({
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6">
+          <div className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6">
             <div className="flex items-center justify-between">
               <p className="font-display text-lg font-semibold text-clinic-ink">Add New Patient</p>
               <button onClick={() => setOpen(false)} className="text-clinic-ink/40 hover:text-clinic-ink">
@@ -156,7 +168,9 @@ export default function PatientsToolbar({
               <div className="grid grid-cols-2 gap-3">
                 <input
                   type="number"
-                  placeholder="Age"
+                  min={0}
+                  max={120}
+                  placeholder="Age (saal)"
                   value={form.age}
                   onChange={(e) => update('age', e.target.value)}
                   className="rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm outline-none focus:border-clinic-teal"
@@ -172,7 +186,16 @@ export default function PatientsToolbar({
                   <option value="other">Other</option>
                 </select>
               </div>
-              <details className="rounded-xl bg-clinic-mint/40 p-3">
+              <div>
+                <label className="text-xs text-clinic-ink/50">Ya paidaish ki tareekh (umar khud nikal aati hai)</label>
+                <input
+                  type="date"
+                  value={form.date_of_birth}
+                  onChange={(e) => update('date_of_birth', e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm outline-none focus:border-clinic-teal"
+                />
+              </div>
+              <details className="rounded-xl bg-clinic-mint/40 p-3" open={ageNum != null && ageNum < 18}>
                 <summary className="cursor-pointer text-sm font-medium text-clinic-teal">
                   Aur tafseel (optional)
                 </summary>
@@ -192,6 +215,7 @@ export default function PatientsToolbar({
                   ))}
                 </datalist>
               </div>
+              <PatientExtraFields value={extra} onChange={setExtra} age={ageNum} inputClass="w-full rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm outline-none focus:border-clinic-teal" />
                 </div>
               </details>
 

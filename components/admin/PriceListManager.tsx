@@ -3,6 +3,7 @@
 import { Fragment, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { effectiveApplies } from '@/lib/applies'
 import TreatmentMaterials, { type InvOption } from '@/components/admin/TreatmentMaterials'
 
 export interface CatalogRow {
@@ -12,7 +13,15 @@ export interface CatalogRow {
   price: number
   is_active: boolean
   category?: string | null
+  applies_to?: 'tooth' | 'mouth' | 'jaw' | 'once' | null
 }
+
+export const APPLIES: { v: 'tooth' | 'mouth' | 'jaw' | 'once'; l: string }[] = [
+  { v: 'tooth', l: 'Har daant ki' },
+  { v: 'mouth', l: 'Poora muh' },
+  { v: 'jaw', l: 'Jabda' },
+  { v: 'once', l: 'Aik dafa' },
+]
 
 interface HistoryRow {
   old_price: number | null
@@ -25,7 +34,9 @@ export default function PriceListManager({
   rows,
   nextInvoice,
   inventory = [],
+  hasAppliesTo = false,
 }: {
+  hasAppliesTo?: boolean
   inventory?: InvOption[]
   rows: CatalogRow[]
   nextInvoice: { prefix: string; next_no: number } | null
@@ -35,6 +46,7 @@ export default function PriceListManager({
   const [price, setPrice] = useState('')
   const [dept, setDept] = useState('dental')
   const [cat, setCat] = useState('')
+  const [applies, setApplies] = useState<'tooth' | 'mouth' | 'jaw' | 'once'>('tooth')
   const [q, setQ] = useState('')
   const [msg, setMsg] = useState('')
   const [busy, setBusy] = useState(false)
@@ -61,6 +73,7 @@ export default function PriceListManager({
       price: Number(price),
       department: dept || null,
       category: cat.trim() || null,
+      ...(hasAppliesTo ? { applies_to: applies } : {}),
     })
     setBusy(false)
     if (error) {
@@ -91,6 +104,14 @@ export default function PriceListManager({
       delete c[id]
       return c
     })
+    router.refresh()
+  }
+
+  async function setApplyTo(r: CatalogRow, v: string) {
+    setMsg('')
+    const supabase = createClient()
+    const { error } = await supabase.from('treatment_catalog').update({ applies_to: v }).eq('id', r.id)
+    if (error) setMsg(error.message)
     router.refresh()
   }
 
@@ -154,6 +175,15 @@ export default function PriceListManager({
             <option value="homeopathic">Homeopathic</option>
             <option value="general">General</option>
           </select>
+          {hasAppliesTo && (
+            <select value={applies} onChange={(e) => setApplies(e.target.value as typeof applies)} className={inputClass} aria-label="Kaise lagti hai">
+              {APPLIES.map((a) => (
+                <option key={a.v} value={a.v}>
+                  {a.l}
+                </option>
+              ))}
+            </select>
+          )}
           <button onClick={add} disabled={busy} className="rounded-full bg-clinic-teal px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">
             Add
           </button>
@@ -180,6 +210,7 @@ export default function PriceListManager({
             <tr>
               <th className="px-4 py-3">Treatment</th>
               <th className="px-4 py-3">Category</th>
+              {hasAppliesTo && <th className="px-4 py-3">Kaise lagti hai</th>}
               <th className="px-4 py-3 text-right">Qeemat</th>
               <th className="px-4 py-3"></th>
             </tr>
@@ -187,7 +218,7 @@ export default function PriceListManager({
           <tbody>
             {rows.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-clinic-ink/50">
+                <td colSpan={5} className="px-4 py-6 text-center text-clinic-ink/50">
                   Abhi koi treatment nahi.
                 </td>
               </tr>
@@ -204,6 +235,17 @@ export default function PriceListManager({
                   <td className="px-4 py-3 text-xs text-clinic-ink/70">
                     {r.category ?? '—'} <span className="capitalize text-clinic-ink/40">· {r.department ?? ''}</span>
                   </td>
+                  {hasAppliesTo && (
+                    <td className="px-4 py-3">
+                      <select value={effectiveApplies(r)} onChange={(e) => setApplyTo(r, e.target.value)} className={`${inputClass} py-1 text-xs`} aria-label="Kaise lagti hai">
+                        {APPLIES.map((a) => (
+                          <option key={a.v} value={a.v}>
+                            {a.l}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                  )}
                   <td className="px-4 py-3 text-right">
                     {editing === r.id ? (
                       <span className="inline-flex items-center gap-2">
@@ -226,7 +268,7 @@ export default function PriceListManager({
                 </tr>
                 {openHist === r.id && (
                   <tr key={`${r.id}-h`} className="bg-clinic-sand/60">
-                    <td colSpan={4} className="px-4 py-3 text-xs text-clinic-ink/70">
+                    <td colSpan={5} className="px-4 py-3 text-xs text-clinic-ink/70">
                       {(history[r.id] ?? []).length === 0 && 'Koi history nahi.'}
                       {(history[r.id] ?? []).map((h, i) => (
                         <p key={i}>
@@ -240,7 +282,7 @@ export default function PriceListManager({
                 )}
                 {openMat === r.id && (
                   <tr className="bg-clinic-sand/60">
-                    <td colSpan={4} className="px-4 py-3">
+                    <td colSpan={5} className="px-4 py-3">
                       <TreatmentMaterials treatmentId={r.id} options={inventory} />
                     </td>
                   </tr>

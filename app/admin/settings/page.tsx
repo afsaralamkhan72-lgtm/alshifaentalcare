@@ -4,11 +4,16 @@ import { requireAnyPerm } from '@/lib/auth'
 import MedicineManager, { type Medicine } from '@/components/admin/MedicineManager'
 import ReminderSetting from '@/components/admin/ReminderSetting'
 import { getReminderDays } from '@/lib/reminders'
+import ClinicOptionsManager, { type OptRow } from '@/components/admin/ClinicOptionsManager'
+import BackupPanel from '@/components/admin/BackupPanel'
+import { OPTION_KINDS } from '@/lib/clinicOptions'
 
 const SECTIONS = [
   { k: 'dental', l: 'Dental dawaiyan' },
   { k: 'homeopathic', l: 'Homeopathic dawaiyan' },
   { k: 'prices', l: 'Treatment prices' },
+  { k: 'lists', l: 'Takleef / Diagnosis list' },
+  { k: 'backup', l: 'Backup (data ki copy)' },
   { k: 'other', l: 'Reminder' },
 ]
 
@@ -18,7 +23,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const sp = await searchParams
   const s = SECTIONS.some((x) => x.k === sp.s) ? (sp.s as string) : 'dental'
   const supabase = await createClient()
-  const [{ data: meds, error }, days] = await Promise.all([
+  const [{ data: meds, error }, days, optRes, bkRes] = await Promise.all([
     s === 'dental' || s === 'homeopathic'
       ? supabase
           .from('medicines')
@@ -28,6 +33,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           .order('name')
       : Promise.resolve({ data: [], error: null }),
     getReminderDays(),
+    s === 'lists' ? supabase.from('clinic_options').select('id, kind, label').order('kind').order('sort_order').order('label') : Promise.resolve({ data: [], error: null }),
+    s === 'backup' ? supabase.from('site_settings').select('value').eq('key', 'last_backup_at').maybeSingle() : Promise.resolve({ data: null }),
   ])
 
   return (
@@ -69,6 +76,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
               </Link>
             </div>
           )}
+          {s === 'lists' && <ClinicOptionsManager kinds={OPTION_KINDS} rows={(optRes.data ?? []) as OptRow[]} missing={Boolean(optRes.error)} />}
+          {s === 'backup' && <BackupPanel last={(bkRes.data as { value?: unknown } | null)?.value ? String((bkRes.data as { value: unknown }).value) : null} />}
           {s === 'other' && <ReminderSetting days={days} />}
         </div>
       </div>

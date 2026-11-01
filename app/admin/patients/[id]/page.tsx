@@ -8,12 +8,14 @@ import PatientProfilePhoto from '@/components/admin/PatientProfilePhoto'
 import PortalLinkButton from '@/components/admin/PortalLinkButton'
 import DeletePatientButton from '@/components/admin/DeletePatientButton'
 import VisitWorkspace, { type VisitRow, type MedOpt } from '@/components/admin/visit/VisitWorkspace'
-import type { CatalogOpt, MaterialOpt, TItem, TVisit } from '@/components/admin/TreatmentsPanel'
+import type { CatalogOpt, MaterialOpt, TItem, TVisit } from '@/components/admin/visit/types'
 import PatientPhotoGallery, { type PatientPhoto } from '@/components/admin/PatientPhotoGallery'
 import TreatmentPlanCard, { type Installment, type Plan } from '@/components/admin/TreatmentPlanCard'
 import { todayKarachi, money, fmtDate } from '@/lib/karachi'
 import { toBalance, type PatientBalance } from '@/lib/ledger'
 import WhatsAppMenu from '@/components/admin/WhatsAppMenu'
+import { effectiveApplies } from '@/lib/applies'
+import AppointmentBoard from '@/components/admin/AppointmentBoard'
 import { apptReminderLink, generalLink, paymentReminderLink } from '@/lib/messages'
 
 interface Props {
@@ -126,7 +128,7 @@ export default async function PatientDetailPage({ params, searchParams }: Props)
   const today = todayKarachi()
   const digits = String(patient.phone ?? '').replace(/[^0-9]/g, '')
 
-  const [balRes, apptRes, histRes] = await Promise.all([
+  const [balRes, apptRes, histRes, labRes] = await Promise.all([
     canMoney ? supabase.from('patient_balances').select('*').eq('patient_id', id).maybeSingle() : Promise.resolve({ data: null, error: null }),
     can('appointments.view')
       ? supabase
@@ -138,7 +140,11 @@ export default async function PatientDetailPage({ params, searchParams }: Props)
           .limit(100)
       : Promise.resolve({ data: [], error: null }),
     canClinical ? supabase.from('patient_history').select('*').eq('patient_id', id).maybeSingle() : Promise.resolve({ data: null, error: null }),
+    can('lab.view')
+      ? supabase.from('lab_cases').select('id, work_type, status, due_date').eq('patient_id', id).is('deleted_at', null).in('status', ['pending', 'sent', 'in_progress', 'received'])
+      : Promise.resolve({ data: [], error: null }),
   ])
+  const openLabs = (labRes.data ?? []) as { id: string; work_type: string | null; status: string; due_date: string | null }[]
   const balance: PatientBalance | null = balRes.data ? toBalance(balRes.data as Record<string, string | number | null>) : null
   // Appointment purane data mein phone se judi hoti thi; dusre patient ki na aaye is liye phone wali sirf tab jab patient_id khali ho
   const appts = ((apptRes.data ?? []) as (ApptRow & { patient_id: string | null; phone: string })[]).filter(
@@ -186,12 +192,28 @@ export default async function PatientDetailPage({ params, searchParams }: Props)
                   date_of_birth: patient.date_of_birth ?? null,
                   address: patient.address,
                   notes: patient.notes,
+                  phone2: patient.phone2 ?? null,
+                  guardian_name: patient.guardian_name ?? null,
+                  guardian_relation: patient.guardian_relation ?? null,
+                  emergency_name: patient.emergency_name ?? null,
+                  emergency_phone: patient.emergency_phone ?? null,
+                  referral_source: patient.referral_source ?? null,
                 }}
               />
             )}
             <a href={`tel:${patient.phone.replace(/[^0-9+]/g, '')}`} className="rounded-full border border-clinic-teal/30 px-4 py-2 text-sm font-semibold text-clinic-ink/80">
               Call
             </a>
+            {can('appointments.manage') && (
+              <AppointmentBoard
+                appointments={[]}
+                listOnly
+                showButton
+                emptyText=""
+                buttonLabel="+ Appointment"
+                preset={{ id: patient.id, full_name: patient.full_name, phone: patient.phone, department: patient.department, mr_number: patient.mr_number }}
+              />
+            )}
             {wa && (
               <WhatsAppMenu
                 size="md"
@@ -218,6 +240,10 @@ export default async function PatientDetailPage({ params, searchParams }: Props)
             ['Agli appointment', nextAppt ? `${fmtDate(nextAppt.preferred_date)}${nextAppt.preferred_time ? ' ' + nextAppt.preferred_time : ''}` : '—'],
             ...(canMoney && balance ? [['Baqaya', money(balance.balance)]] : []),
             ['Pata', patient.address || '—'],
+            ...(patient.phone2 ? [['Dusra phone', patient.phone2]] : []),
+            ...(patient.guardian_name ? [['Guardian', `${patient.guardian_name}${patient.guardian_relation ? ' (' + patient.guardian_relation + ')' : ''}`]] : []),
+            ...(patient.emergency_phone || patient.emergency_name ? [['Emergency', [patient.emergency_name, patient.emergency_phone].filter(Boolean).join(' · ')]] : []),
+            ...(patient.referral_source ? [['Kaise pata chala', patient.referral_source]] : []),
           ]
             .filter(([, v]) => v !== '')
             .map(([k, v]) => (
@@ -228,6 +254,15 @@ export default async function PatientDetailPage({ params, searchParams }: Props)
             ))}
         </dl>
 
+        {openLabs.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {openLabs.map((l) => (
+              <Link key={l.id} href={`/admin/lab/${l.id}`} className="rounded-full bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-800">
+                Lab: {l.work_type ?? 'kaam'} · {l.status === 'received' ? 'aa gaya, fit karna hai' : l.status === 'pending' ? 'bhejna baaki' : l.due_date ? `due ${fmtDate(l.due_date)}` : 'lab mein'}
+              </Link>
+            ))}
+          </div>
+        )}
         {(alerts.length > 0 || patient.notes) && (
           <div className="mt-3 flex flex-wrap gap-1.5">
             {alerts.map((a) => (
@@ -352,7 +387,7 @@ async function WorkspaceSection({
   const can = (p: string) => perms.includes(p)
   const today = todayKarachi()
   const canMoney = isOwner || can('billing.view')
-  const [treatments, chartRes, catRes, docRes, matRes, cvRes, medRes, billRes, rxRes, photoRes] = await Promise.all([
+  const [treatments, chartRes, catRes, docRes, matRes, cvRes, medRes, billRes, rxRes, photoRes, optRes, cvCnt, vnCnt] = await Promise.all([
     getTreatments(patient.id),
     isDental && can('clinical.view')
       ? supabase
@@ -361,7 +396,7 @@ async function WorkspaceSection({
           .eq('patient_id', patient.id)
           .order('treatment_date', { ascending: false })
       : Promise.resolve({ data: [] }),
-    supabase.from('treatment_catalog').select('id, name, price, category, department').eq('is_active', true).order('sort_order').order('name'),
+    supabase.from('treatment_catalog').select('id, name, price, category, department, applies_to').eq('is_active', true).order('sort_order').order('name'),
     supabase.from('treating_doctors').select('name').eq('is_active', true).order('name'),
     can('clinical.edit') ? supabase.from('treatment_materials').select('treatment_id, inventory_id, default_qty, inventory(item_name, unit)') : Promise.resolve({ data: [] }),
     can('clinical.view')
@@ -389,7 +424,14 @@ async function WorkspaceSection({
     can('clinical.view')
       ? supabase.from('patient_photos').select('id, storage_path, caption, taken_on, category').eq('patient_id', patient.id).order('taken_on', { ascending: false })
       : Promise.resolve({ data: [], error: null }),
+    supabase.from('clinic_options').select('kind, label, sort_order').eq('is_active', true).order('sort_order').order('label'),
+    can('clinical.view') ? supabase.from('clinical_visits').select('id', { count: 'exact', head: true }).eq('patient_id', patient.id).eq('status', 'finished') : Promise.resolve({ count: null }),
+    can('clinical.view') ? supabase.from('visit_notes').select('id', { count: 'exact', head: true }).eq('patient_id', patient.id) : Promise.resolve({ count: null }),
   ])
+  const opts = { complaint: [] as string[], homeo_complaint: [] as string[], diagnosis: [] as string[] }
+  if (!optRes.error) for (const o of (optRes.data ?? []) as { kind: keyof typeof opts; label: string }[]) opts[o.kind]?.push(o.label)
+  const isFirstVisit = cvCnt.count === 0 && vnCnt.count === 0
+  const hasPlanned = treatments.some((t) => t.status === 'planned')
   const pastRx = ((rxRes.data ?? []) as { id: string; items: { name_en?: string; name_ur?: string }[] | null; prescribed_date: string }[]).map((r) => ({
     id: r.id,
     date: r.prescribed_date,
@@ -399,7 +441,11 @@ async function WorkspaceSection({
   for (const m of (matRes.data ?? []) as unknown as { treatment_id: string; inventory_id: string; default_qty: number; inventory: { item_name: string; unit: string | null } | null }[]) {
     ;(materials[m.treatment_id] ??= []).push({ inventory_id: m.inventory_id, name: m.inventory?.item_name ?? '', unit: m.inventory?.unit ?? null, default_qty: num(m.default_qty) })
   }
-  const catalog: CatalogOpt[] = (catRes.data ?? []).map((c) => ({ ...c, price: num(c.price) })) as CatalogOpt[]
+  // applies_to naya column hai; SQL abhi na chali ho to purani list (bina is ke) hi le lo
+  const catData = catRes.error
+    ? (await supabase.from('treatment_catalog').select('id, name, price, category, department').eq('is_active', true).order('sort_order').order('name')).data
+    : catRes.data
+  const catalog: CatalogOpt[] = (catData ?? []).map((c) => ({ ...c, price: num(c.price), applies_to: effectiveApplies(c as { name: string; applies_to?: string | null }) })) as CatalogOpt[]
   const visitsToday = (cvRes.data ?? []) as VisitRow[]
   const draft = visitsToday.find((v) => v.status === 'draft') ?? null
   const fin = visitsToday.find((v) => v.status === 'finished') ?? null
@@ -433,6 +479,10 @@ async function WorkspaceSection({
       xraySlot={can('clinical.view') ? <PatientPhotoGallery patientId={patient.id} photos={(('error' in photoRes && photoRes.error ? [] : photoRes.data ?? []) as PatientPhoto[])} canDelete={isOwner} /> : null}
       plansSlot={canMoney ? <Suspense fallback={null}><PlansSlot patient={patient} /></Suspense> : null}
       balance={balance}
+      consentAt={(patient as { consent_at?: string | null }).consent_at ?? null}
+      opts={opts}
+      isFirstVisit={isFirstVisit}
+      hasPlanned={hasPlanned}
       perms={{
         clinicalView: can('clinical.view'),
         clinicalEdit: can('clinical.edit'),

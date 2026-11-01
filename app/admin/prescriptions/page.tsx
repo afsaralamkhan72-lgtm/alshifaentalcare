@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import { requirePerm } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
-import PrescriptionForm from '@/components/admin/PrescriptionForm'
 
 interface PrescriptionItem {
   name_en?: string
@@ -15,42 +14,25 @@ interface PrescriptionItem {
 async function getData() {
   const supabase = await createClient()
 
-  const [patientsRes, recentRes] = await Promise.all([
-    supabase
-      .from('patients')
-      .select('id, full_name, phone, department, mr_number')
-      .is('deleted_at', null)
-      .order('created_at', { ascending: false })
-      .limit(200),
-    supabase
-      .from('prescriptions')
-      .select('id, department, items, prescribed_date, patients(full_name, mr_number)')
-      .order('created_at', { ascending: false })
-      .limit(20),
-  ])
+  const { data } = await supabase
+    .from('prescriptions')
+    .select('id, department, items, prescribed_date, patients(id, full_name, mr_number)')
+    .order('created_at', { ascending: false })
+    .limit(60)
 
-  return {
-    patients: patientsRes.data ?? [],
-    recent: recentRes.data ?? [],
-  }
+  return { recent: data ?? [] }
 }
 
 export default async function PrescriptionsPage() {
   await requirePerm('prescriptions.view')
-  const { patients, recent } = await getData()
+  const { recent } = await getData()
 
   return (
     <div>
       <h1 className="font-display text-2xl font-semibold text-clinic-ink">Prescriptions</h1>
       <p className="mt-1 text-sm text-clinic-ink/60">
-        Bilingual (English / اردو) prescription banayein aur WhatsApp par bhejein.
+        Pichli prescriptions dekhein aur print karein. <strong>Nayi prescription</strong> patient ke page par visit ke andar likhi jati hai (taake wo visit aur bill se juri rahe).
       </p>
-
-      <div className="mt-6">
-        <PrescriptionForm patients={patients} />
-      </div>
-
-      <h2 className="mt-10 font-display text-lg font-semibold text-clinic-ink">Recent Prescriptions</h2>
 
       <div className="mt-3 divide-y divide-clinic-teal/10 rounded-2xl border border-clinic-teal/10 bg-white">
         {recent.length === 0 ? (
@@ -59,14 +41,20 @@ export default async function PrescriptionsPage() {
           </p>
         ) : (
           recent.map((rx) => {
-            const patient = rx.patients as unknown as { full_name: string; mr_number: string } | null
+            const patient = rx.patients as unknown as { id: string; full_name: string; mr_number: string } | null
             const items = (rx.items ?? []) as PrescriptionItem[]
 
             return (
               <div key={rx.id} className="px-4 py-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-sm font-medium text-clinic-ink">
-                    {patient?.full_name ?? 'Unknown'}{' '}
+                    {patient ? (
+                      <Link href={`/admin/patients/${patient.id}`} className="hover:text-clinic-teal">
+                        {patient.full_name}
+                      </Link>
+                    ) : (
+                      'Unknown'
+                    )}{' '}
                     <span className="text-xs text-clinic-ink/40">{patient?.mr_number}</span>
                   </p>
                   <div className="flex items-center gap-2">

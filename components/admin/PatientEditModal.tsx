@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import PatientExtraFields, { ageFrom, extraToDb, type Extra } from './PatientExtraFields'
+import { friendlyError } from '@/lib/errors'
 
 interface PatientEditModalProps {
   patient: {
@@ -15,6 +17,12 @@ interface PatientEditModalProps {
     date_of_birth?: string | null
     address: string | null
     notes: string | null
+    phone2?: string | null
+    guardian_name?: string | null
+    guardian_relation?: string | null
+    emergency_name?: string | null
+    emergency_phone?: string | null
+    referral_source?: string | null
   }
 }
 
@@ -31,6 +39,14 @@ export default function PatientEditModal({ patient }: PatientEditModalProps) {
     address: patient.address ?? '',
     notes: patient.notes ?? '',
   })
+  const [extra, setExtra] = useState<Extra>({
+    phone2: patient.phone2 ?? '',
+    guardian_name: patient.guardian_name ?? '',
+    guardian_relation: patient.guardian_relation ?? '',
+    emergency_name: patient.emergency_name ?? '',
+    emergency_phone: patient.emergency_phone ?? '',
+    referral_source: patient.referral_source ?? '',
+  })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -44,23 +60,24 @@ export default function PatientEditModal({ patient }: PatientEditModalProps) {
     setError('')
 
     const supabase = createClient()
-    const { error: updateError } = await supabase
-      .from('patients')
-      .update({
-        full_name: form.full_name,
-        phone: form.phone,
-        department: form.department,
-        age: form.age ? Number(form.age) : null,
-        gender: form.gender || null,
-        date_of_birth: form.date_of_birth || null,
-        address: form.address || null,
-        notes: form.notes || null,
-      })
-      .eq('id', patient.id)
+    const base = {
+      full_name: form.full_name,
+      phone: form.phone,
+      department: form.department,
+      age: form.age ? Number(form.age) : null,
+      gender: form.gender || null,
+      date_of_birth: form.date_of_birth || null,
+      address: form.address || null,
+      notes: form.notes || null,
+    }
+    let { error: updateError } = await supabase.from('patients').update({ ...base, ...extraToDb(extra) }).eq('id', patient.id)
+    if (updateError && (updateError.code === 'PGRST204' || /column/i.test(updateError.message))) {
+      ;({ error: updateError } = await supabase.from('patients').update(base).eq('id', patient.id))
+    }
 
     setSaving(false)
     if (updateError) {
-      setError('Update nahi hua, dobara koshish karein.')
+      setError('Update nahi hua: ' + friendlyError(updateError.message))
       return
     }
 
@@ -82,7 +99,7 @@ export default function PatientEditModal({ patient }: PatientEditModalProps) {
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6">
+          <div className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6">
             <div className="flex items-center justify-between">
               <p className="font-display text-lg font-semibold text-clinic-ink">Edit Patient</p>
               <button onClick={() => setOpen(false)} className="text-clinic-ink/40 hover:text-clinic-ink">
@@ -137,6 +154,7 @@ export default function PatientEditModal({ patient }: PatientEditModalProps) {
                   className={inputClass}
                 />
               </div>
+              <PatientExtraFields value={extra} onChange={setExtra} age={ageFrom(form.age, form.date_of_birth)} inputClass={inputClass} />
               <textarea
                 placeholder="Address"
                 value={form.address}

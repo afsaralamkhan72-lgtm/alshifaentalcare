@@ -2,8 +2,10 @@ import { createClient } from '@/lib/supabase/server'
 import RecallList, { type RecallRow } from '@/components/admin/RecallList'
 import DormantList, { type DormantPatient } from '@/components/admin/DormantList'
 import { todayKarachi } from '@/lib/karachi'
+import { requireAnyPerm } from '@/lib/auth'
 
 export default async function RecallPage() {
+  await requireAnyPerm('clinical.view')
   const supabase = await createClient()
 
   const today = todayKarachi()
@@ -55,7 +57,14 @@ export default async function RecallPage() {
     .select('patient_id, visit_date')
     .gte('visit_date', cutoff)
 
-  const activeIds = new Set((recentVisits ?? []).map((v) => v.patient_id))
+  // Nayi visit (clinical_visits) bhi gini jaye, warna sirf checkup / prescription wale (khaas kar homeopathy) "ghayab" dikhte hain
+  const { data: recentCv } = await supabase
+    .from('clinical_visits')
+    .select('patient_id')
+    .eq('status', 'finished')
+    .gte('visit_date', cutoff)
+
+  const activeIds = new Set([...(recentVisits ?? []), ...(recentCv ?? [])].map((v) => v.patient_id))
 
   const dormant = ((allPatients ?? []) as DormantPatient[])
     .filter((p) => !activeIds.has(p.id) && p.created_at.slice(0, 10) < cutoff)

@@ -52,9 +52,12 @@ type Panel = { id: string; mode: 'use' | 'buy' | 'history' } | null
 export default function InventoryManager({
   items,
   canManage,
+  forecast = {},
 }: {
   items: InventoryItem[]
   canManage: boolean
+  /** item id -> kitne din ka stock bacha (pichle 30 din ke istemal ke hisaab se) */
+  forecast?: Record<string, number>
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -272,6 +275,9 @@ export default function InventoryManager({
                       ) : low ? (
                         <span className="ml-2 rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-700">Low Stock</span>
                       ) : null}
+                      {forecast[item.id] != null && forecast[item.id] <= 30 && !low && !negative && (
+                        <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">~{Math.max(1, Math.round(forecast[item.id]))} din ka stock</span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       {item.expiry_date ? (
@@ -284,7 +290,7 @@ export default function InventoryManager({
                     <td className="px-4 py-3 text-clinic-ink/60">{item.supplier ?? '—'}</td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-3 text-xs font-semibold text-clinic-teal">
-                        <button onClick={() => openPanel(item.id, 'use')}>Istemal</button>
+                        {canManage && <button onClick={() => openPanel(item.id, 'use')}>Istemal</button>}
                         {canManage && <button onClick={() => openPanel(item.id, 'buy', item)}>Kharid</button>}
                         {canManage && <button onClick={() => openPanel(item.id, 'history')}>History</button>}
                         {canManage && <button onClick={() => deactivate(item)} className="text-clinic-ink/40">Band</button>}

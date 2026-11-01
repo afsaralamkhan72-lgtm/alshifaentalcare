@@ -10,7 +10,7 @@ import SheetPrintButton from '@/components/admin/SheetPrintButton'
 export default async function ReceiptPage({ params }: { params: Promise<{ id: string }> }) {
   const staff = await getStaffProfile()
   const perms = await getPermissions()
-  if (!isOwnerRole(staff.role) && !perms.includes('billing.view') && !perms.includes('billing.collect')) redirect('/admin/dashboard')
+  if (!isOwnerRole(staff.role) && !perms.includes('billing.view') && !perms.includes('billing.collect')) redirect('/admin/dashboard?denied=1')
   const { id } = await params
   const supabase = await createClient()
   const { data: pay } = await supabase
