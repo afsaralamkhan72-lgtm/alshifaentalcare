@@ -35,7 +35,7 @@ export default async function InventoryPage() {
     }
   }
 
-  const lowStock = items.filter((i) => Number(i.quantity) <= Number(i.reorder_level))
+  const lowStock = items.filter((i) => Number(i.reorder_level) > 0 && Number(i.quantity) <= Number(i.reorder_level))
   const expiringSoon = items.filter((i) => {
     if (!i.expiry_date) return false
     const days = (new Date(i.expiry_date).getTime() - Date.now()) / 86_400_000
@@ -46,6 +46,7 @@ export default async function InventoryPage() {
     <div>
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
+          <Link href="/admin/dashboard" className="mb-2 inline-block text-sm text-clinic-ink/50 hover:text-clinic-teal">← Home</Link>
           <h1 className="font-display text-2xl font-semibold text-clinic-ink">Inventory &amp; Stock</h1>
           <p className="mt-1 text-sm text-clinic-ink/60">
             Dental materials aur homeopathic medicines ka stock.

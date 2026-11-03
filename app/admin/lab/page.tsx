@@ -1,4 +1,4 @@
-import { requirePerm } from '@/lib/auth'
+import { requirePerm, getStaffProfile, isOwnerRole } from '@/lib/auth'
 import Link from 'next/link'
 import { toothLabel } from '@/lib/teeth'
 import { createClient } from '@/lib/supabase/server'
@@ -11,6 +11,7 @@ export default async function LabPage({
   searchParams: Promise<{ q?: string; patient?: string; treatment?: string }>
 }) {
   await requirePerm('lab.view')
+  const isOwner = isOwnerRole((await getStaffProfile()).role)
   const params = await searchParams
   const q = (params.q ?? '').replace(/[%,()*\\"']/g, ' ').trim()
 
@@ -82,6 +83,11 @@ export default async function LabPage({
             Work order banayein, lab ko WhatsApp par bhejein, report aaye to case mein upload karein.
           </p>
         </div>
+        {isOwner && (
+          <Link href="/admin/lab/hisaab" className="rounded-full border border-clinic-teal px-4 py-2 text-sm font-semibold text-clinic-teal">
+            Lab ka hisaab
+          </Link>
+        )}
         <LabCaseForm
           labs={(labsRes.data ?? []) as LabOption[]}
           patients={(patientsRes.data ?? []) as PatientOption[]}

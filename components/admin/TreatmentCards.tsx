@@ -8,6 +8,7 @@ import { friendlyError } from '@/lib/errors'
 import { toothLabel } from '@/lib/teeth'
 import { fmtDate } from '@/lib/karachi'
 import type { TItem } from './visit/types'
+import PaymentPlan, { type Plan } from './PaymentPlan'
 
 export interface Stage {
   id: string
@@ -43,6 +44,10 @@ export default function TreatmentCards({
   stages,
   canMoney,
   canEdit,
+  plans = [],
+  canBill = false,
+  patientName = '',
+  phone = null,
 }: {
   patientId: string
   treatments: TItem[]
@@ -50,6 +55,10 @@ export default function TreatmentCards({
   stages: Stage[]
   canMoney: boolean
   canEdit: boolean
+  plans?: Plan[]
+  canBill?: boolean
+  patientName?: string
+  phone?: string | null
 }) {
   const router = useRouter()
   const [busy, setBusy] = useState('')
@@ -96,6 +105,9 @@ export default function TreatmentCards({
                   Kharcha {rs(t.charged)} · Mila {rs(t.paid)}
                   {t.balance > 0 ? <span className="font-semibold text-red-600"> · Baqaya {rs(t.balance)}</span> : <span className="text-emerald-700"> · hisaab saaf</span>}
                 </p>
+              )}
+              {canMoney && t.status !== 'cancelled' && (
+                <PaymentPlan treatmentId={t.id} paid={t.paid} balance={t.balance} plan={plans.find((p) => p.patient_treatment_id === t.id) ?? null} canEdit={canBill} patientName={patientName} phone={phone} />
               )}
               {tl.length > 0 && (
                 <p className="mt-1 flex flex-wrap gap-2 text-xs">

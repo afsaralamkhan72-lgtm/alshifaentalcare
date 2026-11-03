@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -51,11 +51,24 @@ export default function DuesList({
   const [method, setMethod] = useState('cash')
   const [error, setError] = useState('')
   const [payKey, setPayKey] = useState('')
+  const [disc, setDisc] = useState('')
+  const [reason, setReason] = useState('')
+  const [limit, setLimit] = useState(0)
+  useEffect(() => {
+    createClient()
+      .rpc('my_discount_limit')
+      .then(({ data, error: e }) => setLimit(e || data == null ? 0 : Number(data)))
+  }, [])
 
   async function collect(row: DueRow) {
     const got = Number(received || 0)
-    if (got <= 0) return
-    if (got > Number(row.balance_due)) {
+    const d = row.invoice_id ? Number(disc || 0) : 0
+    if (got <= 0 && d <= 0) return
+    if (d > 0 && !reason.trim()) {
+      setError('Riyayat ki wajah likhein')
+      return
+    }
+    if (got + d > Number(row.balance_due)) {
       setError(`Raqam baqaya (Rs. ${Number(row.balance_due).toLocaleString('en-US')}) se zyada hai`)
       return
     }
@@ -66,12 +79,22 @@ export default function DuesList({
 
     // Naye invoice ki payment: invoice + ledger + hisaab sab aik saath (database function)
     if (row.invoice_id) {
-      const { error: rpcErr } = await supabase.rpc('collect_payment', {
-        p_invoice_id: row.invoice_id,
-        p_amount: got,
-        p_method: method,
-        p_key: payKey || null,
-      })
+      const { error: rpcErr } =
+        d > 0
+          ? await supabase.rpc('collect_with_discount', {
+              p_invoice_id: row.invoice_id,
+              p_discount: d,
+              p_amount: got,
+              p_method: method,
+              p_reason: reason.trim(),
+              p_key: payKey || null,
+            })
+          : await supabase.rpc('collect_payment', {
+              p_invoice_id: row.invoice_id,
+              p_amount: got,
+              p_method: method,
+              p_key: payKey || null,
+            })
       setBusyId(null)
       if (rpcErr) {
         setError(rpcErr.message)
@@ -79,7 +102,9 @@ export default function DuesList({
       }
       setCollecting(null)
       setReceived('')
-      if (row.patients?.id) askReceipt({ patientId: row.patients.id, amount: got, method })
+      setDisc('')
+      setReason('')
+      if (row.patients?.id && got > 0) askReceipt({ patientId: row.patients.id, amount: got, method })
       router.refresh()
       onPaid?.()
       return
@@ -242,11 +267,37 @@ export default function DuesList({
                   onClick={() => {
                     setCollecting(null)
                     setReceived('')
+                    setDisc('')
+                    setReason('')
                   }}
                   className="text-xs text-clinic-ink/60 hover:underline"
                 >
                   Cancel
                 </button>
+                {row.invoice_id && limit > 0 && (
+                  <div className="flex w-full flex-wrap items-center gap-2">
+                    <input
+                      type="number"
+                      min={0}
+                      placeholder="Riyayat Rs."
+                      value={disc}
+                      onChange={(e) => {
+                        setDisc(e.target.value)
+                        setReceived(String(Math.max(0, Number(row.balance_due) - (Number(e.target.value) || 0))))
+                      }}
+                      className="w-32 rounded-lg border border-clinic-teal/30 px-3 py-1.5 text-sm"
+                    />
+                    {Number(disc) > 0 && (
+                      <input
+                        value={reason}
+                        onChange={(e) => setReason(e.target.value)}
+                        placeholder="Riyayat ki wajah"
+                        className="min-w-0 flex-1 rounded-lg border border-clinic-teal/30 px-3 py-1.5 text-sm"
+                      />
+                    )}
+                    <span className="text-[11px] text-clinic-ink/50">aap ki had {limit}%</span>
+                  </div>
+                )}
                 {error && <p className="w-full text-xs text-red-600">{error}</p>}
               </div>
             ) : (

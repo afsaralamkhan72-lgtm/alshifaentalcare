@@ -1,10 +1,14 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { requireAnyPerm } from '@/lib/auth'
+import { requireAnyPerm, getStaffProfile, isOwnerRole } from '@/lib/auth'
+import DiscountLimits, { type LimitRow, type LogRow } from '@/components/admin/DiscountLimits'
 import MedicineManager, { type Medicine } from '@/components/admin/MedicineManager'
 import ReminderSetting from '@/components/admin/ReminderSetting'
 import { getReminderDays } from '@/lib/reminders'
 import ClinicOptionsManager, { type OptRow } from '@/components/admin/ClinicOptionsManager'
+import PushToggle from '@/components/admin/PushToggle'
+import PrintSettings from '@/components/admin/PrintSettings'
+import { getPrintCfg } from '@/lib/printSettings'
 import BackupPanel from '@/components/admin/BackupPanel'
 import MessageTemplatesManager from '@/components/admin/MessageTemplatesManager'
 import { OPTION_KINDS } from '@/lib/clinicOptions'
@@ -13,8 +17,11 @@ const SECTIONS = [
   { k: 'dental', l: 'Dental dawaiyan' },
   { k: 'homeopathic', l: 'Homeopathic dawaiyan' },
   { k: 'prices', l: 'Treatment prices' },
+  { k: 'discounts', l: 'Riyayat ki had', owner: true },
   { k: 'lists', l: 'Takleef / Diagnosis list' },
   { k: 'messages', l: 'Messages (WhatsApp)' },
+  { k: 'print', l: 'Print, Logo aur QR' },
+  { k: 'notify', l: 'Phone notification', owner: true },
   { k: 'backup', l: 'Backup (data ki copy)' },
   { k: 'other', l: 'Reminder' },
 ]
@@ -23,8 +30,20 @@ const SECTIONS = [
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ s?: string }> }) {
   await requireAnyPerm('settings.manage')
   const sp = await searchParams
-  const s = SECTIONS.some((x) => x.k === sp.s) ? (sp.s as string) : 'dental'
+  const staff = await getStaffProfile()
+  const isOwner = Boolean(staff && isOwnerRole(staff.role))
+  const sections = SECTIONS.filter((x) => !('owner' in x && x.owner) || isOwner)
+  const s = sections.some((x) => x.k === sp.s) ? (sp.s as string) : 'dental'
   const supabase = await createClient()
+  const printCfg = s === 'print' ? await getPrintCfg() : null
+  const dlRes = s === 'discounts' ? await supabase.from('discount_limits').select('role, max_percent') : null
+  const dgRes =
+    s === 'discounts'
+      ? await supabase.from('discount_log').select('id, created_at, kind, base_amount, discount_amount, percent, given_by_name, given_by_role, patient_id').order('created_at', { ascending: false }).limit(100)
+      : null
+  const logPatientIds = Array.from(new Set(((dgRes?.data ?? []) as { patient_id: string | null }[]).map((r) => r.patient_id).filter(Boolean))) as string[]
+  const pnRes = logPatientIds.length ? await supabase.from('patients').select('id, full_name').in('id', logPatientIds) : { data: [] }
+  const pn = new Map(((pnRes.data ?? []) as { id: string; full_name: string }[]).map((x) => [x.id, x.full_name]))
   const [{ data: meds, error }, days, optRes, msgRes, bkRes] = await Promise.all([
     s === 'dental' || s === 'homeopathic'
       ? supabase
@@ -45,7 +64,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       <h1 className="font-display text-2xl font-semibold text-clinic-ink">Settings</h1>
       <div className="mt-4 grid gap-6 lg:grid-cols-[13rem_1fr]">
         <nav className="flex flex-row flex-wrap gap-2 lg:flex-col">
-          {SECTIONS.map((x) => (
+          {sections.map((x) => (
             <Link
               key={x.k}
               href={`/admin/settings?s=${x.k}`}
@@ -79,6 +98,21 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
               </Link>
             </div>
           )}
+          {s === 'discounts' && (
+            <DiscountLimits
+              missing={Boolean(dlRes?.error || dgRes?.error)}
+              limits={((dlRes?.data ?? []) as { role: string; max_percent: number }[]).map((l) => ({ role: l.role, max_percent: Number(l.max_percent) })) as LimitRow[]}
+              log={((dgRes?.data ?? []) as (Omit<LogRow, 'patient_name'> & { patient_id: string | null })[]).map((l) => ({
+                ...l,
+                base_amount: Number(l.base_amount),
+                discount_amount: Number(l.discount_amount),
+                percent: Number(l.percent),
+                patient_name: l.patient_id ? pn.get(l.patient_id) ?? null : null,
+              }))}
+            />
+          )}
+          {s === 'print' && printCfg && <PrintSettings logo={printCfg.logo} defaults={printCfg.defaults} share={printCfg.share} remind={printCfg.remind} />}
+          {s === 'notify' && <PushToggle />}
           {s === 'lists' && <ClinicOptionsManager kinds={OPTION_KINDS} rows={(optRes.data ?? []) as OptRow[]} missing={Boolean(optRes.error)} />}
           {s === 'messages' && <MessageTemplatesManager rows={(msgRes.data ?? []) as { key: string; body: string }[]} missing={Boolean(msgRes.error)} />}
           {s === 'backup' && <BackupPanel last={(bkRes.data as { value?: unknown } | null)?.value ? String((bkRes.data as { value: unknown }).value) : null} />}

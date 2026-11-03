@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { getStaffProfile, isOwnerRole, requireAnyPerm } from '@/lib/auth'
 import LoyaltyManager from '@/components/admin/LoyaltyManager'
+import ScratchAdmin from '@/components/admin/ScratchAdmin'
 import { todayKarachi } from '@/lib/karachi'
 
 export const dynamic = 'force-dynamic'
@@ -49,7 +50,20 @@ export default async function LoyaltyPage() {
     .filter((u) => !u.expires_at || new Date(u.expires_at).getTime() > now)
     .map((u) => ({ id: u.id, title: u.title, kind: u.kind, value: u.value, treatments: u.treatment_names, expires_at: u.expires_at, patient: one(u.patients) }))
 
+  // Scratch card (FINAL35 SQL na chali ho to ye hissa nahi dikhta, baqi page waise hi chalta hai)
+  const [scrPrizes, scrCards, scrCfg] = await Promise.all([
+    sb.from('scratch_prizes').select('id, title, kind, value, treatment_names, weight, is_active').order('created_at'),
+    sb.from('scratch_cards').select('id, title, kind, value, treatment_names, card_date, expires_at, patients(id, full_name)').is('redeemed_at', null).neq('kind', 'none').order('created_at', { ascending: false }).limit(100),
+    sb.from('site_settings').select('value').eq('key', 'scratch_cfg').maybeSingle(),
+  ])
+  const scratchOn = !scrPrizes.error && !scrCards.error
+  const cfg = (scrCfg.data?.value ?? {}) as { enabled?: boolean; valid_days?: number }
+  const scratchCards = ((scrCards.data ?? []) as unknown as { id: string; title: string; kind: string; value: number | null; treatment_names: string[]; card_date: string; expires_at: string | null; patients: P | P[] | null }[])
+    .filter((c) => !c.expires_at || new Date(c.expires_at).getTime() > now)
+    .map((c) => ({ id: c.id, title: c.title, kind: c.kind, value: c.value, treatment_names: c.treatment_names, card_date: c.card_date, expires_at: c.expires_at, patient: one(c.patients) }))
+
   return (
+    <>
     <LoyaltyManager
       owner={owner}
       program={prog.data}
@@ -59,5 +73,15 @@ export default async function LoyaltyPage() {
       ready={readyRows}
       signups={signups.data ?? []}
     />
+    {scratchOn && (
+      <ScratchAdmin
+        owner={owner}
+        enabled={cfg.enabled === true}
+        days={Number(cfg.valid_days) || 30}
+        prizes={(scrPrizes.data ?? []) as { id: string; title: string; kind: 'percent' | 'amount' | 'free' | 'none'; value: number | null; treatment_names: string[]; weight: number; is_active: boolean }[]}
+        cards={scratchCards}
+      />
+    )}
+    </>
   )
 }

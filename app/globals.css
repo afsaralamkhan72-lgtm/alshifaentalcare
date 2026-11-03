@@ -14,12 +14,12 @@
 }
 .admin-shell,
 .app-blue {
-  --c-teal: 29 78 216;       /* blue-700 */
-  --c-teal-light: 37 99 235; /* blue-600 */
-  --c-mint: 239 246 255;     /* blue-50 */
-  --c-sand: 248 250 252;     /* slate-50, safed */
-  --c-ink: 30 41 59;         /* slate-800 */
-  --c-forest: 30 58 138;     /* blue-900 */
+  --c-teal: 23 105 210;      /* #1769D2 primary blue */
+  --c-teal-light: 59 130 225;
+  --c-mint: 233 241 252;     /* halka neela surface */
+  --c-sand: 244 247 251;     /* #F4F7FB page background */
+  --c-ink: 20 33 56;         /* gehra navy text */
+  --c-forest: 20 43 80;      /* #142B50 navy */
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -32,8 +32,14 @@
 
 /* ---------- Admin panel polish (Phase 9) ---------- */
 .admin-shell {
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   font-feature-settings: 'tnum' 1; /* raqam barabar chaurai ke, columns seedhe */
   -webkit-font-smoothing: antialiased;
+}
+.admin-shell .font-display,
+.admin-shell .font-body {
+  font-family: inherit;
+  letter-spacing: -0.01em;
 }
 .admin-shell .rounded-2xl.border {
   box-shadow: 0 1px 2px rgba(30, 58, 138, 0.05), 0 4px 14px -8px rgba(30, 58, 138, 0.14);

@@ -3,6 +3,8 @@ import { Suspense, cache } from 'react'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getStaffProfile, isOwnerRole, getPermissions } from '@/lib/auth'
+import RewardBanner from '@/components/admin/RewardBanner'
+import { getReadyRewards } from '@/lib/rewards'
 import PatientEditModal from '@/components/admin/PatientEditModal'
 import PatientProfilePhoto from '@/components/admin/PatientProfilePhoto'
 import PortalLinkButton from '@/components/admin/PortalLinkButton'
@@ -10,6 +12,7 @@ import DeletePatientButton from '@/components/admin/DeletePatientButton'
 import VisitWorkspace, { type VisitRow, type MedOpt } from '@/components/admin/visit/VisitWorkspace'
 import type { CatalogOpt, MaterialOpt, TItem, TVisit } from '@/components/admin/visit/types'
 import PatientPhotoGallery, { type PatientPhoto } from '@/components/admin/PatientPhotoGallery'
+import type { Plan as PayPlan, PlanItem } from '@/components/admin/PaymentPlan'
 import TreatmentCards, { type Stage, type LabLite } from '@/components/admin/TreatmentCards'
 import TreatmentPlanCard, { type Installment, type Plan } from '@/components/admin/TreatmentPlanCard'
 import { todayKarachi, money, fmtDate } from '@/lib/karachi'
@@ -183,11 +186,14 @@ export default async function PatientDetailPage({ params, searchParams }: Props)
   const wa = digits ? `https://wa.me/92${digits.replace(/^0/, '').replace(/^92/, '')}` : null
   const isDental = patient.department === 'dental'
 
+  const readyRewards = await getReadyRewards(supabase, patient.id)
+
   return (
     <div className="grid min-w-0 gap-4">
       <Link href="/admin/patients" className="text-sm text-clinic-ink/50 transition-colors hover:text-clinic-teal">
         ← Patients
       </Link>
+      <RewardBanner rewards={readyRewards} />
 
       {/* ================= 1. PATIENT DETAILS ================= */}
       <section id="s1" className="rounded-2xl border border-clinic-teal/10 bg-white p-4">
@@ -343,7 +349,7 @@ export default async function PatientDetailPage({ params, searchParams }: Props)
 
       {canClinical && (
         <Suspense fallback={null}>
-          <TreatmentCardsSlot patientId={patient.id} canMoney={canMoney} canEdit={can('clinical.edit')} canLab={can('lab.view')} />
+          <TreatmentCardsSlot patientId={patient.id} patientName={patient.full_name} phone={patient.phone ?? null} canMoney={canMoney} canBill={can('billing.create')} canEdit={can('clinical.edit')} canLab={can('lab.view')} />
         </Suspense>
       )}
 
@@ -375,13 +381,26 @@ type PatientRow = {
   portal_code?: string | null
 }
 
-async function TreatmentCardsSlot({ patientId, canMoney, canEdit, canLab }: { patientId: string; canMoney: boolean; canEdit: boolean; canLab: boolean }) {
+async function TreatmentCardsSlot({ patientId, patientName, phone, canMoney, canBill, canEdit, canLab }: { patientId: string; patientName: string; phone: string | null; canMoney: boolean; canBill: boolean; canEdit: boolean; canLab: boolean }) {
   const supabase = await createClient()
   const treatments = await getTreatments(patientId)
-  const [labRes, stRes] = await Promise.all([
+  const [labRes, stRes, planRes] = await Promise.all([
     canLab ? supabase.from('lab_cases').select('id, treatment_id, work_type, status, due_date').eq('patient_id', patientId).is('deleted_at', null) : Promise.resolve({ data: [] }),
     supabase.from('treatment_stages').select('id, treatment_id, label, sort_order, done_on').eq('patient_id', patientId),
+    canMoney
+      ? supabase.from('payment_plans').select('id, patient_treatment_id, base_paid, planned_amount, payment_plan_items(id, no, due_date, amount)').eq('patient_id', patientId).eq('status', 'active')
+      : Promise.resolve({ data: [], error: null }),
   ])
+  // SQL abhi nahi chali ho to plans khali (page na toote)
+  const plans: PayPlan[] = planRes.error
+    ? []
+    : ((planRes.data ?? []) as unknown as (Omit<PayPlan, 'items'> & { payment_plan_items: PlanItem[] })[]).map((p) => ({
+        id: p.id,
+        patient_treatment_id: p.patient_treatment_id,
+        base_paid: Number(p.base_paid),
+        planned_amount: Number(p.planned_amount),
+        items: (p.payment_plan_items ?? []).map((i) => ({ ...i, amount: Number(i.amount) })),
+      }))
   return (
     <TreatmentCards
       patientId={patientId}
@@ -390,6 +409,10 @@ async function TreatmentCardsSlot({ patientId, canMoney, canEdit, canLab }: { pa
       stages={('error' in stRes && stRes.error ? [] : stRes.data ?? []) as Stage[]}
       canMoney={canMoney}
       canEdit={canEdit}
+      plans={plans}
+      canBill={canBill}
+      patientName={patientName}
+      phone={phone}
     />
   )
 }
@@ -508,12 +531,15 @@ async function WorkspaceSection({
   const can = (p: string) => perms.includes(p)
   const today = todayKarachi()
   const canMoney = isOwner || can('billing.view')
+  // meri riyayat ki had (SQL chali na ho to purana rule: owner 100%, baqi 0%)
+  const dmRes = await supabase.rpc('my_discount_limit')
+  const discountMax = dmRes.error || dmRes.data == null ? (isOwner ? 100 : 0) : Number(dmRes.data)
   const [treatments, chartRes, catRes, docRes, matRes, qualRes, cvRes, medRes, billRes, rxRes, photoRes, optRes, cvCnt, vnCnt] = await Promise.all([
     getTreatments(patient.id),
     isDental && can('clinical.view')
       ? supabase
           .from('dental_chart')
-          .select('tooth_number, condition, treatment_date, created_at, clinical_visit_id, treatment_id, surfaces, state')
+          .select('tooth_number, condition, treatment_date, created_at, clinical_visit_id, treatment_id, surfaces, state, notes')
           .eq('patient_id', patient.id)
           .order('treatment_date', { ascending: false })
       : Promise.resolve({ data: [] }),
@@ -579,11 +605,11 @@ async function WorkspaceSection({
   const finRx = fin ? ((fin as unknown as { prescriptions?: { id: string }[] }).prescriptions ?? [])[0] : undefined
   const invToday = (billRes.data ?? []) as { id: string; clinical_visit_id: string | null }[]
   const finishedToday = fin ? { id: fin.id, hasInvoice: invToday.some((i) => i.clinical_visit_id === fin.id), prescription_id: finRx?.id ?? null } : null
-  const chartAll = (chartRes.data ?? []) as { tooth_number: string; condition: string; treatment_date: string; created_at: string | null; clinical_visit_id: string | null; treatment_id: string | null; surfaces: string[] | null; state: string | null }[]
+  const chartAll = (chartRes.data ?? []) as { tooth_number: string; condition: string; treatment_date: string; created_at: string | null; clinical_visit_id: string | null; treatment_id: string | null; surfaces: string[] | null; state: string | null; notes?: string | null }[]
   const startedMarks = draft
     ? chartAll
         .filter((c) => c.clinical_visit_id === draft.id && !c.treatment_id)
-        .map((c) => ({ tooth: c.tooth_number, condition: c.condition, surfaces: c.surfaces ?? [], state: (c.state ?? 'existing') as 'existing' | 'planned' | 'completed' }))
+        .map((c) => ({ tooth: c.tooth_number, condition: c.condition, surfaces: c.surfaces ?? [], state: (c.state ?? 'existing') as 'existing' | 'planned' | 'completed', notes: c.notes ?? '' }))
     : []
   const ageNum = patient.age != null ? Number(patient.age) : patient.date_of_birth ? Math.floor((Date.now() - new Date(patient.date_of_birth).getTime()) / 31557600000) : null
   const hist = (key: string) => ((history?.[key] ?? {}) as Record<string, unknown>)
@@ -619,6 +645,7 @@ async function WorkspaceSection({
         collect: isOwner || can('billing.collect'),
         money: canMoney,
         owner: isOwner,
+        discountMax,
         rx: can('prescriptions.write'),
       }}
     />

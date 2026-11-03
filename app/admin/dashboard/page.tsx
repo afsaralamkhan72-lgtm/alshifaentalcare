@@ -10,6 +10,7 @@ import WhatsAppMenu from '@/components/admin/WhatsAppMenu'
 import { apptReminderLink } from '@/lib/messages'
 import { mapTemplates } from '@/lib/messageTemplates'
 import OwnerToday from '@/components/admin/OwnerToday'
+import OwnerMoney from '@/components/admin/OwnerMoney'
 import { todayKarachi } from '@/lib/karachi'
 
 function monthBounds(month: string) {
@@ -196,6 +197,11 @@ export default async function DashboardPage({
           <OwnerToday />
         </Suspense>
       )}
+      {canSeeMoney && (
+        <Suspense fallback={null}>
+          <OwnerMoney />
+        </Suspense>
+      )}
       {canSeeMoney ? (
         <Suspense fallback={<SectionLoading label="Mahine ka jaiza load ho raha hai..." />}>
           <MonthSection month={month} currentMonth={currentMonth} canSeeMoney={canSeeMoney} />
@@ -229,7 +235,7 @@ async function BackupReminder() {
 async function StockAlerts() {
   const sb = await createClient()
   const { data } = await sb.from('inventory').select('item_name, quantity, reorder_level, is_active')
-  const low = (data ?? []).filter((r) => r.is_active !== false && Number(r.quantity) <= Number(r.reorder_level))
+  const low = (data ?? []).filter((r) => r.is_active !== false && Number(r.reorder_level) > 0 && Number(r.quantity) <= Number(r.reorder_level))
   if (low.length === 0) return null
   return (
     <Link href="/admin/inventory" className="mt-6 block rounded-2xl border border-red-200 bg-red-50 p-4">
@@ -247,7 +253,7 @@ async function MonthSection({ month, currentMonth, canSeeMoney }: { month: strin
     supabaseAlerts.from('inventory').select('item_name, quantity, unit, reorder_level, expiry_date, is_active'),
   ])
   const liveStock = (stockRows ?? []).filter((r) => r.is_active !== false)
-  const lowStock = liveStock.filter((r) => Number(r.quantity) <= Number(r.reorder_level))
+  const lowStock = liveStock.filter((r) => Number(r.reorder_level) > 0 && Number(r.quantity) <= Number(r.reorder_level))
   const expiring = liveStock.filter(
     (r) => r.expiry_date && (new Date(r.expiry_date).getTime() - Date.now()) / 86_400_000 <= 30
   )

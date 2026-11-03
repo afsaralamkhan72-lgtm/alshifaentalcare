@@ -31,7 +31,13 @@ export default function MessageTemplatesManager({ rows, missing }: { rows: { key
         <p className="mt-2 text-xs">Har message {'{header}'} (salaam + darood + naam) se shuru aur {'{footer}'} (doctor, clinic, pata, phone) par khatam hota hai. Darood ki line ya doctor ka naam aik baar &quot;Har message ka shuru / aakhir&quot; mein badlen to sab messages mein badal jati hai. Doctor ka naam, pata aur phone clinic ki settings se aate hain.</p>
         <p className="mt-2 text-xs">{'{adab}'} mard/aurat ke hisaab se &quot;محترم … صاحب / محترمہ … صاحبہ&quot; likhta hai (jins na ho to sirf naam).</p>
       </div>
-      {TEMPLATE_DEFAULTS.map((d) => (
+      {(['', 'dental', 'homeopathic'] as const).map((grp) => (
+        <div key={grp || 'all'} className="grid gap-4">
+          <h3 className="mt-2 font-display text-base font-semibold text-clinic-teal">
+            {grp === 'dental' ? 'Dental (sirf dental patients ke liye)' : grp === 'homeopathic' ? 'Homeopathic (sirf homeopathic patients ke liye)' : 'Sab ke liye'}
+          </h3>
+          {grp !== '' && <p className="-mt-2 text-xs text-clinic-ink/60">Hidayat ke matn mein: pehli line sarkhi, &quot;کریں:&quot; / &quot;نہ کریں:&quot; heading, &quot;•&quot; se nuktay, aur &quot;!&quot; se shuru line ehtiyat ki tambeeh banti hai.</p>}
+      {TEMPLATE_DEFAULTS.filter((d) => (d.dept ?? '') === grp).map((d) => (
         <div key={d.key} className="rounded-2xl border border-clinic-teal/10 bg-white p-5">
           <p className="font-display font-semibold text-clinic-ink">{d.label}</p>
           <textarea
@@ -50,6 +56,8 @@ export default function MessageTemplatesManager({ rows, missing }: { rows: { key
             </button>
             {msg[d.key] && <span className="text-sm text-clinic-ink/70">{msg[d.key]}</span>}
           </div>
+        </div>
+      ))}
         </div>
       ))}
     </div>

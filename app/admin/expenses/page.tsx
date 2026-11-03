@@ -68,6 +68,7 @@ export default async function ExpensesPage({
     <div>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
+          <Link href="/admin/accounts" className="mb-2 inline-block text-sm text-clinic-ink/50 hover:text-clinic-teal">← Accounts</Link>
           <h1 className="font-display text-2xl font-semibold text-clinic-ink">Kharche</h1>
           <p className="mt-1 text-sm text-clinic-ink/60">Clinic ke tamam kharche, category ke hisaab se.</p>
         </div>

@@ -92,6 +92,7 @@ export default function PayrollManager({
   }
 
   const totalOwed = balances.reduce((s, b) => s + Math.max(0, Number(b.balance)), 0)
+  const totalExtra = balances.reduce((s, b) => s + Math.max(0, -Number(b.balance)), 0)
 
   return (
     <div className="grid gap-6">
@@ -99,6 +100,7 @@ export default function PayrollManager({
         <div>
           <p className="text-xs text-clinic-ink/50">Staff ko kul dena baqaya</p>
           <p className="font-display text-xl font-semibold text-clinic-ink">{money(totalOwed)}</p>
+          {totalExtra > 0 && <p className="text-[11px] text-red-600">Staff ne zyada liya: {money(totalExtra)}</p>}
         </div>
         <button onClick={generate} className="rounded-full bg-clinic-teal px-5 py-2.5 text-sm font-semibold text-white">
           {period} ki salary banayein
@@ -112,6 +114,7 @@ export default function PayrollManager({
             key={s.id}
             s={s}
             today={today}
+            period={period}
             bal={balances.find((b) => b.staff_id === s.id)}
             rows={ledger.filter((l) => l.staff_id === s.id)}
             acc={access.find((a) => a.staff_id === s.id)}
@@ -141,10 +144,12 @@ export default function PayrollManager({
 function StaffCard({
   s,
   today,
+  period,
   bal,
   rows,
   acc,
 }: {
+  period: string
   s: StaffRow
   today: string
   bal?: BalanceRow
@@ -164,6 +169,11 @@ function StaffCard({
   const [pending, start] = useTransition()
 
   const balance = Number(bal?.balance ?? 0)
+  const monthOf = (r: LedgerRow) => r.period ?? r.entry_date.slice(0, 7)
+  const prevBal = rows.filter((r) => monthOf(r) < period).reduce((t, r) => t + Number(r.amount), 0)
+  const cur = rows.filter((r) => monthOf(r) === period)
+  const curSalary = cur.filter((r) => r.kind === 'salary_due' || r.kind === 'bonus').reduce((t, r) => t + Number(r.amount), 0)
+  const curTaken = cur.filter((r) => r.kind === 'advance' || r.kind === 'payout' || r.kind === 'deduction').reduce((t, r) => t + Number(r.amount), 0)
   const needsMethod = kind === 'advance' || kind === 'payout'
   const portalOn = !!acc && !acc.revoked_at
   const locked = !!acc?.locked_until && new Date(acc.locked_until).getTime() > Date.now()
@@ -244,12 +254,21 @@ function StaffCard({
           <p className="text-xs text-clinic-ink/50">Salary {money(s.monthly_salary)} / mahina</p>
         </div>
         <div className="text-right">
-          <p className="text-xs text-clinic-ink/50">Baqaya (dena hai)</p>
-          <p className={`font-display text-lg font-semibold ${balance < 0 ? 'text-red-600' : 'text-clinic-ink'}`}>{money(balance)}</p>
+          <p className="text-xs text-clinic-ink/50">{balance < 0 ? 'Zyada liya (agle mahine se kategi)' : 'Baqaya (dena hai)'}</p>
+          <p className={`font-display text-lg font-semibold ${balance < 0 ? 'text-red-600' : 'text-clinic-ink'}`}>
+            {balance < 0 ? `−${money(Math.abs(balance))}` : money(balance)}
+          </p>
           {Number(bal?.unconfirmed ?? 0) > 0 && (
             <p className="text-[11px] text-amber-700">{bal?.unconfirmed} entry par staff ne &quot;mil gaye&quot; nahi dabaya</p>
           )}
         </div>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2 rounded-xl bg-clinic-teal/5 p-3 text-xs sm:grid-cols-4">
+        <Cell label="Pichla baqaya / advance" v={prevBal} />
+        <Cell label={`${period} ki salary`} v={curSalary} />
+        <Cell label="Is mahine diya / kata" v={curTaken} />
+        <Cell label="Net abhi" v={balance} bold />
       </div>
 
       {s.is_active && (
@@ -366,6 +385,17 @@ function StaffCard({
           })}
         </div>
       </details>
+    </div>
+  )
+}
+
+function Cell({ label, v, bold }: { label: string; v: number; bold?: boolean }) {
+  return (
+    <div>
+      <p className="text-clinic-ink/50">{label}</p>
+      <p className={`${bold ? 'text-sm font-semibold' : 'font-medium'} ${v < 0 ? 'text-red-600' : 'text-clinic-ink'}`}>
+        {v < 0 ? `−${money(Math.abs(v))}` : money(v)}
+      </p>
     </div>
   )
 }

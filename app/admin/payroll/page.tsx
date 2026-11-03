@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import Link from 'next/link'
 import { requireOwner } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { todayKarachi } from '@/lib/karachi'
@@ -53,6 +54,8 @@ export default async function PayrollPage() {
 
   return (
     <div>
+      <Link href="/admin/accounts" className="mb-2 inline-block text-sm text-clinic-ink/50 hover:text-clinic-teal">← Accounts</Link>
+      <Link href="/admin/attendance" className="mb-2 ml-3 inline-block text-sm font-semibold text-clinic-teal">Staff ki hazri →</Link>
       <h1 className="font-display text-2xl font-semibold text-clinic-ink">Staff Salary &amp; Advance</h1>
       <p className="mt-1 text-sm text-clinic-ink/60">
         Salary, advance (Rs. 1 bhi), bonus aur katauti. Har staff ka apna hisaab, alag link aur PIN se.

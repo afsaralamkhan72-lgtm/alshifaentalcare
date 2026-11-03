@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import ScratchCard from './ScratchCard'
 
 type Out = {
   status: string
@@ -20,6 +21,7 @@ export default function LoyaltyScan() {
   const [busy, setBusy] = useState(true)
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
+  const [agree, setAgree] = useState(false)
   const [err, setErr] = useState('')
 
   async function send(body: object) {
@@ -43,13 +45,17 @@ export default function LoyaltyScan() {
       {s === 'inactive' && <p className="rounded-lg bg-clinic-ink/5 p-4 text-sm">Loyalty card abhi shuru nahi hua. Reception se poochein.</p>}
 
       {form && out && (
-        <form onSubmit={(e) => { e.preventDefault(); void send({ name, phone }) }} className="space-y-3">
+        <form onSubmit={(e) => { e.preventDefault(); if (agree) void send({ name, phone }) }} className="space-y-3">
           <p className="text-sm text-clinic-ink/70">Stamp ke liye apna naam aur phone number likhein (jo clinic mein darj hai).</p>
           {s === 'mismatch' && <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">Naam aur number match nahi hue. Dobara likhein ya reception se poochein.</p>}
           {s === 'ambiguous' && <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">Is number par kai record hain. Poora naam likhein ya reception se poochein.</p>}
           {s === 'limited' && <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">Bohat zyada koshishein. Thori dair baad dobara karein.</p>}
           <input aria-label="Naam" className="w-full rounded-xl border border-clinic-ink/20 px-3 py-3" placeholder="Aap ka naam" value={name} onChange={(e) => setName(e.target.value)} required minLength={2} maxLength={120} />
           <input aria-label="Phone" inputMode="tel" className="w-full rounded-xl border border-clinic-ink/20 px-3 py-3" placeholder="Phone (03xx xxxxxxx)" value={phone} onChange={(e) => setPhone(e.target.value)} required maxLength={30} />
+          <label className="flex items-start gap-2 text-xs text-clinic-ink/70">
+            <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} required className="mt-0.5 h-4 w-4" />
+            <span>Main ijazat deta/deti hun ke clinic mere naam aur phone number ko sirf mere ilaaj, yaad-dahani aur loyalty ke liye istemal kare.</span>
+          </label>
           <button disabled={busy} className="w-full rounded-xl bg-clinic-teal px-4 py-3 font-semibold text-white disabled:opacity-60">{busy ? 'Ek lamha…' : 'Stamp lagayein'}</button>
         </form>
       )}
@@ -68,6 +74,7 @@ export default function LoyaltyScan() {
           {s === 'already' && <p className="mt-1 rounded-lg bg-clinic-ink/5 p-3 text-sm">Aaj ka stamp pehle hi lag chuka hai.</p>}
           {s === 'no_visit' && <p className="mt-1 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">Stamp sirf clinic ki visit wale din lagta hai. Aaj ki visit abhi darj nahi hui — reception se bata dein.</p>}
           <Card c={out.card} />
+          {(s === 'awarded' || s === 'already') && <ScratchCard />}
           {out.card.ready > 0 && <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm font-semibold text-amber-900">🎁 Aap ke {out.card.ready} inaam tayyar hain. Reception ko dikhayein.</p>}
         </div>
       )}

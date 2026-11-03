@@ -40,9 +40,14 @@ const GROUPS: NavGroup[] = [
     title: 'Aur',
     items: [
       { href: '/admin/prescriptions', label: 'Prescriptions', roles: ALL, perm: 'prescriptions.view' },
+      { href: '/admin/reminders', label: 'Yaad-dahani', roles: ALL, perm: ['prescriptions.view', 'clinical.view'] },
       { href: '/admin/recall', label: 'Recall', roles: ALL, perm: 'clinical.view' },
       { href: '/admin/loyalty', label: 'Loyalty', roles: ALL, perm: 'patients.view' },
       { href: '/admin/inventory', label: 'Stock', roles: ALL, perm: 'inventory.view' },
+      { href: '/admin/expenses', label: 'Kharche', roles: ALL, perm: 'expenses.manage' },
+      { href: '/admin/insights', label: 'Insights', roles: OWNER },
+      { href: '/admin/payroll', label: 'Salary', roles: OWNER },
+      { href: '/admin/attendance', label: 'Hazri', roles: OWNER },
       { href: '/admin/settings', label: 'Settings', roles: ALL, perm: 'settings.manage' },
     ],
   },
@@ -56,6 +61,39 @@ const GROUPS: NavGroup[] = [
     ],
   },
 ]
+
+// Chhote line-icons (sirf nishani, kisi library ki zaroorat nahi)
+const ICONS: Record<string, string> = {
+  '/admin/dashboard': 'M3 11l9-8 9 8M5 10v10h5v-6h4v6h5V10',
+  '/admin/patients': 'M16 11a4 4 0 10-8 0 4 4 0 008 0zM4 21c0-4 3.5-6 8-6s8 2 8 6',
+  '/admin/appointments': 'M4 6h16v14H4zM4 10h16M8 3v5M16 3v5',
+  '/admin/treatments': 'M12 4c-2-2-6-1-6 3 0 4 1 8 2 12 1 0 1.5-4 4-4s3 4 4 4c1-4 2-8 2-12 0-4-4-5-6-3z',
+  '/admin/lab': 'M9 3h6M10 3v6l-5 9a2 2 0 002 3h10a2 2 0 002-3l-5-9V3',
+  '/admin/accounts': 'M3 7h18v12H3zM3 11h18M7 15h3',
+  '/admin/prescriptions': 'M6 3h9l4 4v14H6zM9 12h6M9 16h6',
+  '/admin/recall': 'M12 7v5l3 2M21 12a9 9 0 11-3-6.7M21 4v5h-5',
+  '/admin/reminders': 'M6 9a6 6 0 0112 0c0 6 2 7 2 7H4s2-1 2-7zM10 20a2 2 0 004 0',
+  '/admin/loyalty': 'M12 3l2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9z',
+  '/admin/inventory': 'M3 8l9-5 9 5v8l-9 5-9-5zM3 8l9 5 9-5M12 13v8',
+  '/admin/expenses': 'M12 3v18M16 7c0-2-2-3-4-3s-4 1-4 3 2 3 4 3 4 1 4 3-2 3-4 3-4-1-4-3',
+  '/admin/insights': 'M4 20V10M10 20V4M16 20v-8M22 20H2',
+  '/admin/payroll': 'M3 6h18v12H3zM12 9a3 3 0 100 6 3 3 0 000-6z',
+  '/admin/attendance': 'M12 3a9 9 0 100 18 9 9 0 000-18zM12 7v5l3 2',
+  '/admin/settings': 'M12 9a3 3 0 100 6 3 3 0 000-6zM19 12a7 7 0 00-.1-1.3l2-1.5-2-3.4-2.3 1a7 7 0 00-2.2-1.3L14 3h-4l-.4 2.5a7 7 0 00-2.2 1.3l-2.3-1-2 3.4 2 1.5a7 7 0 000 2.6l-2 1.5 2 3.4 2.3-1a7 7 0 002.2 1.3L10 21h4l.4-2.5a7 7 0 002.2-1.3l2.3 1 2-3.4-2-1.5c.1-.4.1-.9.1-1.3z',
+  '/admin/staff': 'M9 11a3 3 0 100-6 3 3 0 000 6zM3 20c0-3 2.5-5 6-5s6 2 6 5M17 11a2.5 2.5 0 100-5M18 15c2 .3 3 2 3 5',
+  '/admin/cms': 'M12 3a9 9 0 100 18 9 9 0 000-18zM3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18',
+  '/admin/audit': 'M5 4h14v16H5zM8 9h8M8 13h8M8 17h5',
+  '/admin/recycle-bin': 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13',
+}
+function NavIcon({ href }: { href: string }) {
+  const d = ICONS[href]
+  if (!d) return null
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0">
+      <path d={d} />
+    </svg>
+  )
+}
 
 const allowed = (i: NavItem, role: Role, perms: string[]) =>
   role === 'admin' || role === 'doctor'
@@ -118,11 +156,12 @@ export default function Sidebar({ role, perms }: { role: Role; perms: string[] }
                         key={item.href}
                         href={item.href}
                         onClick={() => setOpen(false)}
-                        className={`relative rounded-lg px-3 ${item.big ? 'py-2.5 text-base' : 'py-2 text-sm'} font-medium transition-colors ${
+                        className={`relative flex items-center gap-2.5 rounded-lg px-3 ${item.big ? 'py-2.5 text-base' : 'py-2 text-sm'} font-medium transition-colors ${
                           active ? 'bg-white/15 text-white' : 'text-white/70 hover:bg-white/10 hover:text-white'
                         }`}
                       >
                         {active && <span className="absolute inset-y-1.5 left-0 w-1 rounded-full bg-clinic-amber" />}
+                        <NavIcon href={item.href} />
                         {item.label}
                       </Link>
                     )

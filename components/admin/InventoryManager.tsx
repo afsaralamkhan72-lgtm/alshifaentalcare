@@ -272,7 +272,7 @@ export default function InventoryManager({
           </thead>
           <tbody>
             {items.map((item) => {
-              const low = Number(item.quantity) <= Number(item.reorder_level)
+              const low = Number(item.reorder_level) > 0 && Number(item.quantity) <= Number(item.reorder_level)
               const negative = Number(item.quantity) < 0
               const expired = item.expiry_date && new Date(item.expiry_date) < new Date()
               const p = panel?.id === item.id ? panel : null
@@ -311,14 +311,14 @@ export default function InventoryManager({
                         {canManage && <button onClick={() => openPanel(item.id, 'history')}>History</button>}
                         {canManage && (
                           <button
-                            title="On ho to visit ke waqt doctor ye cheez khud chun kar miqdar likhta hai"
+                            title="On karne par visit mein '+ Samaan' ki list mein ye cheez aayegi: doctor khud chun kar miqdar likhta hai (jaise cotton, gauze). Off ho to ye cheez sirf treatment ki recipe se kam hoti hai."
                             onClick={async () => {
                               const { error: e } = await createClient().from('inventory_meta').upsert({ inventory_id: item.id, is_qualitative: !item.qualitative, updated_at: new Date().toISOString() })
                               if (e) setRowMsg(e.message); else router.refresh()
                             }}
                             className={item.qualitative ? 'text-amber-700' : 'text-clinic-ink/40'}
                           >
-                            {item.qualitative ? 'Doctor chunta ✓' : 'Doctor chune?'}
+                            {item.qualitative ? 'Visit mein doctor chunta ✓' : 'Visit mein doctor chune'}
                           </button>
                         )}
                         {canManage && <button onClick={() => deactivate(item)} className="text-clinic-ink/40">Band</button>}

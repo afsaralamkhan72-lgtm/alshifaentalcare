@@ -132,7 +132,7 @@ interface Props {
   xraySlot?: ReactNode
   plansSlot?: ReactNode
   pastRx?: { id: string; date: string; names: string; items?: { name: string; potency: string; dose: string; frequency: string; duration: string; instructions: string }[] }[]
-  perms: { clinicalView: boolean; clinicalEdit: boolean; bill: boolean; collect: boolean; money: boolean; owner: boolean; rx: boolean }
+  perms: { clinicalView: boolean; clinicalEdit: boolean; bill: boolean; collect: boolean; money: boolean; owner: boolean; discountMax: number; rx: boolean }
 }
 
 const DURATIONS = ['Aaj se', '2-3 din', '1 hafta', '2 hafte', '1 mahina', '1 mahine se zyada']
@@ -455,6 +455,10 @@ export default function VisitWorkspace(p: Props) {
     missing: { dx: 'Missing tooth' },
     periapical: { dx: 'Periapical periodontitis' },
     extraction: { tx: 'Simple Extraction' },
+    pulpotomy: { tx: 'Pulpotomy' },
+    pulpectomy: { tx: 'Pulpectomy' },
+    ssc: { tx: 'Stainless Steel Crown' },
+    space_maintainer: { tx: 'Space Maintainer' },
   }
   function addDx(text: string, teeth: string[]) {
     setDiags((ds) => (ds.some((d) => d.text.toLowerCase() === text.toLowerCase()) ? ds.map((d) => (d.text.toLowerCase() === text.toLowerCase() ? { ...d, teeth: [...new Set([...(d.teeth ?? []), ...teeth])] } : d)) : [...ds, { text, teeth }]))
@@ -504,7 +508,8 @@ export default function VisitWorkspace(p: Props) {
   const treatTotal =
     rows.filter((r) => !r.planned && r.name.trim()).reduce((s, r) => s + (Number(r.price) || 0), 0) +
     live.filter((t) => t.status === 'planned' && old[t.id]?.tick).reduce((s, t) => s + (Number(old[t.id]?.price) || 0), 0)
-  const disc = Math.min(Number(discount) || 0, medTotal + extraTotal)
+  const discCap = Math.floor(((medTotal + extraTotal) * Math.min(100, Math.max(0, p.perms.discountMax))) / 100)
+  const disc = Math.min(Number(discount) || 0, discCap)
   const newCharges = treatTotal + medTotal + extraTotal - disc
   const dueNow = p.balance + newCharges
   const paidNum = Number(paid) || 0
@@ -592,7 +597,7 @@ export default function VisitWorkspace(p: Props) {
       p_rx: rx,
       p_extra: extra.filter((e) => Number(e.amount) > 0),
       p_treatments: treatments,
-      p_discount: p.perms.owner ? disc : 0,
+      p_discount: p.perms.bill && p.perms.discountMax > 0 ? disc : 0,
       p_paid: p.perms.collect ? paidNum : 0,
       p_method: method,
       p_key: finishKey.current,
@@ -1219,11 +1224,18 @@ export default function VisitWorkspace(p: Props) {
                     + Extra charge
                   </button>
                 )}
-                {p.perms.owner && medTotal + extraTotal > 0 && (
-                  <p className="flex items-center justify-between gap-2">
-                    <span>Riyayat (sirf dawa / extra par)</span>
-                    <input type="number" min={0} value={discount} onChange={(e) => setDiscount(e.target.value)} className="w-28 rounded-lg border border-clinic-teal/20 px-2 py-1.5 text-right" />
-                  </p>
+                {p.perms.bill && p.perms.discountMax > 0 && medTotal + extraTotal > 0 && (
+                  <div>
+                    <p className="flex items-center justify-between gap-2">
+                      <span>Riyayat (sirf dawa / extra par)</span>
+                      <input type="number" min={0} max={discCap} value={discount} onChange={(e) => setDiscount(e.target.value)} className="w-28 rounded-lg border border-clinic-teal/20 px-2 py-1.5 text-right" />
+                    </p>
+                    {!p.perms.owner || p.perms.discountMax < 100 ? (
+                      <p className={`mt-0.5 text-right text-xs ${(Number(discount) || 0) > discCap ? 'text-red-600' : 'text-clinic-ink/55'}`}>
+                        Aap ki had {p.perms.discountMax}% — zyada se zyada {money(discCap)}
+                      </p>
+                    ) : null}
+                  </div>
                 )}
                 <div className="mt-1 grid gap-1 rounded-xl border border-clinic-teal/15 p-3">
                   <p className="flex justify-between">

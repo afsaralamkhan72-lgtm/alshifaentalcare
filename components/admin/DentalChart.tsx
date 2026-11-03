@@ -65,6 +65,11 @@ export const CONDITIONS = [
   { value: 'furcation', label: 'Furcation', dot: 'bg-yellow-600' },
   { value: 'plaque', label: 'Plaque', dot: 'bg-amber-300' },
   { value: 'calculus', label: 'Calculus', dot: 'bg-yellow-800' },
+  { value: 'pulpotomy', label: 'Pulpotomy', dot: 'bg-purple-300' },
+  { value: 'pulpectomy', label: 'Pulpectomy', dot: 'bg-purple-400' },
+  { value: 'ssc', label: 'Stainless Steel Crown', dot: 'bg-slate-400' },
+  { value: 'space_maintainer', label: 'Space Maintainer', dot: 'bg-emerald-400' },
+  { value: 'exfoliation', label: 'Natural Exfoliation', dot: 'bg-amber-200' },
   { value: 'other', label: 'Other', dot: 'bg-clinic-amber/60' },
 ] as const
 
@@ -92,6 +97,11 @@ export const TOOTH_FILL: Record<string, string> = {
   furcation: '#FDE047',
   plaque: '#FFEDD5',
   calculus: '#CA8A04',
+  pulpotomy: '#DDD6FE',
+  pulpectomy: '#A78BFA',
+  ssc: '#CBD5E1',
+  space_maintainer: '#6EE7B7',
+  exfoliation: '#FDE68A',
   other: '#FBCFA3',
 }
 

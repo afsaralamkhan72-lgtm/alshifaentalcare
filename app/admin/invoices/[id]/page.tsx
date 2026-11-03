@@ -2,10 +2,11 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { requireAnyPerm } from '@/lib/auth'
-import ClinicLogo from '@/components/ClinicLogo'
+import RewardBanner from '@/components/admin/RewardBanner'
+import { getReadyRewards } from '@/lib/rewards'
+import InvoiceSheets from '@/components/print/InvoiceSheets'
+import { getPrintCfg } from '@/lib/printSettings'
 import InvoicePanel, { type PayRow } from '@/components/admin/InvoicePanel'
-import { CLINIC } from '@/clinic.config'
-import { fmtDate, money } from '@/lib/karachi'
 
 export default async function InvoicePage({ params }: { params: Promise<{ id: string }> }) {
   await requireAnyPerm('billing.view')
@@ -42,6 +43,8 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
     reversed: reversedIds.has(p.id),
   }))
 
+  const printCfg = await getPrintCfg()
+  const rewards = inv.status === 'active' ? await getReadyRewards(supabase, inv.patient_id) : []
   const patient = inv.patients as { id: string; full_name: string; phone: string; mr_number: string | null; age: number | null; department: string } | null
   const info = (clinicRes.data?.value ?? {}) as { logo_url?: string }
   const void_ = inv.status === 'void'
@@ -52,75 +55,32 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         ← {patient?.full_name ?? 'Invoices'}
       </Link>
 
-      <div id="invoice-sheet" className="relative mt-3 rounded-2xl border border-clinic-teal/10 bg-white p-6 sm:p-8">
-        {void_ && (
-          <p className="absolute right-6 top-6 rotate-6 rounded border-2 border-red-500 px-3 py-1 font-display text-lg font-bold uppercase text-red-500">
-            Cancelled
-          </p>
-        )}
+      <RewardBanner rewards={rewards} invoice={{ id: inv.id, open: inv.status === 'active' && Number(inv.balance) > 0, items: items.map((i) => ({ name: i.name, line_total: Number(i.line_total) })) }} />
 
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-clinic-gold/40 pb-4">
-          <ClinicLogo logoUrl={info.logo_url ?? null} size={52} withName />
-          <div className="text-right text-xs text-clinic-ink/70">
-            <p>{CLINIC.address.full}</p>
-            <p>{CLINIC.phone.display}</p>
-          </div>
-        </div>
-
-        <div className="mt-5 flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-clinic-ink/50">Invoice</p>
-            <p className="font-display text-2xl font-semibold text-clinic-teal">{inv.invoice_number}</p>
-            <p className="text-sm text-clinic-ink/60">{fmtDate(inv.invoice_date)}</p>
-          </div>
-          <div className="text-sm">
-            <p className="font-semibold text-clinic-ink">{patient?.full_name}</p>
-            <p className="text-clinic-ink/60">{patient?.mr_number} · {patient?.phone}</p>
-            {inv.treating_doctor && <p className="text-clinic-ink/60">Dr: {inv.treating_doctor}</p>}
-          </div>
-        </div>
-
-        <table className="mt-5 w-full text-sm">
-          <thead className="bg-clinic-mint text-left text-clinic-ink/60">
-            <tr>
-              <th className="px-3 py-2">Treatment</th>
-              <th className="px-3 py-2">Daant</th>
-              <th className="px-3 py-2 text-right">Qty</th>
-              <th className="px-3 py-2 text-right">Qeemat</th>
-              <th className="px-3 py-2 text-right">Raqam</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((it) => (
-              <tr key={it.id} className="border-t border-clinic-teal/10">
-                <td className="px-3 py-2">{it.name}</td>
-                <td className="px-3 py-2">{it.tooth ?? '—'}</td>
-                <td className="px-3 py-2 text-right">{it.qty}</td>
-                <td className="px-3 py-2 text-right">{money(it.unit_price)}</td>
-                <td className="px-3 py-2 text-right">{money(it.line_total)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        <div className="mt-4 ml-auto grid max-w-xs gap-1 text-sm">
-          <p className="flex justify-between"><span className="text-clinic-ink/60">Subtotal</span><span>{money(inv.subtotal)}</span></p>
-          {Number(inv.discount_amount) > 0 && (
-            <p className="flex justify-between"><span className="text-clinic-ink/60">Discount ({Number(inv.discount_percent)}%)</span><span>− {money(inv.discount_amount)}</span></p>
-          )}
-          <p className="flex justify-between font-semibold"><span>Total</span><span>{money(inv.total)}</span></p>
-          <p className="flex justify-between text-emerald-700"><span>Mile</span><span>{money(inv.paid_amount)}</span></p>
-          <p className="flex justify-between border-t border-clinic-teal/10 pt-1 font-display text-lg font-semibold text-amber-700">
-            <span>Baqaya</span><span>{money(inv.balance)}</span>
-          </p>
-          {Number(inv.balance) > 0 && inv.due_date && <p className="text-right text-xs text-clinic-ink/60">Aakhri tareekh: {fmtDate(inv.due_date)}</p>}
-        </div>
-
-        {void_ && inv.void_reason && <p className="mt-4 text-xs text-red-700">Cancel ki wajah: {inv.void_reason}</p>}
-        {inv.notes && <p className="mt-4 text-xs text-clinic-ink/60">Note: {inv.notes}</p>}
-
-        <p className="mt-8 text-center text-xs text-clinic-ink/50">{CLINIC.doctor.name} · {CLINIC.name}</p>
-      </div>
+      <InvoiceSheets
+        logo={printCfg.logo}
+        logoUrl={info.logo_url ?? null}
+        defaultTpl={printCfg.defaults.bill}
+        d={{
+          number: inv.invoice_number,
+          date: inv.invoice_date,
+          patientName: patient?.full_name ?? '',
+          mr: patient?.mr_number ?? null,
+          phone: patient?.phone ?? '',
+          doctor: inv.treating_doctor ?? null,
+          items: items.map((it) => ({ id: it.id, name: it.name, tooth: it.tooth, qty: Number(it.qty), unit_price: Number(it.unit_price), line_total: Number(it.line_total) })),
+          subtotal: Number(inv.subtotal),
+          discountAmount: Number(inv.discount_amount),
+          discountPercent: Number(inv.discount_percent),
+          total: Number(inv.total),
+          paid: Number(inv.paid_amount),
+          balance: Number(inv.balance),
+          dueDate: inv.due_date,
+          voided: void_,
+          voidReason: inv.void_reason ?? null,
+          notes: inv.notes ?? null,
+        }}
+      />
 
       <div className="mt-4">
         <InvoicePanel
