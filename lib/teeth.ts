@@ -68,3 +68,15 @@ export function toothLabel(fdi: string) {
 export function isWisdom(fdi: string) {
   return localNumber(fdi) === '8'
 }
+
+const ADULT_NAMES = ['', 'Central Incisor', 'Lateral Incisor', 'Canine', 'First Premolar', 'Second Premolar', 'First Molar', 'Second Molar', 'Wisdom Tooth']
+const MILK_NAMES = ['', 'Central Incisor', 'Lateral Incisor', 'Canine', 'First Molar', 'Second Molar']
+
+/** Daant ka poora naam jaise "Upper Right Wisdom Tooth" (UR 8 ki jagah). Doodh ke daant: "Upper Right Milk First Molar (D)". */
+export function toothTitle(fdi: string) {
+  const q = quadrantOf(fdi)
+  if (!q) return fdi
+  const n = Number(fdi[1])
+  if (isPrimary(fdi)) return `${q.label} Milk ${MILK_NAMES[n] ?? ''} (${toothName(fdi)})`.replace('  ', ' ')
+  return `${q.label} ${ADULT_NAMES[n] ?? toothName(fdi)}`
+}

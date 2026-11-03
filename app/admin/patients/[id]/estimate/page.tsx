@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getPermissions, getStaffProfile, isOwnerRole } from '@/lib/auth'
 import { CLINIC } from '@/clinic.config'
 import { fmtDate, money, todayKarachi } from '@/lib/karachi'
-import { toothLabel } from '@/lib/teeth'
+import { toothTitle as toothLabel } from '@/lib/teeth'
 import SheetPrintButton from '@/components/admin/SheetPrintButton'
 
 /** Treatment plan ka andaza (estimate): jo treatments "plan" hain unki qeemat, patient ke dastakhat ke sath, print / PDF ke liye */

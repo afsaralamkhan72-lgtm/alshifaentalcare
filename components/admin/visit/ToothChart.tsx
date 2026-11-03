@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { isPrimary, PRIMARY, toothLabel, toothName, localNumber } from '@/lib/teeth'
+import { isPrimary, PRIMARY, toothTitle as toothLabel, toothLabel as toothShort, toothName, localNumber } from '@/lib/teeth'
 import ArchChart, { type ToothInfo } from './ArchChart'
 import { CONDITIONS, TOOTH_FILL } from '../DentalChart'
 
@@ -76,7 +76,7 @@ export default function ToothChart({
     if (age != null && age < 12) return 'both'
     return 'adult'
   })
-  const canSwitch = age == null || (age >= 6 && age < 12) || pickOnly
+  const canSwitch = true
   const [narrow, setNarrow] = useState(false)
   const [more, setMore] = useState(false)
   const [planLater, setPlanLater] = useState(false)
@@ -99,23 +99,26 @@ export default function ToothChart({
 
   const [activeT, setActiveT] = useState('')
   const act = selected.includes(activeT) ? activeT : (selected[selected.length - 1] ?? '')
+  // Nishan pehle sirf us daant par jo upar chuna hua hai; "sab par ek saath" tick karne par sab chune hue par
+  const [bulk, setBulk] = useState(false)
+  const targets = bulk && selected.length > 1 ? selected : act ? [act] : []
   const toggle = (t: string) => {
     if (!selected.includes(t)) setActiveT(t)
     onSelect(selected.includes(t) ? selected.filter((x) => x !== t) : [...selected, t])
   }
 
   function apply(c: string) {
-    if (!onMarks || selected.length === 0) return
+    if (!onMarks || targets.length === 0) return
     const same = (m: Mark, t: string) => m.tooth === t && m.condition === c
     const markState = stateFor(c)
-    const allHave = selected.every((t) => marks.some((m) => same(m, t) && m.state === markState))
+    const allHave = targets.every((t) => marks.some((m) => same(m, t) && m.state === markState))
     if (allHave) {
       // wohi nishan wahi halat mein dobara dabane par hat jata hai
-      onMarks(marks.filter((m) => !(selected.includes(m.tooth) && m.condition === c)))
+      onMarks(marks.filter((m) => !(targets.includes(m.tooth) && m.condition === c)))
       return
     }
-    const kept = marks.map((m) => (selected.includes(m.tooth) && m.condition === c ? { ...m, state: markState } : m))
-    const add = selected
+    const kept = marks.map((m) => (targets.includes(m.tooth) && m.condition === c ? { ...m, state: markState } : m))
+    const add = targets
       .filter((t) => !marks.some((m) => same(m, t)))
       .map((tooth) => ({ tooth, condition: c, surfaces: [] as string[], state: markState }))
     onMarks([...kept, ...add])
@@ -170,6 +173,7 @@ export default function ToothChart({
   // ---- Chart par jo nishan hain un ka rang-legend ----
   const usedConds = [...new Set([...marks.map((m) => m.condition), ...old.filter((r) => !marksOf(r.tooth_number).length).map((r) => r.condition)])].filter((c) => c && c !== 'healthy')
   const hasGhost = old.some((r) => !marksOf(r.tooth_number).length)
+  const showCard = !pickOnly && canEdit && selected.length > 0 && Boolean(onMarks)
   const inc = selected.length > 0 && selected.every((t) => ['1', '2', '3'].includes(localNumber(t)) && !isPrimary(t))
 
   return (
@@ -182,8 +186,8 @@ export default function ToothChart({
           <div className="flex overflow-hidden rounded-full border border-clinic-teal/30 text-xs font-semibold">
             {(
               [
-                ['adult', 'Pakke'],
-                ['milk', 'Doodh ke'],
+                ['adult', 'Adult (32 Teeth)'],
+                ['milk', 'Kids (20 Teeth)'],
                 ['both', 'Dono'],
               ] as [Mode, string][]
             ).map(([k, l]) => (
@@ -195,6 +199,8 @@ export default function ToothChart({
         )}
       </div>
 
+      <div className={showCard && !narrow ? 'lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start lg:gap-4' : ''}>
+      <div className="min-w-0">
       {arch}
 
       <p className="mt-2 text-xs text-clinic-ink/60">
@@ -227,20 +233,26 @@ export default function ToothChart({
         </div>
       )}
 
-      {!pickOnly && canEdit && selected.length > 0 && onMarks && (
+      </div>
+
+      {showCard && onMarks && (
         <>
         {narrow && <div className="h-[55vh]" aria-hidden="true" />}
         <div
           className={
             narrow
               ? 'fixed inset-x-0 bottom-0 z-40 grid max-h-[65vh] gap-2 overflow-y-auto rounded-t-2xl border-t border-clinic-teal/20 bg-white p-4 pb-6 shadow-[0_-10px_30px_rgba(20,43,80,0.25)]'
-              : 'mt-3 grid gap-2 rounded-xl bg-clinic-mint/50 p-3'
+              : 'mt-3 grid gap-2 rounded-xl border border-sky-200 bg-sky-50/60 p-3 lg:sticky lg:top-3 lg:mt-0'
           }
         >
           <div className="flex items-center justify-between gap-2">
-            <p className="text-sm font-semibold text-clinic-ink">
-              Daant: <span className="text-clinic-teal">{toothLabel(act)}</span>
-            </p>
+            <div className="flex items-center gap-3">
+              <span className="grid h-12 min-w-12 place-items-center rounded-xl bg-sky-700 px-2 text-base font-bold text-white">{toothShort(act)}</span>
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-clinic-ink/50">Chuna hua daant</p>
+                <p className="text-sm font-semibold text-clinic-ink">{toothLabel(act)}</p>
+              </div>
+            </div>
             <button type="button" onClick={() => onSelect([])} className="rounded-full border border-clinic-ink/20 px-3 py-1 text-xs font-semibold text-clinic-ink/70">
               Band karein ✕
             </button>
@@ -255,14 +267,22 @@ export default function ToothChart({
               ))}
             </div>
           )}
-          <p className="text-xs font-semibold text-clinic-ink/70">Nishan / kaam (jo chune hue sab daanton par lagega)</p>
+          <p className="text-xs font-semibold text-clinic-ink/70">
+            Nishan / kaam — {targets.length > 1 ? 'sab chune hue daanton par lagega' : <>sirf <span className="text-clinic-teal">{toothLabel(act)}</span> par lagega</>}
+          </p>
+          {selected.length > 1 && (
+            <label className="flex items-center gap-2 text-xs text-clinic-ink/70">
+              <input type="checkbox" checked={bulk} onChange={(e) => setBulk(e.target.checked)} className="h-4 w-4" />
+              Sab chune hue daanton par ek saath lagayein
+            </label>
+          )}
           <label className="flex items-center gap-2 text-xs text-clinic-ink/70">
             <input type="checkbox" checked={planLater} onChange={(e) => setPlanLater(e.target.checked)} className="h-4 w-4" />
             Ye kaam aaj nahi, baad mein karna hai (plan mein jayega)
           </label>
           {(() => {
             const btn = (c: (typeof CONDITIONS)[number]) => {
-              const on = selected.every((t) => marks.some((m) => m.tooth === t && m.condition === c.value && m.state === stateFor(c.value)))
+              const on = targets.every((t) => marks.some((m) => m.tooth === t && m.condition === c.value && m.state === stateFor(c.value)))
               return (
                 <button
                   key={c.value}
@@ -295,8 +315,8 @@ export default function ToothChart({
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {more && rest.map(btn)}
-                  {selected.some((t) => marksOf(t).length > 0) && (
-                    <button type="button" onClick={() => onMarks(marks.filter((m) => !selected.includes(m.tooth)))} className="rounded-full px-3 py-1.5 text-xs font-semibold text-red-600 underline">
+                  {targets.some((t) => marksOf(t).length > 0) && (
+                    <button type="button" onClick={() => onMarks(marks.filter((m) => !targets.includes(m.tooth)))} className="rounded-full px-3 py-1.5 text-xs font-semibold text-red-600 underline">
                       Sab nishan hatao
                     </button>
                   )}
@@ -348,6 +368,7 @@ export default function ToothChart({
         </div>
         </>
       )}
+      </div>
     </div>
   )
 }

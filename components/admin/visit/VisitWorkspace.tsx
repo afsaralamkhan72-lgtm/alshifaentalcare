@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { fmtDate, money, todayKarachi, addDays } from '@/lib/karachi'
-import { toothLabel } from '@/lib/teeth'
+import { toothTitle as toothLabel } from '@/lib/teeth'
 import type { CatalogOpt, MaterialOpt, TItem } from './types'
 import ToothChart, { type Mark } from './ToothChart'
 import HistoryFields from './HistoryFields'
@@ -372,7 +372,8 @@ export default function VisitWorkspace(p: Props) {
     const added = next.filter((t) => !sel.includes(t))
     const fix = (teeth: string[] | undefined) => [...(teeth ?? []).filter((t) => next.includes(t)), ...added]
     setSel(next)
-    setDiags((ds) => ds.map((d) => ({ ...d, teeth: fix(d.teeth) })))
+    // Naya daant sirf khali (abhi na likhi hui) diagnosis ki qatar mein aata hai; likhi hui diagnosis ke daant nahi badalte
+    setDiags((ds) => ds.map((d) => (d.text.trim() ? { ...d, teeth: (d.teeth ?? []).filter((t) => next.includes(t)) } : { ...d, teeth: fix(d.teeth) })))
     setRows((rs) => rs.map((r) => (r.applies !== 'tooth' ? r : { ...r, teeth: fix(r.teeth), price: autoPrice(r, fix(r.teeth)) })))
   }
 
@@ -875,7 +876,7 @@ export default function VisitWorkspace(p: Props) {
                 </div>
               ))}
               {canEdit && (
-                <button type="button" onClick={() => setDiags([...diags, { text: '', teeth: [...sel] }])} className="justify-self-start rounded-full border border-clinic-teal/30 px-4 py-1.5 text-sm font-semibold text-clinic-teal">
+                <button type="button" onClick={() => setDiags([...diags, { text: '', teeth: sel.length === 1 ? [...sel] : [] }])} className="justify-self-start rounded-full border border-clinic-teal/30 px-4 py-1.5 text-sm font-semibold text-clinic-teal">
                   + Diagnosis
                 </button>
               )}

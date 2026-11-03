@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
 import { CLINIC } from '@/clinic.config'
 import { todayKarachi } from '@/lib/karachi'
-import { toothLabel } from '@/lib/teeth'
+import { toothTitle as toothLabel } from '@/lib/teeth'
 
 function fmt(d: string | null) {
   return d ? new Date(d).toLocaleDateString('en-GB') : '—'

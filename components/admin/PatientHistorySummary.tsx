@@ -1,6 +1,6 @@
 import { HISTORY_STEPS } from '@/lib/history-steps'
 import ClinicLogo from '@/components/ClinicLogo'
-import { toothLabel } from '@/lib/teeth'
+import { toothTitle as toothLabel } from '@/lib/teeth'
 import { CLINIC } from '@/clinic.config'
 
 type SectionData = Record<string, unknown>

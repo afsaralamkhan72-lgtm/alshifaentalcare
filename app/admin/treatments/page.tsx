@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getPermissions, getStaffProfile, isOwnerRole } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { fmtDate, money, todayKarachi } from '@/lib/karachi'
-import { toothLabel } from '@/lib/teeth'
+import { toothTitle as toothLabel } from '@/lib/teeth'
 
 const FILTERS = [
   { k: 'active', l: 'Chal rahi' },

@@ -1,6 +1,6 @@
 'use client'
 
-import { toothLabel, toothName } from '@/lib/teeth'
+import { toothTitle as toothLabel, toothName } from '@/lib/teeth'
 
 type Spot = [tooth: string, x0: number, x1: number, only?: 'L']
 interface Arch {

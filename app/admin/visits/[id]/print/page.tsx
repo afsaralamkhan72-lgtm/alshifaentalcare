@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { requirePerm, getPermissions } from '@/lib/auth'
 import { CLINIC } from '@/clinic.config'
 import { fmtDate, money } from '@/lib/karachi'
-import { toothLabel } from '@/lib/teeth'
+import { toothTitle as toothLabel } from '@/lib/teeth'
 import SheetPrintButton from '@/components/admin/SheetPrintButton'
 
 const FIND: Record<string, string> = {

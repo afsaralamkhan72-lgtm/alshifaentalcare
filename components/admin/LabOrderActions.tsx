@@ -1,7 +1,7 @@
 'use client'
 
 import { buildWhatsAppLink } from '@/lib/whatsapp'
-import { toothLabel } from '@/lib/teeth'
+import { toothTitle as toothLabel } from '@/lib/teeth'
 import { CLINIC } from '@/clinic.config'
 
 interface Props {

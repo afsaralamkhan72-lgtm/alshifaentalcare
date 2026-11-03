@@ -1,6 +1,6 @@
 import { requirePerm, getStaffProfile, isOwnerRole } from '@/lib/auth'
 import Link from 'next/link'
-import { toothLabel } from '@/lib/teeth'
+import { toothTitle as toothLabel } from '@/lib/teeth'
 import { createClient } from '@/lib/supabase/server'
 import LabCaseForm, { type LabOption, type PatientOption } from '@/components/admin/LabCaseForm'
 import { todayKarachi } from '@/lib/karachi'
