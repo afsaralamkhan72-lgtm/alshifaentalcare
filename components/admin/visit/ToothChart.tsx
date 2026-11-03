@@ -59,6 +59,7 @@ export default function ToothChart({
   old = [],
   canEdit,
   pickOnly = false,
+  renderExtra,
 }: {
   age: number | null
   selected: string[]
@@ -68,6 +69,8 @@ export default function ToothChart({
   old?: OldRecord[]
   canEdit: boolean
   pickOnly?: boolean
+  /** Is daant ke liye masla / kaam likhne ka hissa (visit mein) */
+  renderExtra?: (tooth: string) => React.ReactNode
 }) {
   const [mode, setMode] = useState<Mode>(() => {
     if (selected.some(isPrimary) && selected.some((t) => !isPrimary(t))) return 'both'
@@ -354,6 +357,7 @@ export default function ToothChart({
               })}
             </div>
           )}
+          {renderExtra?.(act)}
           <label className="grid gap-1 text-xs text-clinic-ink/60">
             Note ({toothLabel(act)})
             <textarea

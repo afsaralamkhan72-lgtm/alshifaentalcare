@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { fmtDate, money, todayKarachi, addDays } from '@/lib/karachi'
 import { toothTitle as toothLabel } from '@/lib/teeth'
 import type { CatalogOpt, MaterialOpt, TItem } from './types'
+import CrownStep from './CrownStep'
 import ToothChart, { type Mark } from './ToothChart'
 import HistoryFields from './HistoryFields'
 import { friendlyError } from '@/lib/errors'
@@ -259,6 +260,25 @@ function TeethChips({ all, picked, onChange }: { all: string[]; picked: string[]
   )
 }
 
+/** Qatar ke daant: sirf dikhane ke liye. Badalna ho to "badlein" dabayein (aam tor par chart se hi lagte hain) */
+function TeethTags({ all, picked, onChange, disabled }: { all: string[]; picked: string[]; onChange: (t: string[]) => void; disabled?: boolean }) {
+  const [edit, setEdit] = useState(false)
+  const pool = [...new Set([...all, ...picked])]
+  return (
+    <span className="grid gap-1">
+      <span className="flex flex-wrap items-center gap-1.5 text-xs">
+        {picked.length === 0 ? <span className="text-clinic-ink/50">Daant: chart se daant chunein, ya &quot;badlein&quot; dabayein</span> : [...picked].sort().map((t) => <span key={t} className="rounded-full bg-sky-100 px-2.5 py-0.5 font-semibold text-sky-900">{toothLabel(t)}</span>)}
+        {!disabled && pool.length > 0 && (
+          <button type="button" onClick={() => setEdit(!edit)} className="text-clinic-teal underline">
+            {edit ? 'theek hai' : 'daant badlein'}
+          </button>
+        )}
+      </span>
+      {edit && <TeethChips all={pool} picked={picked} onChange={onChange} />}
+    </span>
+  )
+}
+
 /* ------------------------------------------------------------------ */
 export default function VisitWorkspace(p: Props) {
   const router = useRouter()
@@ -278,7 +298,7 @@ export default function VisitWorkspace(p: Props) {
   const [doctor, setDoctor] = useState(v?.doctor ?? p.defaultDoctor ?? '')
   const [confirmDone, setConfirmDone] = useState<string | null>(null)
   // RCT mukammal hone ke baad: agla qadam (crown) ka ishara
-  const [nextStep, setNextStep] = useState<{ id: string; name: string; teeth: string[] } | null>(null)
+  const [nextStep, setNextStep] = useState<{ id: string; name: string; teeth: string[]; saved?: boolean } | null>(null)
 
   // 2, 3 history
   const [medical, setMedical] = useState<Record<string, unknown>>(p.history.medical_history)
@@ -373,8 +393,16 @@ export default function VisitWorkspace(p: Props) {
     const fix = (teeth: string[] | undefined) => [...(teeth ?? []).filter((t) => next.includes(t)), ...added]
     setSel(next)
     // Naya daant sirf khali (abhi na likhi hui) diagnosis ki qatar mein aata hai; likhi hui diagnosis ke daant nahi badalte
-    setDiags((ds) => ds.map((d) => (d.text.trim() ? { ...d, teeth: (d.teeth ?? []).filter((t) => next.includes(t)) } : { ...d, teeth: fix(d.teeth) })))
-    setRows((rs) => rs.map((r) => (r.applies !== 'tooth' ? r : { ...r, teeth: fix(r.teeth), price: autoPrice(r, fix(r.teeth)) })))
+    setDiags((ds) => ds.map((d) => (d.text.trim() ? d : { ...d, teeth: fix(d.teeth) })))
+    // Likhi hui (naam wali) diagnosis / treatment ke daant chart se chunna-hatana kabhi nahi badalta (hatao ya 'daant badlein' se hi badalte hain); naya daant sirf khali qatar mein aata hai
+    setRows((rs) =>
+      rs.map((r) => {
+        if (r.applies !== 'tooth') return r
+        if (r.name.trim()) return r
+        const teeth = fix(r.teeth)
+        return { ...r, teeth, price: autoPrice(r, teeth) }
+      }),
+    )
   }
 
   // Treatment likhne par chart par nishan khud: ho gayi to "aaj ho gaya", plan ho to "karna hai"
@@ -446,33 +474,174 @@ export default function VisitWorkspace(p: Props) {
   const updRow = (key: string, patch: Partial<TRow>) => setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)))
   const updOld = (id: string, patch: Partial<OldRow>) => setOld((o) => ({ ...o, [id]: { ...{ tick: false, notes: '', price: '' }, ...o[id], ...patch } }))
 
-  // Chart ke nishan se doctor ko suggestion: doctor dabaye to hi judta hai
-  const SUGGEST: Record<string, { dx?: string; tx?: string }> = {
-    caries: { dx: 'Dental caries', tx: 'Composite Filling' },
-    calculus: { dx: 'Calculus / Tartar', tx: 'Scaling & Polishing' },
-    plaque: { dx: 'Plaque', tx: 'Scaling & Polishing' },
-    fracture: { dx: 'Fractured tooth', tx: 'Porcelain Fused to Metal Crown (PFM)' },
-    mobility: { dx: 'Tooth mobility' },
-    missing: { dx: 'Missing tooth' },
-    periapical: { dx: 'Periapical periodontitis' },
-    extraction: { tx: 'Simple Extraction' },
-    pulpotomy: { tx: 'Pulpotomy' },
-    pulpectomy: { tx: 'Pulpectomy' },
-    ssc: { tx: 'Stainless Steel Crown' },
-    space_maintainer: { tx: 'Space Maintainer' },
+  // ---- Chart ke panel se: is daant ka masla (diagnosis) aur kaam (treatment) ----
+  const [workPlanned, setWorkPlanned] = useState(false)
+  const [dxQ, setDxQ] = useState('')
+  const [txQ, setTxQ] = useState('')
+  const eq = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
+  function addDxTooth(text: string, tooth: string) {
+    const tx = text.trim()
+    if (!tx) return
+    setDiags((ds) => (ds.some((d) => eq(d.text, tx)) ? ds.map((d) => (eq(d.text, tx) ? { ...d, teeth: [...new Set([...(d.teeth ?? []), tooth])] } : d)) : [...ds, { text: tx, teeth: [tooth] }]))
   }
-  function addDx(text: string, teeth: string[]) {
-    setDiags((ds) => (ds.some((d) => d.text.toLowerCase() === text.toLowerCase()) ? ds.map((d) => (d.text.toLowerCase() === text.toLowerCase() ? { ...d, teeth: [...new Set([...(d.teeth ?? []), ...teeth])] } : d)) : [...ds, { text, teeth }]))
+  function removeDxTooth(text: string, tooth: string) {
+    setDiags((ds) =>
+      ds.flatMap((d) => {
+        if (!eq(d.text, text)) return [d]
+        const teeth = (d.teeth ?? []).filter((x) => x !== tooth)
+        return teeth.length ? [{ ...d, teeth }] : []
+      }),
+    )
   }
-  function addTx(name: string, teeth: string[]) {
-    const c = p.catalog.find((x) => x.name.toLowerCase() === name.toLowerCase())
+  function addTxTooth(name: string, tooth: string, planned: boolean) {
+    const nm = name.trim()
+    if (!nm) return
+    const c = p.catalog.find((x) => eq(x.name, nm))
     const applies: Applies = c?.applies_to ?? 'tooth'
-    const t = applies === 'tooth' ? teeth : []
-    const mats: Record<string, string> = {}
-    if (c) for (const m of p.materials[c.id] ?? []) mats[m.inventory_id] = String(m.default_qty)
-    const row: TRow = { key: newKey(), name, catalog_id: c?.id ?? null, teeth: t, price: String(c?.price ?? ''), planned: true, notes: '', mats, applies, unit: applies === 'tooth' && c ? c.price : null, manual: false, jaw: '' }
-    row.price = autoPrice(row, t)
-    setRows((rs) => [...rs, row])
+    setRows((rs) => {
+      const i = rs.findIndex((r) => eq(r.name, nm) && r.planned === planned && r.applies === applies)
+      if (i >= 0 && applies === 'tooth') {
+        return rs.map((r, j) => {
+          if (j !== i || r.teeth.includes(tooth)) return r
+          const teeth = [...r.teeth, tooth]
+          return { ...r, teeth, price: autoPrice(r, teeth) }
+        })
+      }
+      if (i >= 0) return rs
+      const mats: Record<string, string> = {}
+      if (c) for (const m of p.materials[c.id] ?? []) mats[m.inventory_id] = String(m.default_qty)
+      const teeth = applies === 'tooth' ? [tooth] : []
+      const row: TRow = { key: newKey(), name: c?.name ?? nm, catalog_id: c?.id ?? null, teeth, price: String(c?.price ?? ''), planned, notes: '', mats, applies, unit: applies === 'tooth' && c ? c.price : null, manual: false, jaw: '' }
+      row.price = autoPrice(row, teeth)
+      return [...rs, row]
+    })
+  }
+  function removeTxTooth(key: string, tooth: string) {
+    setRows((rs) =>
+      rs.flatMap((r) => {
+        if (r.key !== key) return [r]
+        const teeth = r.teeth.filter((x) => x !== tooth)
+        return teeth.length ? [{ ...r, teeth, price: autoPrice(r, teeth) }] : []
+      }),
+    )
+  }
+  // Masla chunne par kaam ki tajweez: Price List ke naam se (naam hard-coded nahi, list mein jo mile)
+  const TX_RULES: [RegExp, RegExp][] = [
+    [/caries|cavity/i, /filling/i],
+    [/pulpitis|necrosis|periapical|abscess/i, /root canal|\brct\b/i],
+    [/fracture|broken/i, /crown/i],
+    [/calculus|tartar|plaque|gingivitis/i, /scaling/i],
+    [/mobility|impact|non-?restorable|periodontitis/i, /extraction/i],
+  ]
+  const dentalCat = p.catalog.filter((c) => c.department !== 'homeopathic')
+  function renderToothWork(tooth: string) {
+    const myDx = diags.filter((d) => (d.teeth ?? []).includes(tooth)).map((d) => d.text)
+    const myRows = rows.filter((r) => r.applies === 'tooth' && r.teeth.includes(tooth))
+    const sugg: string[] = []
+    for (const dx of myDx) for (const [dr, tr] of TX_RULES) if (dr.test(dx)) {
+      const hit = dentalCat.find((c) => tr.test(c.name) && (c.applies_to ?? 'tooth') === 'tooth')
+      if (hit && !sugg.includes(hit.name) && !myRows.some((r) => eq(r.name, hit.name))) sugg.push(hit.name)
+    }
+    const quick: string[] = []
+    for (const k of [/filling/i, /root canal|\brct\b/i, /crown/i, /extraction/i, /implant/i]) {
+      const hit = dentalCat.find((c) => k.test(c.name) && (c.applies_to ?? 'tooth') === 'tooth')
+      if (hit && !quick.includes(hit.name) && !sugg.includes(hit.name)) quick.push(hit.name)
+    }
+    const chip = (on: boolean) => `rounded-full px-2.5 py-1 text-xs font-semibold ${on ? 'bg-sky-700 text-white' : 'border border-sky-300 bg-white text-sky-900'}`
+    return (
+      <div className="grid gap-3 rounded-xl border border-sky-200 bg-white p-2.5" data-testid="tooth-work">
+        <div className="grid gap-1.5">
+          <p className="text-xs font-bold text-clinic-ink">1. Is daant ka masla (Diagnosis)</p>
+          <div className="flex flex-wrap gap-1.5">
+            {diagList.slice(0, 8).map((d) => {
+              const on = myDx.some((x) => eq(x, d))
+              return (
+                <button key={d} type="button" aria-pressed={on} onClick={() => (on ? removeDxTooth(d, tooth) : addDxTooth(d, tooth))} className={chip(on)}>
+                  {on ? '✓ ' : ''}
+                  {d}
+                </button>
+              )
+            })}
+            {myDx.filter((x) => !diagList.slice(0, 8).some((d) => eq(d, x))).map((x) => (
+              <button key={x} type="button" aria-pressed onClick={() => removeDxTooth(x, tooth)} className={chip(true)}>
+                ✓ {x}
+              </button>
+            ))}
+          </div>
+          <input
+            list="diag-list"
+            value={dxQ}
+            onChange={(e) => setDxQ(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                addDxTooth(dxQ, tooth)
+                setDxQ('')
+              }
+            }}
+            placeholder="Aur masla likhein, phir Enter"
+            className="rounded-lg border border-clinic-teal/20 px-2.5 py-1.5 text-xs"
+          />
+        </div>
+        <div className="grid gap-1.5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-bold text-clinic-ink">2. Is daant ka kaam (Treatment)</p>
+            <span className="inline-flex overflow-hidden rounded-full border border-clinic-ink/20 text-[11px] font-semibold">
+              <button type="button" aria-pressed={!workPlanned} onClick={() => setWorkPlanned(false)} className={`px-2.5 py-1 ${!workPlanned ? 'bg-emerald-600 text-white' : 'text-clinic-ink/60'}`}>Aaj ho gaya</button>
+              <button type="button" aria-pressed={workPlanned} onClick={() => setWorkPlanned(true)} className={`px-2.5 py-1 ${workPlanned ? 'bg-amber-500 text-white' : 'text-clinic-ink/60'}`}>Plan</button>
+            </span>
+          </div>
+          {sugg.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 text-xs">
+              <span className="text-clinic-ink/60">Masle ke hisab se:</span>
+              {sugg.map((n) => (
+                <button key={n} type="button" onClick={() => addTxTooth(n, tooth, workPlanned)} className="rounded-full border border-clinic-teal/50 bg-clinic-mint px-2.5 py-1 font-semibold text-clinic-teal">
+                  + {n}
+                </button>
+              ))}
+            </div>
+          )}
+          {quick.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {quick.map((n) => (
+                <button key={n} type="button" onClick={() => addTxTooth(n, tooth, workPlanned)} className="rounded-full border border-sky-300 bg-white px-2.5 py-1 text-xs font-semibold text-sky-900">
+                  + {n}
+                </button>
+              ))}
+            </div>
+          )}
+          <input
+            list="cat-list"
+            value={txQ}
+            onChange={(e) => setTxQ(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                addTxTooth(txQ, tooth, workPlanned)
+                setTxQ('')
+              }
+            }}
+            placeholder="Koi aur kaam (list se chunein), phir Enter"
+            className="rounded-lg border border-clinic-teal/20 px-2.5 py-1.5 text-xs"
+          />
+          {myRows.length > 0 && (
+            <div className="grid gap-1">
+              {myRows.map((r) => (
+                <div key={r.key} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-sky-50 px-2.5 py-1.5 text-xs">
+                  <span className="font-semibold text-clinic-ink">
+                    {r.name}
+                    <span className={`ml-2 rounded-full px-2 py-0.5 text-[10px] ${r.planned ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{r.planned ? 'plan' : 'aaj ho gaya'}</span>
+                    {p.perms.bill && r.unit != null && <span className="ml-2 text-clinic-ink/60">Rs. {r.unit}</span>}
+                  </span>
+                  <button type="button" onClick={() => removeTxTooth(r.key, tooth)} className="text-red-600 underline">hatao</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <p className="text-[11px] text-clinic-ink/55">Qeemat, samaan aur note neeche &quot;Aaj ka kaam&quot; mein dikhte hain.</p>
+      </div>
+    )
   }
 
   function pickCatalog(r: TRow, name: string) {
@@ -499,7 +668,7 @@ export default function VisitWorkspace(p: Props) {
     if (error) return setMsg({ ok: false, t: friendlyError(error.message) })
     setOld((o) => ({ ...o, [id]: { tick: false, notes: '', price: '' } }))
     setMsg({ ok: true, t: 'Treatment mukammal likh di gayi.' })
-    if (doneT && /root canal|\brct\b|pulpectomy/i.test(doneT.name)) setNextStep({ id: doneT.id, name: doneT.name, teeth: doneT.teeth })
+    if (doneT && /root canal|\brct\b|pulpectomy/i.test(doneT.name)) setNextStep({ id: doneT.id, name: doneT.name, teeth: doneT.teeth, saved: true })
     router.refresh()
   }
 
@@ -817,33 +986,7 @@ export default function VisitWorkspace(p: Props) {
           {/* 6. DENTAL CHART */}
           {!homeo && (
             <Section n={secNo()} title="Dental Chart">
-              <ToothChart age={p.patient.age} selected={sel} onSelect={pickTeeth} marks={marks} onMarks={setMarks} old={p.chartRecords} canEdit={canEdit} />
-              {canEdit && (() => {
-                const groups = Object.keys(SUGGEST)
-                  .map((cond) => ({ cond, teeth: marks.filter((m) => m.condition === cond).map((m) => m.tooth), ...SUGGEST[cond] }))
-                  .filter((g) => g.teeth.length > 0)
-                if (groups.length === 0) return null
-                return (
-                  <div className="mt-3 grid gap-1.5 rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs">
-                    <p className="font-semibold text-sky-900">Chart se suggestion (dabane par hi judega, aap badal sakte hain)</p>
-                    {groups.map((g) => (
-                      <div key={g.cond} className="flex flex-wrap items-center gap-1.5">
-                        <span className="text-clinic-ink/70">{g.teeth.map(toothLabel).join(', ')}:</span>
-                        {g.dx && (
-                          <button type="button" onClick={() => addDx(g.dx!, g.teeth)} className="rounded-full border border-sky-300 bg-white px-2.5 py-1 font-semibold text-sky-800">
-                            Dx jorein: {g.dx}
-                          </button>
-                        )}
-                        {g.tx && (
-                          <button type="button" onClick={() => addTx(g.tx!, g.teeth)} className="rounded-full border border-clinic-teal/40 bg-white px-2.5 py-1 font-semibold text-clinic-teal">
-                            Plan jorein: {g.tx}
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )
-              })()}
+              <ToothChart age={p.patient.age} selected={sel} onSelect={pickTeeth} marks={marks} onMarks={setMarks} old={p.chartRecords} canEdit={canEdit} renderExtra={renderToothWork} />
             </Section>
           )}
 
@@ -857,7 +1000,7 @@ export default function VisitWorkspace(p: Props) {
           </Section>
 
           {/* 8. DIAGNOSIS */}
-          <Section n={secNo()} title="Diagnosis">
+          <Section n={secNo()} title="Diagnosis (masla)" hint="Daant par tap karke chart ke panel se jorein. Yahan sab ek jagah nazar aata hai, badalna ho to likh kar badlein.">
             <datalist id="diag-list">
               {diagList.map((d) => (
                 <option key={d} value={d} />
@@ -872,7 +1015,7 @@ export default function VisitWorkspace(p: Props) {
                       hatao
                     </button>
                   </div>
-                  {!homeo && <TeethChips all={sel} picked={d.teeth ?? []} onChange={(t) => setDiags(diags.map((x, j) => (j === i ? { ...x, teeth: t } : x)))} />}
+                  {!homeo && <TeethTags all={sel} picked={d.teeth ?? []} disabled={!canEdit} onChange={(t) => setDiags(diags.map((x, j) => (j === i ? { ...x, teeth: t } : x)))} />}
                 </div>
               ))}
               {canEdit && (
@@ -884,7 +1027,7 @@ export default function VisitWorkspace(p: Props) {
           </Section>
 
           {/* 9. TREATMENT */}
-          <Section n={secNo()} title="Aaj ka kaam aur Plan (Treatment)" hint="Jo aaj hua wo Aaj ho gayi, jo aage karna hai wo Plan rakhein.">
+          <Section n={secNo()} title="Aaj ka kaam aur Plan (Treatment)" hint="Kaam chart ke panel se jorein. Yahan qeemat, samaan aur note dekhein/badlein.">
             <datalist id="cat-list">
               {p.catalog
                 .filter((c) => (homeo ? c.department !== 'dental' : c.department !== 'homeopathic'))
@@ -944,26 +1087,23 @@ export default function VisitWorkspace(p: Props) {
                 </div>
               )}
 
-              {nextStep && canEdit && (
-                <div className="grid gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-                  <p className="font-semibold">Agla qadam: {nextStep.name} ke baad aam tor par Crown lagta hai{nextStep.teeth.length ? ` (daant ${nextStep.teeth.map(toothLabel).join(', ')})` : ''}.</p>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setRows([...rows, { key: newKey(), name: '', catalog_id: null, teeth: [...nextStep.teeth], price: '', planned: true, notes: `${nextStep.name} ke baad crown`, mats: {}, applies: 'tooth', unit: null, manual: false, jaw: '' }])
-                        setNextStep(null)
-                      }}
-                      className="rounded-full bg-clinic-teal px-4 py-1.5 text-xs font-semibold text-white"
-                    >
-                      Crown plan mein jorein
-                    </button>
-                    <a href={`/admin/lab?patient=${p.patient.id}&treatment=${nextStep.id}`} target="_blank" className="rounded-full border border-clinic-teal px-4 py-1.5 text-xs font-semibold text-clinic-teal">
-                      Seedha lab ke liye tayyar karein
-                    </a>
-                    <button type="button" onClick={() => setNextStep(null)} className="text-xs underline">Abhi nahi</button>
-                  </div>
-                </div>
+              {nextStep && canEdit && !homeo && (
+                <CrownStep
+                  key={nextStep.id + nextStep.teeth.join(',')}
+                  from={nextStep.name}
+                  teeth={nextStep.teeth}
+                  catalog={p.catalog.filter((c) => c.department !== 'homeopathic')}
+                  canBill={p.perms.bill}
+                  labHref={nextStep.saved ? `/admin/lab?patient=${p.patient.id}&treatment=${nextStep.id}` : undefined}
+                  onClose={() => setNextStep(null)}
+                  onAdd={(picks) => {
+                    setRows((rs) => [
+                      ...rs,
+                      ...picks.map((k): TRow => ({ key: newKey(), name: k.name, catalog_id: k.catalog_id, teeth: k.teeth, price: k.price, planned: k.planned, notes: `${nextStep.name} ke baad crown`, mats: k.catalog_id ? Object.fromEntries((p.materials[k.catalog_id] ?? []).map((m) => [m.inventory_id, String(m.default_qty)])) : {}, applies: 'tooth', unit: k.unit, manual: k.unit == null, jaw: '' })),
+                    ])
+                    setNextStep(null)
+                  }}
+                />
               )}
               {rows.map((r) => (
                 <div key={r.key} className="grid gap-2 rounded-xl border border-clinic-teal/20 p-3">
@@ -992,8 +1132,8 @@ export default function VisitWorkspace(p: Props) {
                       </div>
                       {r.applies === 'tooth' && (
                         <>
-                          <TeethChips all={sel} picked={r.teeth} onChange={(t) => setRowTeeth(r, t)} />
-                          {sel.length === 0 && <p className="text-[11px] text-amber-700">Upar chart se daant chunein, phir yahan khud aa jayenge.</p>}
+                          <TeethTags all={sel} picked={r.teeth} disabled={!canEdit} onChange={(t) => setRowTeeth(r, t)} />
+                          {sel.length === 0 && r.teeth.length === 0 && <p className="text-[11px] text-amber-700">Upar chart par daant par tap karke kaam jorein, ya "daant badlein" dabayein.</p>}
                           {r.unit != null && !r.manual && r.teeth.length > 1 && (
                             <p className="text-[11px] text-clinic-ink/60">
                               Har daant {money(r.unit)} × {r.teeth.length} daant = {money(r.unit * r.teeth.length)}
@@ -1013,6 +1153,11 @@ export default function VisitWorkspace(p: Props) {
                       )}
                       {(r.applies === 'mouth' || r.applies === 'once') && <p className="text-[11px] text-clinic-ink/55">{r.applies === 'mouth' ? 'Poore muh ka kaam, daant chunne ki zaroorat nahi.' : 'Aik dafa ka charge, daant chunne ki zaroorat nahi.'}</p>}
                     </div>
+                  )}
+                  {!homeo && canEdit && /root canal|\brct\b|pulpectomy/i.test(r.name) && r.teeth.length > 0 && (
+                    <button type="button" onClick={() => setNextStep({ id: r.key, name: r.name, teeth: [...r.teeth] })} className="justify-self-start rounded-full border border-amber-400 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-900">
+                      Is ke baad Crown lagayein →
+                    </button>
                   )}
                   <div className="flex flex-wrap items-center gap-2 text-sm">
                     <button type="button" onClick={() => updRow(r.key, { planned: false })} className={`rounded-full px-3 py-1 text-xs font-semibold ${!r.planned ? 'bg-emerald-600 text-white' : 'border border-clinic-ink/20 text-clinic-ink/60'}`}>
@@ -1105,6 +1250,24 @@ export default function VisitWorkspace(p: Props) {
               </div>
             )}
           </div>
+          {!rxQ.trim() && canEdit && (
+            <div className="mt-3 grid gap-1.5" data-testid="rx-quick">
+              <p className="text-xs font-semibold text-clinic-ink/60">{rxCat === 'dental' ? 'Dental' : 'Homeopathic'} dawaiyan (aik tap se jorein, dose khud bhar jayegi)</p>
+              <div className="flex flex-wrap gap-1.5">
+                {p.medicines
+                  .filter((m) => m.category === rxCat && !lines.some((l) => l.medicine_id === m.id))
+                  .sort((x, y) => Number(y.available) - Number(x.available) || x.name.localeCompare(y.name))
+                  .slice(0, 12)
+                  .map((m) => (
+                    <button key={m.id} type="button" onClick={() => addMed(m)} className="rounded-full border border-clinic-teal/30 bg-white px-3 py-1.5 text-xs font-semibold text-clinic-teal">
+                      + {m.name} <span className="font-normal text-clinic-ink/50">{m.strength ?? m.potency ?? ''}</span>
+                    </button>
+                  ))}
+                {p.medicines.filter((m) => m.category === rxCat).length === 0 && <p className="text-xs text-amber-700">Abhi is qism ki koi dawa list mein nahi. Settings mein dawaiyan jorein, ya upar naam likh kar &quot;list se bahar&quot; dabayein.</p>}
+              </div>
+            </div>
+          )}
+          {lines.length === 0 && <p className="mt-3 rounded-lg bg-clinic-mint/50 px-3 py-2 text-xs text-clinic-ink/60">Abhi koi dawa nahi likhi. Upar se dawa chunein, ya prescription ki zaroorat na ho to khali chhor dein.</p>}
           {lines.length > 0 && (
             <div className="mt-3 grid gap-2">
               {lines.map((l, i) => (
