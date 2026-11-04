@@ -2,6 +2,7 @@ import Sidebar from '@/components/admin/Sidebar'
 import LogoutButton from '@/components/admin/LogoutButton'
 import AssistantBar from '@/components/admin/AssistantBar'
 import ReceiptHost from '@/components/admin/ReceiptHost'
+import NativePush from '@/components/NativePush'
 import { getPermissions, getStaffProfile } from '@/lib/auth'
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -13,7 +14,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <Sidebar role={profile.role as 'admin' | 'doctor' | 'receptionist'} perms={perms} />
 
       <div className="min-w-0 flex-1">
-        <header className="flex items-center justify-between border-b border-clinic-teal/10 bg-white px-4 py-3 pl-20 sm:px-6 lg:pl-6">
+        <header className="flex items-center justify-between border-b border-clinic-teal/10 bg-white px-4 py-3 sm:px-6">
           <div>
             <p className="text-sm text-clinic-ink/50">Assalam o Alaikum,</p>
             <p className="font-display font-semibold text-clinic-ink">{profile.full_name}</p>
@@ -27,7 +28,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           </div>
         </header>
 
-        <main className="p-4 sm:p-6">{children}</main>
+        <NativePush kind="staff" />
+        <main className="p-4 pb-24 sm:p-6 sm:pb-24 lg:pb-6">{children}</main>
         {(perms.includes('billing.view') || profile.role !== 'receptionist') && <ReceiptHost />}
       </div>
     </div>

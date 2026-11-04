@@ -4,10 +4,13 @@ export type Dept = 'dental' | 'homeopathic'
 export interface PrintTpl { id: string; label: string; dept: Dept | 'both' }
 
 export const BILL_TEMPLATES: PrintTpl[] = [
+  { id: 'soft', label: 'Software wala (Neela-Safed)', dept: 'both' },
+  { id: 'green', label: 'Hara (Patient Bill / Invoice)', dept: 'both' },
   { id: 'classic', label: 'Purana (Classic)', dept: 'both' },
   { id: 'blue', label: 'Naya (Neela)', dept: 'both' },
 ]
 export const RX_TEMPLATES: PrintTpl[] = [
+  { id: 'soft', label: 'Software wala (Neela-Safed)', dept: 'both' },
   { id: 'classic', label: 'Purana (Classic)', dept: 'both' },
   { id: 'pad_red', label: 'Pad (Laal-Kala)', dept: 'dental' },
   { id: 'pad_bw', label: 'Pad (Kala-Safed, hidayat ke saath)', dept: 'dental' },
@@ -21,7 +24,7 @@ export function rxTemplatesFor(dept: string | null | undefined): PrintTpl[] {
 
 export interface PrintLogo { data: string | null; size: number; badge: boolean }
 export interface PrintDefaults { bill: string; rx_dental: string; rx_homeo: string }
-export const DEFAULT_PRINT: PrintDefaults = { bill: 'classic', rx_dental: 'classic', rx_homeo: 'classic' }
+export const DEFAULT_PRINT: PrintDefaults = { bill: 'soft', rx_dental: 'soft', rx_homeo: 'soft' }
 
 /** Hidayat ke sets (message_templates ki keys). Dental / Homeopathic alag. */
 export const AFTERCARE: { key: string; label: string; dept: Dept }[] = [

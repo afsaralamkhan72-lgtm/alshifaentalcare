@@ -86,3 +86,70 @@ export async function staffAcknowledge(token: string, entryId: string): Promise<
   revalidatePath(`/staff/${token}`)
   return data === true
 }
+
+export type ClockResult = {
+  ok: boolean
+  code?: string
+  message: string
+  distance?: number
+}
+
+async function sessionStaff(token: string) {
+  const jar = await cookies()
+  const staffId = readSession(jar.get(STAFF_COOKIE)?.value)
+  const db = createAdminClient()
+  if (!staffId || !db) return null
+  const { data: acc } = await db
+    .from('staff_portal_access')
+    .select('staff_id, revoked_at')
+    .eq('token_hash', hashToken(token))
+    .maybeSingle()
+  if (!acc || acc.revoked_at || acc.staff_id !== staffId) return null
+  return { staffId, db }
+}
+
+/** Hazri / chhutti ka button. Waqt hamesha database ka (Karachi), phone ka nahi. */
+export async function staffClock(
+  token: string,
+  action: 'in' | 'out',
+  lat: number | null,
+  lng: number | null,
+  reason: string
+): Promise<ClockResult> {
+  const s = await sessionStaff(token)
+  if (!s) return { ok: false, message: 'Login ka waqt khatam ho gaya. Dobara PIN likhein.' }
+  if (action !== 'in' && action !== 'out') return { ok: false, message: 'Action ghalat hai.' }
+  const { data, error } = await s.db.rpc('staff_self_clock', {
+    p_staff: s.staffId,
+    p_action: action,
+    p_lat: lat,
+    p_lng: lng,
+    p_reason: reason.slice(0, 200) || null,
+    p_source: 'self',
+  })
+  revalidatePath(`/staff/${token}`)
+  if (error || !data) return { ok: false, message: 'Hazri nahi lag saki. Dobara koshish karein.' }
+  return data as ClockResult
+}
+
+/** Location na mile / hazri bhool gaye: doctor sahab ko darkhwast */
+export async function staffClockRequest(
+  token: string,
+  kind: 'in' | 'out',
+  reason: string,
+  lat: number | null,
+  lng: number | null
+): Promise<ClockResult> {
+  const s = await sessionStaff(token)
+  if (!s) return { ok: false, message: 'Login ka waqt khatam ho gaya. Dobara PIN likhein.' }
+  const { data, error } = await s.db.rpc('staff_attendance_request', {
+    p_staff: s.staffId,
+    p_kind: kind,
+    p_reason: reason.slice(0, 200),
+    p_lat: lat,
+    p_lng: lng,
+  })
+  revalidatePath(`/staff/${token}`)
+  if (error || !data) return { ok: false, message: 'Darkhwast nahi ja saki. Dobara koshish karein.' }
+  return data as ClockResult
+}

@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { requireOwner } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { todayKarachi } from '@/lib/karachi'
+import { nextPayDay, prevMonth } from '@/lib/attendanceUi'
 import PayrollManager, {
   type StaffRow,
   type BalanceRow,
@@ -44,6 +45,10 @@ export default async function PayrollPage() {
     )
   }
 
+  const { data: ar } = await supabase.from('attendance_rules').select('pay_day, remind_days').eq('id', 1).maybeSingle()
+  const pay = nextPayDay(today, ar && 'pay_day' in ar && ar.pay_day ? Number(ar.pay_day) : null)
+  const showPay = pay && ar && pay.daysLeft <= Number(ar.remind_days ?? 2)
+
   // Portal ki halat sirf server (service key) padh sakta hai
   let access: AccessRow[] = []
   const admin = createAdminClient()
@@ -60,11 +65,17 @@ export default async function PayrollPage() {
       <p className="mt-1 text-sm text-clinic-ink/60">
         Salary, advance (Rs. 1 bhi), bonus aur katauti. Har staff ka apna hisaab, alag link aur PIN se.
       </p>
+      {showPay && pay && (
+        <p className="mt-3 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+          Tankhwah ki tareekh {pay.daysLeft === 0 ? 'aaj hai' : `${pay.daysLeft} din baad hai`} ({pay.date}). Neeche &quot;{prevMonth(today)} ka mahina tayyar karein&quot; dabayen, phir har staff ko tankhwah dein.
+        </p>
+      )}
       <p className="mt-3"><a href="/admin/payroll/report" className="rounded-full border border-clinic-teal px-4 py-2 text-sm font-semibold text-clinic-teal">Mahana report</a></p>
       <div className="mt-6">
         <PayrollManager
           today={today}
           period={today.slice(0, 7)}
+          lastMonth={prevMonth(today)}
           staff={(staffRes.data ?? []) as StaffRow[]}
           balances={(balRes.data ?? []) as BalanceRow[]}
           ledger={(ledRes.data ?? []) as LedgerRow[]}

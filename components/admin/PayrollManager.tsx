@@ -51,6 +51,7 @@ const input = 'rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm outline
 export default function PayrollManager({
   today,
   period,
+  lastMonth,
   staff,
   balances,
   ledger,
@@ -58,6 +59,8 @@ export default function PayrollManager({
 }: {
   today: string
   period: string
+  /** pichhla mahina (jo khatam ho chuka): iski salary tayyar hoti hai */
+  lastMonth: string
   staff: StaffRow[]
   balances: BalanceRow[]
   ledger: LedgerRow[]
@@ -65,7 +68,7 @@ export default function PayrollManager({
 }) {
   const router = useRouter()
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
-  const [nf, setNf] = useState({ full_name: '', title: '', phone: '', monthly_salary: '' })
+  const [nf, setNf] = useState({ full_name: '', title: '', phone: '', monthly_salary: '', joined_on: today })
 
   async function addStaff(e: React.FormEvent) {
     e.preventDefault()
@@ -75,19 +78,20 @@ export default function PayrollManager({
       title: nf.title.trim() || null,
       phone: nf.phone.trim() || null,
       monthly_salary: Number(nf.monthly_salary || 0),
-      joined_on: today,
+      joined_on: nf.joined_on || today,
     })
     if (error) return setMsg({ ok: false, text: 'Staff save nahi hua.' })
-    setNf({ full_name: '', title: '', phone: '', monthly_salary: '' })
+    setNf({ full_name: '', title: '', phone: '', monthly_salary: '', joined_on: today })
     setMsg({ ok: true, text: 'Staff add ho gaya.' })
     router.refresh()
   }
 
   async function generate() {
     const supabase = createClient()
-    const { data, error } = await supabase.rpc('staff_generate_salary', { p_period: period })
+    if (!confirm(`${lastMonth} ka mahina sab staff ke liye tayyar karein? Salary, hazri ki katauti aur overtime khate mein likh di jayegi, aur is mahine ki hazri lock ho jayegi.`)) return
+    const { data, error } = await supabase.rpc('payroll_finalize_all', { p_period: lastMonth })
     if (error) return setMsg({ ok: false, text: error.message })
-    setMsg({ ok: true, text: `${period} ki salary ${data} staff ke liye bani (jin ki pehle se bani thi unhe dobara nahi banayi).` })
+    setMsg({ ok: true, text: `${lastMonth}: ${data} staff ka mahina tayyar ho gaya (salary, katauti, overtime khate mein likh di). Jin ka pehle ho chuka tha unhe dobara nahi banaya.` })
     router.refresh()
   }
 
@@ -103,7 +107,7 @@ export default function PayrollManager({
           {totalExtra > 0 && <p className="text-[11px] text-red-600">Staff ne zyada liya: {money(totalExtra)}</p>}
         </div>
         <button onClick={generate} className="rounded-full bg-clinic-teal px-5 py-2.5 text-sm font-semibold text-white">
-          {period} ki salary banayein
+          {lastMonth} ka mahina tayyar karein
         </button>
       </div>
       {msg && <p className={`text-sm ${msg.ok ? 'text-emerald-700' : 'text-red-600'}`}>{msg.text}</p>}
@@ -134,6 +138,9 @@ export default function PayrollManager({
           <input placeholder="Kaam (jaise Assistant)" value={nf.title} onChange={(e) => setNf({ ...nf, title: e.target.value })} className={input} />
           <input placeholder="Phone (WhatsApp)" value={nf.phone} onChange={(e) => setNf({ ...nf, phone: e.target.value })} className={input} />
           <input type="number" min="0" placeholder="Mahana salary" value={nf.monthly_salary} onChange={(e) => setNf({ ...nf, monthly_salary: e.target.value })} className={input} />
+          <label className="grid gap-0.5 text-xs text-clinic-ink/60">Joining ki tareekh (tankhwah isi din se)
+            <input type="date" required value={nf.joined_on} onChange={(e) => setNf({ ...nf, joined_on: e.target.value })} className={input} />
+          </label>
         </div>
         <button className="mt-3 rounded-full border border-clinic-teal px-5 py-2 text-sm font-semibold text-clinic-teal">Add</button>
       </form>

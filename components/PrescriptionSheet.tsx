@@ -21,11 +21,11 @@ export interface RxSheetData {
 }
 
 /** Prescription ka saaf safha (print / PDF / patient portal, teeno jagah wahi) */
-export default function PrescriptionSheet({ rx }: { rx: RxSheetData }) {
+export default function PrescriptionSheet({ rx, bare = false }: { rx: RxSheetData; bare?: boolean }) {
   const p = rx.patient
   return (
-    <div id="print-sheet" className="rounded-2xl border border-clinic-teal/10 bg-white p-5 text-clinic-ink sm:p-8">
-      <header className="flex flex-wrap items-start justify-between gap-3 border-b-2 border-clinic-teal pb-4">
+    <div id={bare ? undefined : 'print-sheet'} className={bare ? 'text-clinic-ink' : 'rounded-2xl border border-clinic-teal/10 bg-white p-5 text-clinic-ink sm:p-8'}>
+      {!bare && <header className="flex flex-wrap items-start justify-between gap-3 border-b-2 border-clinic-teal pb-4">
         <div>
           <p className="font-display text-2xl font-semibold text-clinic-teal">{CLINIC.name}</p>
           <p className="text-sm text-clinic-ink/70">{CLINIC.tagline}</p>
@@ -38,7 +38,7 @@ export default function PrescriptionSheet({ rx }: { rx: RxSheetData }) {
           <p className="text-xs text-clinic-ink/70">{CLINIC.doctor.qualification}</p>
           {CLINIC.doctor.registration && <p className="text-xs text-clinic-ink/70">Reg. No: {CLINIC.doctor.registration}</p>}
         </div>
-      </header>
+      </header>}
 
       <section className="mt-4 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
         <p>

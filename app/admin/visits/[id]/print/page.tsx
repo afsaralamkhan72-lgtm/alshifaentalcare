@@ -5,6 +5,7 @@ import { requirePerm, getPermissions } from '@/lib/auth'
 import { CLINIC } from '@/clinic.config'
 import { fmtDate, money } from '@/lib/karachi'
 import { toothTitle as toothLabel } from '@/lib/teeth'
+import ShareQr from '@/components/print/ShareQr'
 import SheetPrintButton from '@/components/admin/SheetPrintButton'
 
 const FIND: Record<string, string> = {
@@ -135,6 +136,10 @@ export default async function VisitPrintPage({ params }: { params: Promise<{ id:
           {v.notes && <Row k="Notes">{v.notes}</Row>}
         </div>
         {v.status !== 'finished' && <p className="mt-4 text-xs text-amber-700">Ye visit abhi draft hai.</p>}
+
+        <div className="mt-6 flex justify-end border-t border-clinic-teal/10 pt-3">
+          <ShareQr patientId={v.patient_id} label="Apni report khud dekhein, QR scan karein" />
+        </div>
       </div>
     </div>
   )

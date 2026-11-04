@@ -61,7 +61,10 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         logo={printCfg.logo}
         logoUrl={info.logo_url ?? null}
         defaultTpl={printCfg.defaults.bill}
+        layout={printCfg.layout}
         d={{
+          patientId: patient?.id ?? inv.patient_id,
+          age: patient?.age ?? null,
           number: inv.invoice_number,
           date: inv.invoice_date,
           patientName: patient?.full_name ?? '',

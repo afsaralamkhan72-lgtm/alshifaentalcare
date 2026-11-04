@@ -9,6 +9,9 @@ import { fmtDate } from '@/lib/karachi'
 import PrescriptionSheet, { type RxSheetData } from '@/components/PrescriptionSheet'
 import LogoMark from '@/components/print/LogoMark'
 import { rxTemplatesFor, aftercareFor, type PrintLogo } from '@/lib/printTemplates'
+import { DEFAULT_LAYOUT, type PrintLayout } from '@/lib/printLayout'
+import LetterheadFrame from '@/components/print/LetterheadFrame'
+import SoftHeader from '@/components/print/SoftHeader'
 
 const THEME: Record<string, { main: string; dark: string; light: string }> = {
   pad_red: { main: '#c0272d', dark: '#111111', light: '#fbeaea' },
@@ -162,7 +165,7 @@ function Pad({
 }
 
 export default function RxPrint({
-  rx, dept, patientId, rxId, logo, logoUrl, defaultTpl, aftercare, phone, patientName,
+  rx, dept, patientId, rxId, logo, logoUrl, defaultTpl, aftercare, phone, patientName, layout = DEFAULT_LAYOUT,
 }: {
   rx: RxSheetData
   dept: string
@@ -174,10 +177,11 @@ export default function RxPrint({
   aftercare: Record<string, string>
   phone: string | null
   patientName: string
+  layout?: PrintLayout
 }) {
   const tpls = rxTemplatesFor(dept)
   const cares = aftercareFor(dept)
-  const [tpl, setTpl] = useState(tpls.some((t) => t.id === defaultTpl) ? defaultTpl : 'classic')
+  const [tpl, setTpl] = useState(tpls.some((t) => t.id === defaultTpl) ? defaultTpl : 'soft')
   const [filled, setFilled] = useState(true)
   const [careKey, setCareKey] = useState((tpl === 'pad_bw' || tpl === 'pad_green') && cares[0] ? cares[0].key : '')
   const [careText, setCareText] = useState((tpl === 'pad_bw' || tpl === 'pad_green') && cares[0] ? aftercare[cares[0].key] ?? '' : '')
@@ -288,7 +292,28 @@ export default function RxPrint({
         <p className="text-[11px] text-clinic-ink/50">Purane link ko dobara na bhejein; QR har print par naya banta hai aur kuch din baad khud band ho jata hai.</p>
       </div>
 
-      {isPad ? (
+      {tpl === 'soft' ? (
+        <LetterheadFrame layout={layout} id="print-sheet">
+          <div style={{ background: '#fff', color: 'rgb(var(--c-ink))', fontSize: `${14 * layout.scale}px`, borderRadius: layout.letterhead.data ? 0 : 14, border: layout.letterhead.data ? 'none' : '1px solid rgb(var(--c-mint))', overflow: 'hidden', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+            {!layout.letterhead.data && <SoftHeader logo={logo} logoUrl={logoUrl} layout={layout} />}
+            <div style={{ padding: layout.letterhead.data ? 0 : '12px 24px 20px' }}>
+              <PrescriptionSheet rx={rx} bare />
+              {qr && layout.show.qr && (
+                <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 10 }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={qr} alt="QR" width={90} height={90} />
+                  <span style={{ fontSize: 12 }}>Apna record khud dekhein, QR scan karein</span>
+                </div>
+              )}
+              {layout.show.signature && <div style={{ marginTop: 26, width: 200, borderTop: '1px solid currentColor', paddingTop: 4, fontSize: 12 }}>Doctor ke dastkhat</div>}
+              {layout.show.stamp && layout.stamp && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={layout.stamp} alt="Mohar" style={{ height: 80, width: 'auto', marginTop: 8 }} />
+              )}
+            </div>
+          </div>
+        </LetterheadFrame>
+      ) : isPad ? (
         <Pad id={tpl} rx={rx} logo={logo} logoUrl={logoUrl} filled={filled} care={careKey ? careText : ''} qr={qr} />
       ) : (
         <div>

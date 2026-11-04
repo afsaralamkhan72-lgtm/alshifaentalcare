@@ -29,7 +29,13 @@ export default async function PrescriptionsPage() {
 
   return (
     <div>
-      <h1 className="font-display text-2xl font-semibold text-clinic-ink">Prescriptions</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="font-display text-2xl font-semibold text-clinic-ink">Prescriptions</h1>
+        <Link href="/admin/patients" className="rounded-full bg-clinic-teal px-4 py-2 text-sm font-semibold text-white">
+          + Naya
+        </Link>
+      </div>
+      <p className="mt-1 text-xs text-clinic-ink/50">Naya prescription: patient chunein, us ki visit mein dawaiyan likhein. Phir yahan nazar aayegi.</p>
       <p className="mt-1 text-sm text-clinic-ink/60">
         Pichli prescriptions dekhein aur print karein. <strong>Nayi prescription</strong> patient ke page par visit ke andar likhi jati hai (taake wo visit aur bill se juri rahe).
       </p>

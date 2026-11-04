@@ -6,6 +6,10 @@ import LogoMark from '@/components/print/LogoMark'
 import { CLINIC } from '@/clinic.config'
 import { fmtDate, money } from '@/lib/karachi'
 import { BILL_TEMPLATES, type PrintLogo } from '@/lib/printTemplates'
+import { accentOf, DEFAULT_LAYOUT, type PrintLayout } from '@/lib/printLayout'
+import LetterheadFrame from '@/components/print/LetterheadFrame'
+import SoftHeader from '@/components/print/SoftHeader'
+import ShareQr from '@/components/print/ShareQr'
 
 export interface InvItem { id: string; name: string; tooth: string | null; qty: number; unit_price: number; line_total: number }
 export interface InvData {
@@ -26,6 +30,8 @@ export interface InvData {
   voided: boolean
   voidReason: string | null
   notes: string | null
+  patientId?: string
+  age?: number | null
 }
 
 const BLUE = '#0b5fa5'
@@ -198,8 +204,199 @@ function Blue({ d, logo, logoUrl }: { d: InvData; logo: PrintLogo; logoUrl: stri
   )
 }
 
-export default function InvoiceSheets({ d, logo, logoUrl, defaultTpl }: { d: InvData; logo: PrintLogo; logoUrl: string | null; defaultTpl: string }) {
-  const [tpl, setTpl] = useState(BILL_TEMPLATES.some((t) => t.id === defaultTpl) ? defaultTpl : 'classic')
+
+const GREEN = '#1b7f3b'
+const GREEN_D = '#14562a'
+
+/** Software wala neela-safed bill: header, patient ki tafseel, jadwal, hisaab, QR, dastkhat. Settings se har cheez on/off. */
+function Soft({ d, logo, logoUrl, layout }: { d: InvData; logo: PrintLogo; logoUrl: string | null; layout: PrintLayout }) {
+  const acc = accentOf(layout)
+  const lh = Boolean(layout.letterhead.data)
+  const sh = layout.show
+  const th: React.CSSProperties = { background: acc, color: '#fff', padding: '8px 10px', fontSize: '0.85em', textAlign: 'left' }
+  const td: React.CSSProperties = { padding: '8px 10px', borderBottom: '1px solid rgb(var(--c-mint))', verticalAlign: 'top', overflowWrap: 'anywhere' }
+  const row = (k: string, v: string, bold?: boolean, color?: string) => (
+    <p style={{ display: 'flex', justifyContent: 'space-between', gap: 16, padding: '4px 12px', fontWeight: bold ? 700 : 400, color }}><span>{k}</span><span>{v}</span></p>
+  )
+  const paidStamp = d.total > 0 && d.balance <= 0 && !d.voided
+  return (
+    <LetterheadFrame layout={layout} id="invoice-sheet">
+      <div style={{ position: 'relative', fontSize: `${14 * layout.scale}px`, color: 'rgb(var(--c-ink))', background: '#fff', borderRadius: lh ? 0 : 14, border: lh ? 'none' : '1px solid rgb(var(--c-mint))', overflow: 'hidden' }}>
+        {d.voided && <p style={{ position: 'absolute', right: 24, top: 150, transform: 'rotate(6deg)', border: '2px solid #ef4444', color: '#ef4444', padding: '2px 12px', fontWeight: 700, fontSize: 18, textTransform: 'uppercase' }}>Cancelled</p>}
+        {!lh && <SoftHeader logo={logo} logoUrl={logoUrl} layout={layout} />}
+        <div style={{ padding: lh ? 0 : '8px 24px 20px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', margin: '16px 0 10px', gap: 8 }}>
+            <p style={{ fontSize: '1.5em' }}>Bill / Invoice</p>
+            <p style={{ fontWeight: 600, color: acc }}>{d.number}</p>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '8px 24px' }}>
+            <div><p style={{ fontSize: '0.8em', opacity: 0.6 }}>Patient</p><p style={{ fontWeight: 600 }}>{d.patientName}</p></div>
+            {sh.mr && <div><p style={{ fontSize: '0.8em', opacity: 0.6 }}>MR Number</p><p style={{ fontWeight: 600 }}>{d.mr ?? '—'}</p></div>}
+            <div><p style={{ fontSize: '0.8em', opacity: 0.6 }}>Phone</p><p style={{ fontWeight: 600 }}>{d.phone}</p></div>
+            <div><p style={{ fontSize: '0.8em', opacity: 0.6 }}>Date</p><p style={{ fontWeight: 600 }}>{fmtDate(d.date)}</p></div>
+            {sh.age && d.age != null && <div><p style={{ fontSize: '0.8em', opacity: 0.6 }}>Umar</p><p style={{ fontWeight: 600 }}>{d.age} saal</p></div>}
+            {sh.doctor && d.doctor && <div><p style={{ fontSize: '0.8em', opacity: 0.6 }}>Doctor</p><p style={{ fontWeight: 600 }}>{d.doctor}</p></div>}
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 16 }}>
+            <thead style={{ display: 'table-header-group' }}>
+              <tr><th style={th}>#</th><th style={th}>Tafseel</th><th style={th}>Daant</th><th style={{ ...th, textAlign: 'right' }}>Qty</th><th style={{ ...th, textAlign: 'right' }}>Qeemat</th><th style={{ ...th, textAlign: 'right' }}>Total</th></tr>
+            </thead>
+            <tbody>
+              {d.items.map((it, i) => (
+                <tr key={it.id} style={{ breakInside: 'avoid' }}>
+                  <td style={td}>{i + 1}</td><td style={td}>{it.name}</td><td style={td}>{it.tooth ?? '—'}</td>
+                  <td style={{ ...td, textAlign: 'right' }}>{it.qty}</td>
+                  <td style={{ ...td, textAlign: 'right', whiteSpace: 'nowrap' }}>{money(it.unit_price)}</td>
+                  <td style={{ ...td, textAlign: 'right', whiteSpace: 'nowrap' }}>{money(it.line_total)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16, marginTop: 14, breakInside: 'avoid' }}>
+            <div style={{ display: 'grid', gap: 8 }}>
+              {sh.qr && d.patientId && <ShareQr patientId={d.patientId} />}
+              {paidStamp && <p style={{ display: 'inline-block', border: '3px solid #047857', color: '#047857', borderRadius: 10, padding: '4px 14px', fontWeight: 800, transform: 'rotate(-5deg)' }}>PAID ✓ {layout.texts.thanks}</p>}
+            </div>
+            <div style={{ width: 'min(100%, 320px)', background: 'rgb(var(--c-mint))', borderRadius: 10, padding: '6px 0' }}>
+              {row('Subtotal', money(d.subtotal))}
+              {d.discountAmount > 0 && row(`Riyayat (${d.discountPercent}%)`, `− ${money(d.discountAmount)}`)}
+              {row('Kul raqam', money(d.total), true)}
+              {row('Mila', money(d.paid), false, '#047857')}
+              <div style={{ background: acc, color: '#fff', borderRadius: 8, margin: '4px 6px 2px' }}>{row('Baqaya', money(d.balance), true)}</div>
+              {d.balance > 0 && d.dueDate && <p style={{ textAlign: 'right', fontSize: '0.8em', padding: '2px 12px' }}>Aakhri tareekh: {fmtDate(d.dueDate)}</p>}
+            </div>
+          </div>
+          {d.voided && d.voidReason && <p style={{ marginTop: 10, fontSize: '0.85em', color: '#b91c1c' }}>Cancel ki wajah: {d.voidReason}</p>}
+          {d.notes && <p style={{ marginTop: 10, fontSize: '0.85em' }}>Note: {d.notes}</p>}
+          {(sh.signature || (sh.stamp && layout.stamp)) && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16, marginTop: 28, breakInside: 'avoid' }}>
+              {sh.signature ? <div style={{ width: 200, borderTop: '1px solid currentColor', paddingTop: 4, fontSize: '0.85em' }}>Patient ke dastkhat</div> : <span />}
+              {sh.stamp && layout.stamp && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={layout.stamp} alt="Mohar" style={{ height: 80, width: 'auto' }} />
+              )}
+            </div>
+          )}
+          {sh.darood && layout.texts.darood.trim() && <p style={{ marginTop: 16, background: 'rgb(var(--c-mint))', borderRadius: 10, padding: '10px 14px', textAlign: 'center', whiteSpace: 'pre-line', direction: 'rtl' }}>{layout.texts.darood}</p>}
+          <div style={{ marginTop: 14, textAlign: 'center', fontSize: '0.85em', display: 'grid', gap: 2 }}>
+            {layout.texts.footer.trim() && <p>{layout.texts.footer}</p>}
+            {layout.texts.website.trim() && <p style={{ color: acc }}>{layout.texts.website}</p>}
+            {sh.timings && <p style={{ opacity: 0.7 }}>{CLINIC.timings.full}</p>}
+          </div>
+        </div>
+      </div>
+    </LetterheadFrame>
+  )
+}
+
+/** Hara bill (Patient Bill / Invoice / بل): hara header, patti, dabbe, PAID stamp, darood ka dabba, footer, dastkhat aur mohar. */
+function Green({ d, logo, logoUrl, layout }: { d: InvData; logo: PrintLogo; logoUrl: string | null; layout: PrintLayout }) {
+  const G = layout.accent ?? GREEN
+  const lh = Boolean(layout.letterhead.data)
+  const sh = layout.show
+  const th: React.CSSProperties = { background: G, color: '#fff', padding: '7px 10px', fontSize: '0.9em', textAlign: 'left', border: '1px solid #fff' }
+  const td: React.CSSProperties = { padding: '6px 10px', border: `1px solid ${G}`, overflowWrap: 'anywhere' }
+  const box = (k: string, v: string, hi?: boolean, strong?: boolean) => (
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '6px 10px', border: `1px solid ${G}`, background: hi ? G : '#fff', color: hi ? '#fff' : '#111', fontWeight: strong || hi ? 700 : 600 }}>
+      <span>{k}</span><span>{v}</span>
+    </div>
+  )
+  const paidStamp = d.total > 0 && d.balance <= 0 && !d.voided
+  return (
+    <LetterheadFrame layout={layout} id="invoice-sheet">
+      <div style={{ position: 'relative', fontSize: `${14 * layout.scale}px`, color: '#111', background: '#fff', overflow: 'hidden', borderRadius: lh ? 0 : 14, border: lh ? 'none' : `1px solid ${G}` }}>
+        {d.voided && <p style={{ position: 'absolute', right: 24, top: 150, transform: 'rotate(6deg)', border: '2px solid #ef4444', color: '#ef4444', padding: '2px 12px', fontWeight: 700, fontSize: 18, textTransform: 'uppercase' }}>Cancelled</p>}
+        {!lh && (
+          <div style={{ background: `linear-gradient(135deg, #ffffff 0%, #eaf6ee 55%, ${G}22 100%)`, padding: '14px 22px 0', textAlign: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, flexWrap: 'wrap' }}>
+              {(logo.data || logoUrl) && <LogoMark logo={logo} fallbackUrl={logoUrl} />}
+              <div>
+                <p style={{ fontSize: '2em', fontWeight: 800, color: GREEN_D, lineHeight: 1.1 }}>{CLINIC.name}</p>
+                {sh.tagline && <p style={{ display: 'inline-block', marginTop: 6, border: `1px solid ${G}`, borderRadius: 99, padding: '2px 14px', fontWeight: 600, color: GREEN_D, background: '#fff' }}>{layout.texts.tagline.trim() || CLINIC.slogan}</p>}
+                {sh.doctor && <p style={{ marginTop: 6, fontWeight: 700 }}>{CLINIC.doctor.name}</p>}
+                {sh.doctor && <p style={{ fontSize: '0.85em' }}>{CLINIC.doctor.qualification}</p>}
+              </div>
+            </div>
+            <div style={{ marginTop: 10, borderTop: `3px solid ${G}`, padding: '6px 0', fontSize: '0.85em', display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '4px 18px' }}>
+              {sh.address && <span>{CLINIC.address.full}</span>}
+              {sh.phone && <span>{CLINIC.phone.display}</span>}
+            </div>
+          </div>
+        )}
+        <div style={{ padding: lh ? 0 : '10px 22px 18px' }}>
+          <p style={{ margin: '4px auto 10px', width: 'fit-content', background: G, color: '#fff', borderRadius: 12, padding: '6px 38px', fontSize: '1.4em', fontWeight: 700 }}>Patient Bill / Invoice / بل</p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', border: `1px solid ${G}`, borderRadius: 8, overflow: 'hidden' }}>
+            <div style={{ padding: '8px 12px', display: 'grid', gap: 3 }}>
+              <p><b>Patient Name:</b> {d.patientName}</p>
+              {sh.mr && <p><b>Patient ID:</b> {d.mr ?? '—'}</p>}
+              {sh.age && d.age != null && <p><b>Age:</b> {d.age} Years</p>}
+              <p><b>Phone:</b> {d.phone}</p>
+            </div>
+            <div style={{ padding: '8px 12px', display: 'grid', gap: 3, borderLeft: `1px solid ${G}`, alignContent: 'start' }}>
+              <p><b>Bill No:</b> {d.number}</p>
+              <p><b>Date:</b> {fmtDate(d.date)}</p>
+              {sh.doctor && d.doctor && <p><b>Doctor:</b> {d.doctor}</p>}
+            </div>
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 12 }}>
+            <thead style={{ display: 'table-header-group' }}>
+              <tr><th style={{ ...th, width: 34 }}>#</th><th style={th}>Description / تفصیل</th><th style={{ ...th, textAlign: 'center' }}>Qty</th><th style={{ ...th, textAlign: 'right' }}>Unit Price (Rs.)</th><th style={{ ...th, textAlign: 'right' }}>Total (Rs.)</th></tr>
+            </thead>
+            <tbody>
+              {d.items.map((it, i) => (
+                <tr key={it.id} style={{ breakInside: 'avoid' }}>
+                  <td style={td}>{i + 1}</td><td style={td}>{it.name}{it.tooth ? ` (${it.tooth})` : ''}</td>
+                  <td style={{ ...td, textAlign: 'center' }}>{it.qty}</td>
+                  <td style={{ ...td, textAlign: 'right' }}>{Number(it.unit_price).toLocaleString()}</td>
+                  <td style={{ ...td, textAlign: 'right' }}>{Number(it.line_total).toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 14, marginTop: 14, breakInside: 'avoid' }}>
+            <div style={{ display: 'grid', gap: 6 }}>
+              {sh.payment && (
+                <div>
+                  <p style={{ fontWeight: 700, color: GREEN_D }}>✔ Payment Method:</p>
+                  <p>Easypaisa / JazzCash</p>
+                  <p style={{ fontWeight: 700, fontSize: '1.15em' }}>{CLINIC.payments.easypaisa}</p>
+                </div>
+              )}
+              {sh.qr && d.patientId && <ShareQr patientId={d.patientId} size={80} />}
+            </div>
+            {paidStamp && <p style={{ border: `3px solid ${G}`, color: G, borderRadius: 10, padding: '6px 16px', fontWeight: 800, fontSize: '1.2em', transform: 'rotate(-6deg)', textAlign: 'center' }}>PAID ✓<br /><span style={{ fontSize: '0.8em' }}>{layout.texts.thanks}</span></p>}
+            <div style={{ width: 'min(100%, 290px)' }}>
+              {box('Sub Total:', money(d.subtotal).replace('Rs. ', ''))}
+              {box('Discount:', d.discountAmount > 0 ? `${d.discountAmount.toLocaleString()}` : '0')}
+              {box('Total Amount:', Number(d.total).toLocaleString(), true)}
+              {box('Paid Amount:', Number(d.paid).toLocaleString())}
+              {box('Remaining:', Number(d.balance).toLocaleString(), true)}
+            </div>
+          </div>
+          {d.voided && d.voidReason && <p style={{ marginTop: 10, fontSize: '0.85em', color: '#b91c1c' }}>Cancel ki wajah: {d.voidReason}</p>}
+          {d.notes && <p style={{ marginTop: 10, fontSize: '0.85em' }}>Note: {d.notes}</p>}
+          {sh.darood && layout.texts.darood.trim() && <p style={{ marginTop: 14, border: `1px solid ${G}`, background: '#eef7f0', borderRadius: 12, padding: '10px 14px', textAlign: 'center', whiteSpace: 'pre-line', direction: 'rtl', fontSize: '1.1em' }}>{layout.texts.darood}</p>}
+          <div style={{ marginTop: 12, background: G, color: '#fff', borderRadius: 8, padding: '7px 14px', display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8, fontSize: '0.9em' }}>
+            <span>{layout.texts.website.trim() || CLINIC.address.full}</span>
+            <span>{layout.texts.footer.trim() || layout.texts.tagline.trim() || CLINIC.slogan}</span>
+          </div>
+          {(sh.signature || (sh.stamp && layout.stamp)) && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16, marginTop: 22, breakInside: 'avoid' }}>
+              {sh.signature ? <div style={{ width: 220, borderTop: '1px solid #111', paddingTop: 4 }}>Patient Signature:</div> : <span />}
+              {sh.stamp && layout.stamp && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={layout.stamp} alt="Mohar" style={{ height: 90, width: 'auto' }} />
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </LetterheadFrame>
+  )
+}
+
+export default function InvoiceSheets({ d, logo, logoUrl, defaultTpl, layout = DEFAULT_LAYOUT }: { d: InvData; logo: PrintLogo; logoUrl: string | null; defaultTpl: string; layout?: PrintLayout }) {
+  const [tpl, setTpl] = useState(BILL_TEMPLATES.some((t) => t.id === defaultTpl) ? defaultTpl : 'soft')
   return (
     <div>
       <style>{`#invoice-sheet, #invoice-sheet * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }`}</style>
@@ -209,7 +406,7 @@ export default function InvoiceSheets({ d, logo, logoUrl, defaultTpl }: { d: Inv
           {BILL_TEMPLATES.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
         </select>
       </label>
-      {tpl === 'blue' ? <Blue d={d} logo={logo} logoUrl={logoUrl} /> : <Classic d={d} logo={logo} logoUrl={logoUrl} />}
+      {tpl === 'soft' ? <Soft d={d} logo={logo} logoUrl={logoUrl} layout={layout} /> : tpl === 'green' ? <Green d={d} logo={logo} logoUrl={logoUrl} layout={layout} /> : tpl === 'blue' ? <Blue d={d} logo={logo} logoUrl={logoUrl} /> : <Classic d={d} logo={logo} logoUrl={logoUrl} />}
     </div>
   )
 }

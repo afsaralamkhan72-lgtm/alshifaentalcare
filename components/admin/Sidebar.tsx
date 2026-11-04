@@ -111,16 +111,10 @@ export default function Sidebar({ role, perms }: { role: Role; perms: string[] }
       .filter((i) => pathname === i.href || pathname.startsWith(`${i.href}/`))
       .sort((a, b) => b.href.length - a.href.length)[0]?.href ?? ''
 
+  const quick = GROUPS[0].items.filter((i) => allowed(i, role, perms) && i.href !== '/admin/lab' && i.href !== '/admin/treatments').slice(0, 4)
+
   return (
     <>
-      <button
-        onClick={() => setOpen(!open)}
-        aria-label="Menu kholein"
-        className="fixed left-4 top-4 z-40 flex h-10 w-10 items-center justify-center rounded-full bg-clinic-teal text-white shadow-md lg:hidden"
-      >
-        ☰
-      </button>
-
       {open && <div onClick={() => setOpen(false)} className="fixed inset-0 z-30 bg-black/30 lg:hidden" />}
 
       <aside
@@ -175,6 +169,42 @@ export default function Sidebar({ role, perms }: { role: Role; perms: string[] }
           Version {process.env.NEXT_PUBLIC_BUILD_DATE} · {process.env.NEXT_PUBLIC_BUILD_ID}
         </p>
       </aside>
+
+      {/* Sirf phone/tablet: neeche ki patti (laptop par nazar nahi aati) */}
+      <nav
+        aria-label="Jaldi raaste"
+        className="fixed inset-x-0 bottom-0 z-20 border-t border-clinic-teal/15 bg-white/95 backdrop-blur print:hidden lg:hidden"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
+        <div className="mx-auto flex max-w-xl items-stretch justify-around">
+          {quick.map((item) => {
+            const active = item.href === activeHref
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex min-h-[56px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 text-[11px] font-semibold ${
+                  active ? 'text-clinic-teal' : 'text-clinic-ink/55'
+                }`}
+              >
+                <NavIcon href={item.href} />
+                <span className="max-w-full truncate">{item.label === 'Appointments' ? 'Appts' : item.label}</span>
+              </Link>
+            )
+          })}
+          <button
+            type="button"
+            onClick={() => setOpen(!open)}
+            aria-label="Poora menu"
+            className="flex min-h-[56px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 text-[11px] font-semibold text-clinic-ink/55"
+          >
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+              <path d="M4 7h16M4 12h16M4 17h16" />
+            </svg>
+            Menu
+          </button>
+        </div>
+      </nav>
     </>
   )
 }

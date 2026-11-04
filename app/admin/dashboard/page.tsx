@@ -10,6 +10,7 @@ import WhatsAppMenu from '@/components/admin/WhatsAppMenu'
 import { apptReminderLink } from '@/lib/messages'
 import { mapTemplates } from '@/lib/messageTemplates'
 import OwnerToday from '@/components/admin/OwnerToday'
+import MyAttendance from '@/components/admin/MyAttendance'
 import OwnerMoney from '@/components/admin/OwnerMoney'
 import { todayKarachi } from '@/lib/karachi'
 
@@ -172,6 +173,7 @@ export default async function DashboardPage({
           Aap ko ye page kholne ki ijazat nahi. Zaroorat ho to Admin se &quot;Staff aur Permissions&quot; mein ijazat lagwayein.
         </div>
       )}
+      <MyAttendance />
       {canSeeMoney && (
         <Suspense fallback={null}>
           <BackupReminder />

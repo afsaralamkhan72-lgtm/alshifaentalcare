@@ -4,6 +4,7 @@ import { STAFF_COOKIE, hashToken, readSession } from '@/lib/staffPortal'
 import { CLINIC } from '@/clinic.config'
 import { money, fmtDate } from '@/lib/karachi'
 import { PinForm, AckButton, LogoutButton } from '@/components/StaffPortalClient'
+import StaffClockPanel, { type ClockState } from '@/components/StaffClockPanel'
 
 export const dynamic = 'force-dynamic'
 export const metadata = {
@@ -60,7 +61,7 @@ export default async function StaffPortalPage({ params }: { params: Promise<{ to
     )
   }
 
-  const [memberRes, balRes, ledRes] = await Promise.all([
+  const [memberRes, balRes, ledRes, stateRes] = await Promise.all([
     db.from('staff_members').select('full_name, title, monthly_salary, is_active').eq('id', acc.staff_id).maybeSingle(),
     db.from('staff_balances').select('*').eq('staff_id', acc.staff_id).maybeSingle(),
     db
@@ -70,7 +71,9 @@ export default async function StaffPortalPage({ params }: { params: Promise<{ to
       .order('entry_date', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(200),
+    db.rpc('staff_attendance_state', { p_staff: acc.staff_id }),
   ])
+  const st = stateRes.error ? null : (stateRes.data as (ClockState & { linked?: boolean }) | null)
 
   const m = memberRes.data
   if (!m || !m.is_active) {
@@ -93,6 +96,8 @@ export default async function StaffPortalPage({ params }: { params: Promise<{ to
         </div>
         <LogoutButton token={token} />
       </div>
+
+      {st && st.linked !== false && <StaffClockPanel token={token} state={st} />}
 
       <div className="mt-5 rounded-2xl bg-clinic-teal p-5 text-white">
         <p className="text-xs text-white/60">Abhi aap ke baqaya (mile ge)</p>

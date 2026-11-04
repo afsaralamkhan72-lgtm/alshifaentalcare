@@ -50,6 +50,7 @@ export default async function PrescriptionPrintPage({ params }: { params: Promis
         aftercare={aftercare}
         phone={p?.phone ?? null}
         patientName={p?.full_name ?? ''}
+        layout={printCfg.layout}
       />
     </div>
   )

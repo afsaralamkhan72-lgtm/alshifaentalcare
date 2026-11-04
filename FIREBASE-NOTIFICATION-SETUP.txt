@@ -1,0 +1,18 @@
+NOTIFICATION (OPTIONAL, BAAD MEIN) — jab aap chahein tab karein. Iske baghair baqi sab kuch chalta hai.
+
+Zaroorat: Google Firebase ka muft account (aap ka Gmail).
+
+1. firebase.google.com par "Add project" (naam: Al Shifa).
+2. Project Settings > General > "Add app" > Android. Package name likhein: com.alshifa.clinic
+   Wahan se "google-services.json" download hogi.
+3. GitHub repo > Settings > Secrets and variables > Actions > New repository secret
+   Naam: GOOGLE_SERVICES_JSON    Value: us file ka poora text paste karein.
+   (Is file ko repo mein NA rakhein, sirf secret mein.)
+4. Firebase > Project Settings > Service accounts > "Generate new private key" (JSON file milegi).
+5. Vercel > Settings > Environment Variables:
+   FIREBASE_SERVICE_ACCOUNT  = us JSON ka poora text
+   CRON_SECRET               = koi lambi random cheez (kam az kam 20 haroof)
+6. GitHub Actions se APK dobara banayein, patients ko nayi APK dein.
+7. Admin > Settings > Notification mein "Yaad-dahani chalu" karke Save karein.
+
+Roz subah 9:30 (Karachi) khud chalta hai: kal ki appointment aur (agar chalu ho) baqaya ki yaad-dahani.

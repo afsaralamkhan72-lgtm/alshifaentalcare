@@ -118,6 +118,18 @@ export default async function PortalView({ patient, supabase, rxHref }: { patien
   }
   const rsx = (n: number) => `Rs. ${Number(n).toLocaleString('en-US')}`
 
+  // Stamp aur inaam (loyalty). Jo na ho ya error aaye to ye hissa chhup jata hai, baqi page chalta rahta hai.
+  const [lcRes, scRes] = await Promise.all([
+    supabase.rpc('_loyalty_card', { p_patient: patient.id }),
+    supabase.from('scratch_cards').select('id, title, kind, expires_at, redeemed_at').eq('patient_id', patient.id).order('card_date', { ascending: false }).limit(10),
+  ])
+  const lc = (lcRes.error ? null : lcRes.data) as { stamps: number; total: number; cycle_size: number | null; next_title: string | null; remaining: number | null; ready: { id: string; title: string; expires_at: string | null }[] } | null
+  const nowMs = Date.now()
+  const scr = ((scRes.error ? [] : scRes.data ?? []) as { id: string; title: string; kind: string; expires_at: string | null; redeemed_at: string | null }[]).filter(
+    (c) => c.kind !== 'none' && !c.redeemed_at && (!c.expires_at || new Date(c.expires_at).getTime() > nowMs),
+  )
+  const showLoyalty = !!lc && (lc.total > 0 || (lc.ready?.length ?? 0) > 0 || scr.length > 0)
+
   const upcoming = appointments.find(
     (a) => a.preferred_date && a.preferred_date >= today && a.status !== 'cancelled'
   )
@@ -289,6 +301,51 @@ export default async function PortalView({ patient, supabase, rxHref }: { patien
                 </div>
               )
             })}
+          </div>
+        </section>
+      )}
+
+      {showLoyalty && lc && (
+        <section className="mt-8">
+          <h2 className="font-display font-semibold text-clinic-ink">Mere stamp aur inaam</h2>
+          <div className="mt-3 rounded-2xl border border-clinic-teal/10 bg-white p-4">
+            <p className="text-sm text-clinic-ink/70">
+              Is round ke stamp: <span className="font-semibold text-clinic-ink">{lc.stamps}</span>
+              {lc.cycle_size ? ` / ${lc.cycle_size}` : ''} · kul stamp: <span className="font-semibold text-clinic-ink">{lc.total}</span>
+            </p>
+            {lc.cycle_size ? (
+              <div className="mt-2 flex flex-wrap gap-1.5" aria-hidden="true">
+                {Array.from({ length: Math.min(lc.cycle_size, 30) }).map((_, i) => (
+                  <span key={i} className={`h-4 w-4 rounded-full ${i < lc.stamps ? 'bg-clinic-teal' : 'bg-clinic-teal/15'}`} />
+                ))}
+              </div>
+            ) : null}
+            {lc.next_title && lc.remaining != null && lc.remaining > 0 && (
+              <p className="mt-2 text-xs text-clinic-ink/60">
+                Agla inaam <span className="font-semibold">{lc.next_title}</span>: {lc.remaining} stamp aur.
+              </p>
+            )}
+            {(lc.ready?.length ?? 0) > 0 && (
+              <div className="mt-3 grid gap-2">
+                {lc.ready.map((r) => (
+                  <div key={r.id} className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+                    Aap ka inaam tayyar: <span className="font-semibold">{r.title}</span>
+                    {r.expires_at ? <span className="text-xs text-emerald-800/70"> (mudat: {fmt(r.expires_at)})</span> : null}
+                  </div>
+                ))}
+              </div>
+            )}
+            {scr.length > 0 && (
+              <div className="mt-3 grid gap-2">
+                {scr.map((c) => (
+                  <div key={c.id} className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                    Scratch card ka inaam: <span className="font-semibold">{c.title}</span>
+                    {c.expires_at ? <span className="text-xs text-amber-800/70"> (mudat: {fmt(c.expires_at)})</span> : null}
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="mt-3 text-[11px] text-clinic-ink/45">Inaam lene ke liye clinic par bataein.</p>
           </div>
         </section>
       )}

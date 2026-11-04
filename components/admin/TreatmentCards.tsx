@@ -106,6 +106,19 @@ export default function TreatmentCards({
                   {t.balance > 0 ? <span className="font-semibold text-red-600"> · Baqaya {rs(t.balance)}</span> : <span className="text-emerald-700"> · hisaab saaf</span>}
                 </p>
               )}
+              {canEdit && canMoney && t.status === 'active' && t.visits.length > 0 && t.balance <= 0 && (
+                <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+                  <span>Paisa poora mil gaya. Kaam khatam hai to treatment mukammal karein.</span>
+                  <button
+                    type="button"
+                    disabled={busy === 'done-' + t.id}
+                    onClick={() => run('done-' + t.id, () => sb().rpc('set_treatment_status', { p_treatment_id: t.id, p_status: 'completed' }))}
+                    className="rounded-full bg-emerald-600 px-4 py-1 text-xs font-semibold text-white disabled:opacity-50"
+                  >
+                    Mukammal karein
+                  </button>
+                </div>
+              )}
               {canMoney && t.status !== 'cancelled' && (
                 <PaymentPlan treatmentId={t.id} paid={t.paid} balance={t.balance} plan={plans.find((p) => p.patient_treatment_id === t.id) ?? null} canEdit={canBill} patientName={patientName} phone={phone} />
               )}

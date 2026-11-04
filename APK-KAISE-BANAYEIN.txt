@@ -1,0 +1,14 @@
+ANDROID APK (aik hi app: Patient + Staff)
+
+Push ke baad (GitHub website par, apni repo mein):
+1. "Actions" tab kholein.
+2. Left side par "Android APK banao" chunein.
+3. "Run workflow" dabayein (hara button), phir dobara "Run workflow".
+4. 5-8 minute intezar karein. Hara tick aaye to us run par click karein.
+5. Neeche "Artifacts" mein "al-shifa-apk" par click karke zip download karein. Is ke andar app-debug.apk hai.
+6. Wo APK WhatsApp se bhejein / phone mein copy karein. Install karte waqt "Unknown source" ki ijazat dein.
+
+Pehli screen par Patient ke liye "Mera record dekhein" aur "Appointment lein" hain.
+Staff login chhupa hua hai: logo par 5 baar jaldi jaldi tap karein.
+App aap ki live website kholti hai, isliye website badalne par APK dobara banane ki zaroorat nahi.
+Pehli baar GPS wali hazri par phone location ki ijazat maangega: "Allow" dein.

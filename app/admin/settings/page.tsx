@@ -7,6 +7,9 @@ import ReminderSetting from '@/components/admin/ReminderSetting'
 import { getReminderDays } from '@/lib/reminders'
 import ClinicOptionsManager, { type OptRow } from '@/components/admin/ClinicOptionsManager'
 import PushToggle from '@/components/admin/PushToggle'
+import AppNotifySettings, { type NotifyCfg } from '@/components/admin/AppNotifySettings'
+import { fcmConfigured } from '@/lib/fcm'
+import { createAdminClient } from '@/lib/supabase/admin'
 import PrintSettings from '@/components/admin/PrintSettings'
 import { getPrintCfg } from '@/lib/printSettings'
 import BackupPanel from '@/components/admin/BackupPanel'
@@ -111,8 +114,13 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
               }))}
             />
           )}
-          {s === 'print' && printCfg && <PrintSettings logo={printCfg.logo} defaults={printCfg.defaults} share={printCfg.share} remind={printCfg.remind} />}
-          {s === 'notify' && <PushToggle />}
+          {s === 'print' && printCfg && <PrintSettings logo={printCfg.logo} defaults={printCfg.defaults} share={printCfg.share} remind={printCfg.remind} layout={printCfg.layout} />}
+          {s === 'notify' && (
+            <>
+              <PushToggle />
+              {isOwner && (await NotifyBlock())}
+            </>
+          )}
           {s === 'lists' && <ClinicOptionsManager kinds={OPTION_KINDS} rows={(optRes.data ?? []) as OptRow[]} missing={Boolean(optRes.error)} />}
           {s === 'messages' && <MessageTemplatesManager rows={(msgRes.data ?? []) as { key: string; body: string }[]} missing={Boolean(msgRes.error)} />}
           {s === 'backup' && <BackupPanel last={(bkRes.data as { value?: unknown } | null)?.value ? String((bkRes.data as { value: unknown }).value) : null} />}
@@ -121,4 +129,28 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       </div>
     </div>
   )
+}
+
+async function NotifyBlock() {
+  const supabase = await createClient()
+  const { data } = await supabase.from('site_settings').select('value').eq('key', 'app_notify_cfg').maybeSingle()
+  const v = (data?.value ?? {}) as Partial<NotifyCfg>
+  const cfg: NotifyCfg = {
+    enabled: !!v.enabled,
+    appt: v.appt !== false,
+    appt_days: Number(v.appt_days) || 1,
+    due: !!v.due,
+    due_min: Number(v.due_min) || 1000,
+    due_every_days: Number(v.due_every_days) || 7,
+  }
+  let pd = 0
+  let sd = 0
+  const admin = createAdminClient()
+  if (admin) {
+    const a = await admin.from('device_tokens').select('id', { count: 'exact', head: true }).eq('kind', 'patient')
+    const b = await admin.from('device_tokens').select('id', { count: 'exact', head: true }).eq('kind', 'staff')
+    pd = a.count ?? 0
+    sd = b.count ?? 0
+  }
+  return <AppNotifySettings cfg={cfg} fcm={fcmConfigured()} cron={!!process.env.CRON_SECRET} patientDevices={pd} staffDevices={sd} />
 }

@@ -83,3 +83,31 @@
     background: #fff !important;
   }
 }
+
+/* ---------- FINAL42: sirf phone (laptop par koi asar nahi) ---------- */
+@media (max-width: 767px) {
+  .admin-shell {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation; /* double-tap zoom ki deri khatam */
+  }
+  /* 16px se chhota text ho to iPhone khud zoom kar deta hai */
+  .admin-shell input:not([type='checkbox']):not([type='radio']),
+  .admin-shell select,
+  .admin-shell textarea {
+    font-size: 16px;
+    min-height: 42px;
+  }
+  .admin-shell main img,
+  .admin-shell main video {
+    max-width: 100%;
+    height: auto;
+  }
+  .admin-shell main {
+    overflow-wrap: anywhere;
+  }
+  .admin-shell table th,
+  .admin-shell table td {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+}

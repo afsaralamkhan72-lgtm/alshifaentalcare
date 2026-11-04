@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { CLINIC } from '@/clinic.config'
 import PortalView, { Shell } from '@/components/portal/PortalView'
+import RememberCode from '@/components/portal/RememberCode'
 
 export const metadata = {
   title: `My Record | ${CLINIC.name}`,
@@ -36,5 +37,10 @@ export default async function PortalRecordPage({
 
   if (!patient) notFound()
 
-  return <PortalView patient={patient} supabase={supabase} rxHref={(id) => `/portal/${encodeURIComponent(code)}/rx/${id}`} />
+  return (
+    <>
+      <RememberCode code={code.toLowerCase()} />
+      <PortalView patient={patient} supabase={supabase} rxHref={(id) => `/portal/${encodeURIComponent(code)}/rx/${id}`} />
+    </>
+  )
 }

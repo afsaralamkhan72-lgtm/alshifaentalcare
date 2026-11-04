@@ -1450,7 +1450,7 @@ export default function VisitWorkspace(p: Props) {
           <Section n={secNo()} title="Aage kya (agli appointment / recall)">
             <fieldset disabled={!canEdit} className="grid gap-3 sm:grid-cols-3">
               <div>
-                <label className="text-xs font-medium text-clinic-ink/70">Tareekh</label>
+                <label className="text-xs font-medium text-clinic-ink/70">Tareekh <span className="font-normal text-clinic-ink/45">(aakhri visit ho to khali chhodein)</span></label>
                 <input type="date" min={todayKarachi()} value={nextDate} onChange={(e) => setNextDate(e.target.value)} className={input} />
                 <div className="mt-1 flex flex-wrap gap-1">
                   {[3, 7, 14, 30].map((d) => (

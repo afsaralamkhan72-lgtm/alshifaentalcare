@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { friendlyError } from '@/lib/errors'
 import { BILL_TEMPLATES, RX_TEMPLATES, type PrintDefaults, type PrintLogo } from '@/lib/printTemplates'
+import PrintLayoutSettings from '@/components/admin/PrintLayoutSettings'
+import type { PrintLayout } from '@/lib/printLayout'
 
 /** Logo ko khud chhota kar ke (compress) data URL banata hai: lamba kinara 600px, ~100KB se kam */
 async function compressImage(file: File): Promise<string> {
@@ -39,12 +41,13 @@ async function compressImage(file: File): Promise<string> {
 }
 
 export default function PrintSettings({
-  logo, defaults, share, remind,
+  logo, defaults, share, remind, layout,
 }: {
   logo: PrintLogo
   defaults: PrintDefaults
   share: { days: number; require_last4: boolean }
   remind: { med_days_before: number }
+  layout: PrintLayout
 }) {
   const router = useRouter()
   const [data, setData] = useState<string | null>(logo.data)
@@ -129,6 +132,8 @@ export default function PrintSettings({
         </div>
         {!data && logo.data && <p className="mt-2 text-xs text-amber-700">&quot;Logo mehfooz karein&quot; dabayein to purana logo hat jayega.</p>}
       </section>
+
+      <PrintLayoutSettings initial={layout} logo={{ data, size, badge }} />
 
       <section className={card}>
         <h2 className="font-display text-lg font-semibold text-clinic-ink">Pehle se chuna hua template</h2>

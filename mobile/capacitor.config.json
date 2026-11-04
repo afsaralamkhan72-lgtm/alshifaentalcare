@@ -1,0 +1,14 @@
+{
+  "appId": "com.alshifa.clinic",
+  "appName": "Al Shifa",
+  "webDir": "www",
+  "server": {
+    "url": "https://alshifahomeoanddentalcare.com/start",
+    "cleartext": false,
+    "allowNavigation": ["alshifahomeoanddentalcare.com", "*.alshifahomeoanddentalcare.com", "*.supabase.co", "wa.me", "api.whatsapp.com"]
+  },
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#0B4F4A"
+  }
+}
