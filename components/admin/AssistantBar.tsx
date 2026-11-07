@@ -361,9 +361,10 @@ export default function AssistantBar() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="flex items-center gap-2 rounded-full border border-clinic-teal/20 px-3 py-1.5 text-xs text-clinic-ink/50 transition-colors hover:border-clinic-teal hover:text-clinic-teal"
+        className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-clinic-teal/20 px-3 py-1.5 text-xs text-clinic-ink/50 transition-colors hover:border-clinic-teal hover:text-clinic-teal"
       >
-        <span>Ask about a patient</span>
+        <span className="sm:hidden">Ask ?</span>
+        <span className="hidden sm:inline">Ask about a patient</span>
         <kbd className="hidden rounded bg-clinic-mint px-1.5 py-0.5 text-[10px] font-semibold text-clinic-teal sm:inline">
           Ctrl K
         </kbd>

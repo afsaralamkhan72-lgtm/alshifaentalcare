@@ -52,7 +52,7 @@ export default async function EstimatePage({ params }: { params: Promise<{ id: s
         {rows.length === 0 ? (
           <p className="mt-6 text-sm text-clinic-ink/60">Koi plan wali treatment nahi hai.</p>
         ) : (
-          <table className="mt-5 w-full text-sm">
+          <div className="mt-5 overflow-x-auto"><table className="w-full text-sm">
             <thead>
               <tr className="border-b border-clinic-teal/20 text-left text-xs text-clinic-ink/60">
                 <th className="py-2">#</th>
@@ -75,7 +75,7 @@ export default async function EstimatePage({ params }: { params: Promise<{ id: s
                 <td className="py-3 text-right font-display text-lg font-semibold">{money(total)}</td>
               </tr>
             </tbody>
-          </table>
+          </table></div>
         )}
         <p className="mt-4 text-xs text-clinic-ink/60">Ye sirf andaza hai. Asal kharcha treatment ke dauran badal sakta hai; badalne se pehle aap ko bataya jayega.</p>
         <div className="mt-14 grid grid-cols-2 gap-10 text-xs text-clinic-ink/70">

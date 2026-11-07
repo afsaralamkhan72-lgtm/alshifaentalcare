@@ -71,12 +71,12 @@ export default async function OwnerMoney() {
           <Link href="/admin/accounts" className="text-xs font-semibold text-clinic-teal">Poori report →</Link>
         </div>
         <div className="mt-3 overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="table-fit w-full text-sm">
             <thead>
               <tr className="text-left text-[11px] uppercase tracking-wide text-clinic-ink/45">
                 <th className="py-1 pr-3 font-semibold" />
-                <th className="py-1 pr-3 text-right font-semibold">Is mahine ({month}, abhi tak)</th>
-                <th className="py-1 pr-3 text-right font-semibold">Pichla mahina ({prev}, poora)</th>
+                <th className="py-1 pr-3 text-right font-semibold">Is mahine<span className="block text-[9px] font-normal normal-case tracking-normal text-clinic-ink/40">{month}, abhi tak</span></th>
+                <th className="py-1 pr-3 text-right font-semibold">Pichla mahina<span className="block text-[9px] font-normal normal-case tracking-normal text-clinic-ink/40">{prev}, poora</span></th>
                 <th className="py-1 text-right font-semibold">Farq</th>
               </tr>
             </thead>
@@ -127,9 +127,9 @@ function Cmp({ label, a, b, p, bold, invert }: { label: string; a: number; b: nu
   return (
     <tr className={bold ? 'font-semibold' : ''}>
       <td className="py-2 pr-3 text-clinic-ink/70">{label}</td>
-      <td className="py-2 pr-3 text-right text-clinic-ink">{money(a)}</td>
-      <td className="py-2 pr-3 text-right text-clinic-ink/70">{money(b)}</td>
-      <td className={`py-2 text-right ${good == null ? 'text-clinic-ink/40' : good ? 'text-emerald-700' : 'text-red-600'}`}>
+      <td className="whitespace-nowrap py-2 pr-3 text-right text-clinic-ink">{money(a)}</td>
+      <td className="whitespace-nowrap py-2 pr-3 text-right text-clinic-ink/70">{money(b)}</td>
+      <td className={`whitespace-nowrap py-2 text-right ${good == null ? 'text-clinic-ink/40' : good ? 'text-emerald-700' : 'text-red-600'}`}>
         {p == null ? '—' : `${p > 0 ? '+' : ''}${p}%`}
       </td>
     </tr>

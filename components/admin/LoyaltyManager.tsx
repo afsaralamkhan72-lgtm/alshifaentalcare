@@ -97,7 +97,7 @@ export default function LoyaltyManager(props: {
                 <button disabled={busy} onClick={() => run(() => sb.rpc('loyalty_redeem', { p_unlock: u.id, p_note: null }), 'Inaam de diya gaya darj ho gaya')} className="rounded-lg bg-clinic-teal px-3 py-2 text-white disabled:opacity-60">Inaam diya</button>
               </li>
             ))}
-            {props.ready.length > 0 && <li className="pt-3 text-xs text-clinic-ink/50">Note: chhoot bill mein khud nahi lagti — bill banate waqt haath se kam karein, phir yahan “Inaam diya” dabayein.</li>}
+            {props.ready.length > 0 && <li className="pt-3 text-xs text-clinic-ink/50">Chhoot lagane ka asaan tareeqa: marez ka visit mukammal karein, aane wali screen par “Chhoot lagayein” dabayein. Chhoot aur “Inaam diya” khud ho jate hain. Yahan “Inaam diya” sirf tab dabayein jab chhoot ke bajaye koi muft cheez di ho.</li>}
           </ul>
         )}
 

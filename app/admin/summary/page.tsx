@@ -1,10 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
-import { requireAnyPerm } from '@/lib/auth'
+import { requireAnyPerm, getStaffProfile, isOwnerRole } from '@/lib/auth'
 import { todayKarachi } from '@/lib/karachi'
 import SummaryReport, { type ReportData } from '@/components/admin/SummaryReport'
 
 export default async function SummaryPage({ searchParams }: { searchParams: Promise<{ from?: string; to?: string }> }) {
   await requireAnyPerm('reports.view')
+  const me = await getStaffProfile()
   const sp = await searchParams
   const today = todayKarachi()
   const ok = (s?: string) => /^\d{4}-\d{2}-\d{2}$/.test(s ?? '')
@@ -22,6 +23,7 @@ export default async function SummaryPage({ searchParams }: { searchParams: Prom
         <a href="/admin/reports" className="rounded-full bg-clinic-mint px-3 py-1 text-clinic-teal">Mahine ki report</a>
         <a href="/admin/ledger-check" className="rounded-full bg-clinic-mint px-3 py-1 text-clinic-teal">Hisaab check (purana vs naya)</a>
         <a href="/admin/billing" className="rounded-full bg-clinic-mint px-3 py-1 text-clinic-teal">Purani entries (transactions)</a>
+        {isOwnerRole(me.role) && <a href="/admin/insights" className="rounded-full bg-clinic-mint px-3 py-1 text-clinic-teal">Insights (kamai ka rukh, wapas nahi aaye)</a>}
         <a href="/admin/inventory/count" className="rounded-full bg-clinic-mint px-3 py-1 text-clinic-teal">Stock ginti</a>
       </div>
       <form className="mt-4 flex flex-wrap items-end gap-3 print:hidden">

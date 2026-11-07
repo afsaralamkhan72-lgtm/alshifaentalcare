@@ -23,7 +23,8 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-      - uses: android-actions/setup-android@v3
+      - name: Android SDK licenses (runner par SDK pehle se maujood hai)
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
       - name: Firebase ki file (agar secret mein rakhi ho)
         env:
           GSJ: ${{ secrets.GOOGLE_SERVICES_JSON }}

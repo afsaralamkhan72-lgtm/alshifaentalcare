@@ -534,7 +534,7 @@ async function WorkspaceSection({
   // meri riyayat ki had (SQL chali na ho to purana rule: owner 100%, baqi 0%)
   const dmRes = await supabase.rpc('my_discount_limit')
   const discountMax = dmRes.error || dmRes.data == null ? (isOwner ? 100 : 0) : Number(dmRes.data)
-  const [treatments, chartRes, catRes, docRes, matRes, qualRes, cvRes, medRes, billRes, rxRes, photoRes, optRes, cvCnt, vnCnt] = await Promise.all([
+  const [treatments, chartRes, catRes, docRes, matRes, qualRes, cvRes, medRes, billRes, rxRes, photoRes, optRes, cvCnt, vnCnt, vsRes] = await Promise.all([
     getTreatments(patient.id),
     isDental && can('clinical.view')
       ? supabase
@@ -575,6 +575,7 @@ async function WorkspaceSection({
     supabase.from('clinic_options').select('kind, label, sort_order').eq('is_active', true).order('sort_order').order('label'),
     can('clinical.view') ? supabase.from('clinical_visits').select('id', { count: 'exact', head: true }).eq('patient_id', patient.id).eq('status', 'finished') : Promise.resolve({ count: null }),
     can('clinical.view') ? supabase.from('visit_notes').select('id', { count: 'exact', head: true }).eq('patient_id', patient.id) : Promise.resolve({ count: null }),
+    supabase.from('site_settings').select('value').eq('key', 'visit_show').maybeSingle(),
   ])
   const opts = { complaint: [] as string[], homeo_complaint: [] as string[], diagnosis: [] as string[] }
   if (!optRes.error) for (const o of (optRes.data ?? []) as { kind: keyof typeof opts; label: string }[]) opts[o.kind]?.push(o.label)
@@ -616,7 +617,7 @@ async function WorkspaceSection({
 
   return (
     <VisitWorkspace
-      patient={{ id: patient.id, full_name: patient.full_name, phone: patient.phone, department: patient.department, age: ageNum }}
+      patient={{ id: patient.id, full_name: patient.full_name, phone: patient.phone, department: patient.department, age: ageNum, notes: ((patient as { notes?: string | null }).notes) ?? null }}
       visit={draft}
       finishedToday={finishedToday}
       startedMarks={startedMarks}
@@ -637,6 +638,7 @@ async function WorkspaceSection({
       consentAt={(patient as { consent_at?: string | null }).consent_at ?? null}
       opts={opts}
       isFirstVisit={isFirstVisit}
+      visitShow={(vsRes.data?.value ?? null) as { medical?: boolean; dental?: boolean; exam?: boolean; xray?: boolean } | null}
       hasPlanned={hasPlanned}
       perms={{
         clinicalView: can('clinical.view'),

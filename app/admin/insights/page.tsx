@@ -14,7 +14,7 @@ function Bars({ rows, fmt = (n: number) => String(n) }: { rows: { label: string;
   return (
     <div className="grid gap-1.5">
       {rows.map((r) => (
-        <div key={r.label} className="grid grid-cols-[84px_1fr_auto] items-center gap-2 text-xs">
+        <div key={r.label} className="grid grid-cols-[84px_minmax(0,1fr)_auto] items-center gap-2 text-xs">
           <span className="text-clinic-ink/60">{r.label}</span>
           <div className="h-3 rounded-full bg-clinic-mint"><div className="h-3 rounded-full bg-clinic-teal" style={{ width: `${Math.round((r.v / max) * 100)}%` }} /></div>
           <span className="tabular-nums text-clinic-ink">{fmt(r.v)}</span>
@@ -24,7 +24,7 @@ function Bars({ rows, fmt = (n: number) => String(n) }: { rows: { label: string;
   )
 }
 const Card = ({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) => (
-  <section className="rounded-2xl border border-clinic-teal/10 bg-white p-5">
+  <section className="min-w-0 rounded-2xl border border-clinic-teal/10 bg-white p-5">
     <h2 className="font-display text-lg font-semibold text-clinic-ink">{title}</h2>
     {hint && <p className="mb-3 mt-0.5 text-xs text-clinic-ink/50">{hint}</p>}
     {children}
@@ -153,12 +153,12 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
         </table></div>
       </Card>
 
-      <div className="grid gap-5 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
         <Card title="Bheed ke ghante" hint="Pichle 90 din ki visits, kis waqt shuru hui"><Bars rows={hourRows} /></Card>
         <Card title="Bheed ke din" hint="Pichle 90 din"><Bars rows={wdRows} /></Card>
       </div>
 
-      <div className="grid gap-5 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
         <Card title="Appointment par na aana (taqreeban)" hint="Confirmed appointment jis din marez ki visit darj nahi hui. Pichle 90 din.">
           <p className="text-2xl font-semibold text-clinic-ink">{pct}% <span className="text-sm font-normal text-clinic-ink/60">({noshow.length} / {linked.length})</span></p>
           <p className="mt-2 text-xs text-clinic-ink/50">Marez ne agar aur din visit ki ho to wo bhi yahan ginti mein aa sakta hai.</p>

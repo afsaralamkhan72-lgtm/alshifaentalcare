@@ -75,8 +75,8 @@ export default async function StaffPage({
             <input name="full_name" required placeholder="Naam" className={inputClass} />
             <input name="phone" placeholder="Phone (optional)" className={inputClass} />
             <input name="email" type="email" required placeholder="Email (login)" className={inputClass} autoComplete="off" />
-            <input name="password" type="text" required minLength={8} placeholder="Password (8+)" className={inputClass} autoComplete="off" />
-            <select name="role" className={inputClass} defaultValue="receptionist">
+            <input name="password" type="password" required minLength={8} placeholder="Password (8+)" className={inputClass} autoComplete="new-password" />
+            <select name="role" className={inputClass + ' ' + 'max-w-full'} defaultValue="receptionist">
               <option value="receptionist">Reception / Assistant (permissions tick se)</option>
               <option value="doctor">Doctor (clinical + paisa, sab)</option>
             </select>

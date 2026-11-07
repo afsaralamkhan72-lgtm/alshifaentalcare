@@ -15,6 +15,7 @@ import { getPrintCfg } from '@/lib/printSettings'
 import BackupPanel from '@/components/admin/BackupPanel'
 import MessageTemplatesManager from '@/components/admin/MessageTemplatesManager'
 import { OPTION_KINDS } from '@/lib/clinicOptions'
+import VisitShowSettings, { type VisitShow } from '@/components/admin/VisitShowSettings'
 
 const SECTIONS = [
   { k: 'dental', l: 'Dental dawaiyan' },
@@ -22,6 +23,7 @@ const SECTIONS = [
   { k: 'prices', l: 'Treatment prices' },
   { k: 'discounts', l: 'Riyayat ki had', owner: true },
   { k: 'lists', l: 'Takleef / Diagnosis list' },
+  { k: 'visit', l: 'Visit page par kya dikhana hai', owner: true },
   { k: 'messages', l: 'Messages (WhatsApp)' },
   { k: 'print', l: 'Print, Logo aur QR' },
   { k: 'notify', l: 'Phone notification', owner: true },
@@ -38,6 +40,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const sections = SECTIONS.filter((x) => !('owner' in x && x.owner) || isOwner)
   const s = sections.some((x) => x.k === sp.s) ? (sp.s as string) : 'dental'
   const supabase = await createClient()
+  const vsRes = s === 'visit' ? await supabase.from('site_settings').select('value').eq('key', 'visit_show').maybeSingle() : null
   const printCfg = s === 'print' ? await getPrintCfg() : null
   const dlRes = s === 'discounts' ? await supabase.from('discount_limits').select('role, max_percent') : null
   const dgRes =
@@ -101,6 +104,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
               </Link>
             </div>
           )}
+          {s === 'visit' && <VisitShowSettings initial={((vsRes?.data?.value ?? {}) as VisitShow) || {}} />}
           {s === 'discounts' && (
             <DiscountLimits
               missing={Boolean(dlRes?.error || dgRes?.error)}

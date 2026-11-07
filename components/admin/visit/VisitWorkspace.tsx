@@ -15,6 +15,7 @@ import { useTemplates } from '@/lib/useTemplates'
 import { messageLink } from '@/lib/messages'
 import { askReceipt } from '@/lib/receiptEvent'
 import PaymentDialog from '@/components/admin/PaymentDialog'
+import VisitRewards from '@/components/admin/VisitRewards'
 
 /* ------------------------------------------------------------------ */
 export interface VisitRow {
@@ -108,7 +109,7 @@ interface OldRow {
 }
 
 interface Props {
-  patient: { id: string; full_name: string; phone: string; department: string; age: number | null }
+  patient: { id: string; full_name: string; phone: string; department: string; age: number | null; notes?: string | null }
   visit: VisitRow | null
   finishedToday: { id: string; hasInvoice: boolean; prescription_id: string | null } | null
   startedMarks: Mark[]
@@ -129,6 +130,8 @@ interface Props {
   /** Settings se aayi hui chips ki list (khali ho to default) */
   opts?: { complaint: string[]; homeo_complaint: string[]; diagnosis: string[] }
   isFirstVisit?: boolean
+  /** Settings se: visit page par kaun si cheezein seedha dikhni hain (baqi "Zaroorat par" mein) */
+  visitShow?: { medical?: boolean; dental?: boolean; exam?: boolean; xray?: boolean } | null
   hasPlanned?: boolean
   xraySlot?: ReactNode
   plansSlot?: ReactNode
@@ -155,90 +158,24 @@ const SLOTS = (() => {
 const input = 'mt-1 w-full rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm outline-none focus:border-clinic-teal'
 const newKey = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : String(Date.now() + Math.random()))
 
-function Section({ n, title, children, hint, collapsed }: { n: number; title: string; children: React.ReactNode; hint?: string; collapsed?: boolean }) {
-  const head = (
-    <>
-      <span className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-clinic-teal text-sm text-white">{n}</span>
-      {title}
-    </>
-  )
+function Section({ title, children, hint, collapsed }: { n?: number; title: string; children: React.ReactNode; hint?: string; collapsed?: boolean }) {
   if (collapsed) {
     return (
-      <section id={`s${n}`} className="scroll-mt-20 rounded-2xl border border-clinic-teal/10 bg-white p-4 sm:p-5">
+      <section className="rounded-2xl border border-clinic-teal/10 bg-white p-4 sm:p-5">
         <details>
-          <summary className="cursor-pointer font-display text-lg font-semibold text-clinic-ink">
-            {head}
-            <span className="ml-2 text-xs font-normal text-clinic-ink/50">(pehle bhari ja chuki hai, kholne ke liye dabayein)</span>
-          </summary>
+          <summary className="cursor-pointer font-display text-lg font-semibold text-clinic-ink">{title}</summary>
           <div className="mt-3">{children}</div>
-          <NextBtn n={n} />
         </details>
       </section>
     )
   }
   return (
-    <section id={`s${n}`} className="scroll-mt-20 rounded-2xl border border-clinic-teal/10 bg-white p-4 sm:p-5">
-      <h2 className="font-display text-lg font-semibold text-clinic-ink">{head}</h2>
+    <section className="rounded-2xl border border-clinic-teal/10 bg-white p-4 sm:p-5">
+      <h2 className="font-display text-lg font-semibold text-clinic-ink">{title}</h2>
       {hint && <p className="mb-3 mt-1 text-xs text-clinic-ink/55">{hint}</p>}
       {!hint && <div className="mb-3" />}
       {children}
-      <NextBtn n={n} />
     </section>
-  )
-}
-
-/** Har hisse ke aakhir mein: agle hisse par chalein (agar agla hissa ho) */
-function NextBtn({ n }: { n: number }) {
-  const [has, setHas] = useState(false)
-  useEffect(() => {
-    setHas(Boolean(document.getElementById(`s${n + 1}`)))
-  }, [n])
-  if (!has) return null
-  return (
-    <div className="mt-4 flex justify-end">
-      <button
-        type="button"
-        onClick={() => document.getElementById(`s${n + 1}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-        className="rounded-full border border-clinic-teal/30 px-4 py-1.5 text-xs font-semibold text-clinic-teal hover:bg-clinic-mint"
-      >
-        Agla hissa ↓
-      </button>
-    </div>
-  )
-}
-
-/** Upar chipakti patti: saare hisse ek nazar mein, dabane par seedha wahan */
-function StepBar() {
-  const [items, setItems] = useState<{ id: string; label: string }[]>([])
-  useEffect(() => {
-    const root = document.querySelector('[data-visit-root]')
-    if (!root) return
-    const list = [...root.querySelectorAll<HTMLElement>('section[id^="s"]')]
-      .filter((el) => /^s\d+$/.test(el.id))
-      .map((el) => {
-        const t = (el.querySelector('h2, summary')?.textContent ?? '').replace(/^\d+/, '').replace(/\(.*$/, '').replace(/pehle bhari.*$/, '').trim()
-        return { id: el.id, label: t.length > 22 ? t.slice(0, 20) + '…' : t }
-      })
-      .filter((x) => x.label)
-    setItems(list)
-  }, [])
-  if (items.length < 3) return null
-  return (
-    <nav aria-label="Visit ke hisse" className="sticky top-0 z-20 -mx-4 overflow-x-auto border-b border-clinic-teal/10 bg-white/95 px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6 print:hidden">
-      <ol className="flex w-max gap-1.5 text-xs">
-        {items.map((it, i) => (
-          <li key={it.id}>
-            <button
-              type="button"
-              onClick={() => document.getElementById(it.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-              className="whitespace-nowrap rounded-full bg-clinic-mint px-3 py-1 font-semibold text-clinic-teal hover:bg-clinic-teal hover:text-white"
-            >
-              {i + 1}. {it.label}
-            </button>
-          </li>
-        ))}
-      </ol>
-    </nav>
   )
 }
 
@@ -290,18 +227,34 @@ export default function VisitWorkspace(p: Props) {
   const visitId = useRef<string | null>(v?.id ?? null)
   const [busy, setBusy] = useState<'' | 'save' | 'finish'>('')
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null)
-  const [showForm, setShowForm] = useState(!p.finishedToday || p.visit !== null)
+  // Visit tab shuru hota hai jab doctor "Naya visit shuru karein" dabaye (ya pehle ka draft maujood ho)
+  const [showForm, setShowForm] = useState(p.visit !== null)
+  const [step, setStep] = useState(1)
+  const [more, setMore] = useState(false)
+  const [wantRx, setWantRx] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [savedAt, setSavedAt] = useState(0)
   const tpl = useTemplates()
   const [done, setDone] = useState<{ visit_id: string; prescription_id: string | null; hasInvoice: boolean } | null>(null)
 
   // doctor jis ke naam par aaj ka visit (income by doctor report isi se banti hai)
   const [doctor, setDoctor] = useState(v?.doctor ?? p.defaultDoctor ?? '')
   const [confirmDone, setConfirmDone] = useState<string | null>(null)
+  // "Haan, mukammal" dabane par treatment usi waqt band nahi hoti: visit mukammal hone par band hoti hai (taake is visit ka note/ginti bhi bane)
+  const [completeOnFinish, setCompleteOnFinish] = useState<Record<string, boolean>>({})
   // RCT mukammal hone ke baad: agla qadam (crown) ka ishara
   const [nextStep, setNextStep] = useState<{ id: string; name: string; teeth: string[]; saved?: boolean } | null>(null)
 
   // 2, 3 history
-  const [medical, setMedical] = useState<Record<string, unknown>>(p.history.medical_history)
+  // Patient banate waqt jo allergy / blood thinner likhi thi (notes mein) wahi yahan pehle se aa jaye, dobara na poochni paray
+  const [medical, setMedical] = useState<Record<string, unknown>>(() => {
+    const m = { ...p.history.medical_history } as Record<string, unknown>
+    const notes = p.patient.notes ?? ''
+    const a = /Allergy:\s*([^·]+)/i.exec(notes)
+    if (a && !String(m.allergies ?? '').trim()) m.allergies = a[1].trim()
+    if (/blood thinner/i.test(notes) && !m.blood_thinners) m.blood_thinners = 'Yes'
+    return m
+  })
   const [dental, setDental] = useState<Record<string, unknown>>(p.history.dental_history)
   // 4, 5
   const [cItems, setCItems] = useState<string[]>(v?.complaint?.items ?? [])
@@ -328,7 +281,19 @@ export default function VisitWorkspace(p: Props) {
   const [extra, setExtra] = useState<{ label: string; amount: string }[]>([])
   const [discount, setDiscount] = useState('')
   const [paid, setPaid] = useState('')
-  const [method, setMethod] = useState('cash')
+  const [method, setMethodRaw] = useState('cash')
+  const setMethod = (m: string) => {
+    setMethodRaw(m)
+    try {
+      localStorage.setItem('alshifa-pay-method', m)
+    } catch {}
+  }
+  useEffect(() => {
+    try {
+      const m = localStorage.getItem('alshifa-pay-method')
+      if (m && ['cash', 'bank', 'easypaisa', 'jazzcash'].includes(m)) setMethodRaw(m)
+    } catch {}
+  }, [])
   // 12 next
   const [nextDate, setNextDate] = useState(v?.next_date ?? '')
   const [nextTime, setNextTime] = useState(v?.next_time ?? '')
@@ -366,6 +331,7 @@ export default function VisitWorkspace(p: Props) {
         if (raw) {
           apply(JSON.parse(raw))
           found = true
+          setShowForm(true)
         }
       } catch {}
       // Browser mein kuch na ho (naya device / browser saaf) to server par Save ki hui nakal
@@ -534,6 +500,19 @@ export default function VisitWorkspace(p: Props) {
     [/mobility|impact|non-?restorable|periodontitis/i, /extraction/i],
   ]
   const dentalCat = p.catalog.filter((c) => c.department !== 'homeopathic')
+  // Chart par kaam ka nishan lagane se bill wali treatment ki qatar khud ban jati hai (aur hatane par hat jati hai)
+  const WORK_RX: Record<string, RegExp> = { filling: /filling/i, rct: /root canal|\brct\b/i, crown: /crown/i, bridge: /bridge/i, extraction: /extraction/i, implant: /implant/i, denture: /denture/i }
+  function onChartWork(cond: string, teeth: string[], planned: boolean, on: boolean) {
+    const rx = WORK_RX[cond]
+    if (!rx) return
+    if (on) {
+      const hit = dentalCat.find((c) => rx.test(c.name) && (c.applies_to ?? 'tooth') === 'tooth')
+      if (!hit) return
+      for (const t of teeth) addTxTooth(hit.name, t, planned)
+    } else {
+      for (const r of rows) if (r.applies === 'tooth' && rx.test(r.name)) for (const t of teeth) if (r.teeth.includes(t)) removeTxTooth(r.key, t)
+    }
+  }
   function renderToothWork(tooth: string) {
     const myDx = diags.filter((d) => (d.teeth ?? []).includes(tooth)).map((d) => d.text)
     const myRows = rows.filter((r) => r.applies === 'tooth' && r.teeth.includes(tooth))
@@ -660,16 +639,14 @@ export default function VisitWorkspace(p: Props) {
   function setRowApplies(r: TRow, a: Applies) {
     updRow(r.key, { applies: a, teeth: a === 'tooth' ? (r.teeth.length ? r.teeth : [...sel]) : [], jaw: a === 'jaw' ? r.jaw : '', unit: a === 'tooth' ? r.unit : null })
   }
-  async function completeTreatment(id: string) {
+  function completeTreatment(id: string) {
     setMsg(null)
     const doneT = p.treatments.find((x) => x.id === id)
-    const { error } = await createClient().rpc('set_treatment_status', { p_treatment_id: id, p_status: 'completed' })
     setConfirmDone(null)
-    if (error) return setMsg({ ok: false, t: friendlyError(error.message) })
-    setOld((o) => ({ ...o, [id]: { tick: false, notes: '', price: '' } }))
-    setMsg({ ok: true, t: 'Treatment mukammal likh di gayi.' })
+    setCompleteOnFinish((m) => ({ ...m, [id]: true }))
+    // is visit ka note bhi banna chahiye, is liye visit ka nishan khud lag jaye
+    setOld((o) => ({ ...o, [id]: { tick: true, notes: o[id]?.notes ?? '', price: o[id]?.price ?? '' } }))
     if (doneT && /root canal|\brct\b|pulpectomy/i.test(doneT.name)) setNextStep({ id: doneT.id, name: doneT.name, teeth: doneT.teeth, saved: true })
-    router.refresh()
   }
 
   const consultCat = p.catalog.find((c) => /consult|check-?up/i.test(c.name) && (homeo ? c.department !== 'dental' : c.department !== 'homeopathic')) ?? null
@@ -683,16 +660,63 @@ export default function VisitWorkspace(p: Props) {
   const newCharges = treatTotal + medTotal + extraTotal - disc
   const dueNow = p.balance + newCharges
   const paidNum = Number(paid) || 0
+  const savingRef = useRef(false)
+  const busyRef = useRef('')
+  busyRef.current = busy
+  const lastSaved = useRef<string | null>(null)
+  const sigNow = JSON.stringify([data(), rows, old, lines, rxNotes, extra, sel, doctor])
+  useEffect(() => {
+    if (!restored || done || !showForm || !canEdit) return
+    if (lastSaved.current === null) {
+      // pehli dafa: jo shuru mein tha usay "badla hua nahi" maanein, jab tak kuch likha na jaye
+      lastSaved.current = visitId.current ? sigNow : sigNow
+      return
+    }
+    if (lastSaved.current === sigNow) return
+    const t = setTimeout(() => void quietSave(), 6000)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sigNow, restored, done, showForm])
 
+  const openingVisit = useRef<Promise<string | null> | null>(null)
   async function ensureVisit(): Promise<string | null> {
     if (visitId.current) return visitId.current
-    const { data: id, error } = await createClient().rpc('open_clinical_visit', { p_patient_id: p.patient.id })
-    if (error || !id) {
-      setMsg({ ok: false, t: friendlyError(error?.message ?? 'Visit nahi khul saka') })
-      return null
+    // autosave aur finish aik sath chalen to visit do dafa na khule
+    if (!openingVisit.current) {
+      openingVisit.current = (async () => {
+        const { data: id, error } = await createClient().rpc('open_clinical_visit', { p_patient_id: p.patient.id })
+        if (error || !id) {
+          setMsg({ ok: false, t: friendlyError(error?.message ?? 'Visit nahi khul saka') })
+          return null
+        }
+        visitId.current = id as string
+        return visitId.current
+      })().finally(() => {
+        openingVisit.current = null
+      })
     }
-    visitId.current = id as string
-    return visitId.current
+    return openingVisit.current
+  }
+
+  /** Khamoshi se save (qadam badalte waqt aur kuch der baad khud). Bill ki raqam/dawa "Visit khatam" par hi lagti hai. */
+  async function quietSave() {
+    if (!canEdit || done || busyRef.current || savingRef.current) return
+    savingRef.current = true
+    setSaving(true)
+    try {
+      const id = await ensureVisit()
+      if (!id) return
+      const sb = createClient()
+      const { error } = await sb.rpc('save_clinical_visit', { p_id: id, p_data: data() })
+      if (!error) {
+        await sb.rpc('save_visit_draft_extra', { p_id: id, p_extra: { rows, old, lines, rxNotes, extra, sel, paid } })
+        lastSaved.current = sigNow
+        setSavedAt(Date.now())
+      }
+    } finally {
+      savingRef.current = false
+      setSaving(false)
+    }
   }
 
   async function save() {
@@ -712,8 +736,14 @@ export default function VisitWorkspace(p: Props) {
   async function finish() {
     if (busy) return
     if (paidNum > dueNow + 0.001) return setMsg({ ok: false, t: `Mili raqam kul baqaya (${money(dueNow)}) se zyada hai` })
-    if (lines.some((l) => !l.name.trim())) return setMsg({ ok: false, t: 'Har dawa ka naam likhein' })
-    if (rows.some((r) => !r.name.trim())) return setMsg({ ok: false, t: 'Har treatment ka naam likhein (ya qatar hata dein)' })
+    if (lines.some((l) => !l.name.trim())) {
+      setStep(3)
+      return setMsg({ ok: false, t: 'Qadam 3 (Dawa): har dawa ka naam likhein' })
+    }
+    if (rows.some((r) => !r.name.trim())) {
+      setStep(2)
+      return setMsg({ ok: false, t: 'Qadam 2 (Daant aur kaam): har treatment ka naam likhein (ya qatar hata dein)' })
+    }
     setBusy('finish')
     setMsg(null)
     const id = await ensureVisit()
@@ -786,6 +816,10 @@ export default function VisitWorkspace(p: Props) {
     for (const e of extras) { const q = Number(e.qty) || 0; if (e.inventory_id && q > 0) extraMap.set(e.inventory_id, (extraMap.get(e.inventory_id) ?? 0) + q) }
     for (const [inventory_id, qty] of extraMap) usage.push({ inventory_id, qty, treatment_id: null as unknown as string })
     let warn = consentWarn
+    for (const tid of Object.keys(completeOnFinish).filter((k) => completeOnFinish[k])) {
+      const { error: cErr } = await createClient().rpc('set_treatment_status', { p_treatment_id: tid, p_status: 'completed' })
+      if (cErr) warn += 'Treatment mukammal nahi likhi ja saki: ' + friendlyError(cErr.message) + ' '
+    }
     if (recallEff && canEdit) {
       const months = Number(recallEff)
       const type = hasScaling() ? 'Scaling & Polishing' : 'Routine Check-up'
@@ -799,8 +833,14 @@ export default function VisitWorkspace(p: Props) {
       if (rErr) warn += 'Recall save nahi hua: ' + friendlyError(rErr.message) + ' '
     }
     if (usage.length > 0) {
-      const { error: sErr } = await createClient().rpc('record_usage', { p_items: usage, p_patient_id: p.patient.id, p_invoice_id: null, p_note: 'Visit', p_key: finishKey.current + ':stk' })
-      if (sErr) warn += 'Visit mukammal, magar samaan stock se nahi kata: ' + sErr.message
+      // Har cheez alag se katti hai: aik ka stock kam ho to baqi phir bhi kat jati hain
+      const sbu = createClient()
+      const failed: string[] = []
+      for (let i = 0; i < usage.length; i++) {
+        const { error: sErr } = await sbu.rpc('record_usage', { p_items: [usage[i]], p_patient_id: p.patient.id, p_invoice_id: null, p_note: 'Visit', p_key: finishKey.current + ':stk' + i })
+        if (sErr) failed.push(sErr.message)
+      }
+      if (failed.length) warn += `Visit mukammal. ${usage.length - failed.length} cheezein stock se kat gayin, ${failed.length} nahi kati: ` + failed.join(' ')
     }
     try {
       localStorage.removeItem(draftKey)
@@ -816,9 +856,6 @@ export default function VisitWorkspace(p: Props) {
 
   const complaintList = (homeo ? p.opts?.homeo_complaint : p.opts?.complaint)?.length ? (homeo ? p.opts!.homeo_complaint : p.opts!.complaint) : homeo ? HOMEO_COMPLAINTS : COMPLAINTS
   const diagList = p.opts?.diagnosis?.length ? p.opts.diagnosis : DIAG_SUGGEST
-  // Section numbers jo asal mein dikhte hain unhi ke hisaab se (homeopathy mein 3 aur 6 nahi hote)
-  let secNoCount = 1
-  const secNo = () => ++secNoCount
   const fin = done ? { id: done.visit_id, prescription_id: done.prescription_id, hasInvoice: done.hasInvoice } : p.finishedToday
 
   /* ---------- sirf bill dekhne wale (reception) ---------- */
@@ -830,55 +867,84 @@ export default function VisitWorkspace(p: Props) {
     )
   }
 
-  return (
-    <div data-visit-root className="grid min-w-0 grid-cols-1 gap-4">
-      <StepBar />
-      {fin && (
-        <div className="rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-4">
-          <p className="font-semibold text-emerald-800">✓ Aaj ka visit mukammal ho gaya</p>
-          {msg && <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">{msg.t}</p>}
-          <div className="mt-3 flex flex-wrap gap-2 text-sm">
-            {fin.prescription_id && (
-              <a href={`/admin/prescriptions/${fin.prescription_id}/print`} target="_blank" className="rounded-full bg-clinic-teal px-5 py-2.5 font-semibold text-white">
-                Prescription PDF
-              </a>
-            )}
-            {p.patient.phone && (
-              <a
-                href={messageLink('visit_thanks', { full_name: p.patient.full_name, phone: p.patient.phone, gender: (p.patient as { gender?: string | null }).gender ?? null }, {}, tpl)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-full bg-whatsapp px-5 py-2.5 font-semibold text-white"
-              >
-                WhatsApp
-              </a>
-            )}
-            {fin.hasInvoice && p.perms.money && (
-              <a href={`/admin/visits/${fin.id}/invoice`} target="_blank" className="rounded-full bg-clinic-teal px-5 py-2.5 font-semibold text-white">
-                Invoice PDF
-              </a>
-            )}
+  /* ---------- 4 qadam ---------- */
+  const vs = (k: 'medical' | 'dental' | 'exam' | 'xray') =>
+    Boolean(p.visitShow?.[k]) ||
+    (k === 'exam' && Object.entries(findings).some(([key, val]) => key !== 'radiographic' && String(val ?? '').trim() !== '')) ||
+    (k === 'xray' && String(findings.radiographic ?? '').trim() !== '')
+  const moreOpts = [
+    !vs('medical') && 'Sehat history',
+    !homeo && !vs('dental') && 'Daanton ki history',
+    !vs('exam') && 'Muaina',
+    !vs('xray') && 'X-ray',
+  ].filter(Boolean) as string[]
+  const stepIds: number[] = [1, 2, ...(p.perms.rx ? [3] : []), 4]
+  const stepPos = Math.max(0, stepIds.indexOf(step))
+  const stepTitle: Record<number, string> = { 1: 'Takleef', 2: homeo ? 'Masla aur ilaj' : 'Daant aur kaam', 3: 'Dawa', 4: 'Paise aur khatam' }
+  const stepCls = (n: number) => (step === n ? 'grid gap-4' : 'hidden')
+  const rxOn = wantRx || lines.length > 0
+  function goStep(n: number) {
+    setStep(n)
+    void quietSave()
+    setTimeout(() => document.querySelector('[data-visit-root] nav[aria-label="Visit ke qadam"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60)
+  }
+  const Stepper = () => (
+    <nav aria-label="Visit ke qadam" className="rounded-2xl border border-clinic-teal/10 bg-white p-3 print:hidden">
+      <p className="text-xs font-semibold text-clinic-ink/60">
+        Qadam {stepPos + 1} / {stepIds.length}
+      </p>
+      <ol className="mt-2 flex gap-1.5">
+        {stepIds.map((n, i) => (
+          <li key={n} className="min-w-0 flex-1">
+            <button
+              type="button"
+              onClick={() => goStep(n)}
+              aria-current={n === step ? 'step' : undefined}
+              className={`w-full truncate rounded-full px-2 py-1.5 text-[11px] font-semibold sm:text-xs ${n === step ? 'bg-clinic-teal text-white' : i < stepPos ? 'bg-clinic-mint text-clinic-teal' : 'bg-clinic-sand text-clinic-ink/60'}`}
+            >
+              {i + 1}. {stepTitle[n]}
+            </button>
+          </li>
+        ))}
+      </ol>
+    </nav>
+  )
+  const medConds = Array.isArray(medical.conditions) ? (medical.conditions as string[]) : []
+  const toggleCond = (c: string) =>
+    setMedical({ ...medical, conditions: medConds.includes(c) ? medConds.filter((x) => x !== c) : [...medConds.filter((x) => x !== 'None'), c] })
+  const healthCard =
+    p.isFirstVisit && !vs('medical') ? (
+      <section className="rounded-2xl border border-clinic-teal/10 bg-white p-4 sm:p-5">
+        <h2 className="font-display text-lg font-semibold text-clinic-ink">Sehat ki chhoti jaankari</h2>
+        <p className="mb-3 mt-1 text-xs text-clinic-ink/55">Pehli visit par sirf zaroori baatein. Poori history &quot;Zaroorat par&quot; mein hai.</p>
+        <fieldset disabled={!canEdit} className="grid gap-3">
+          <div className="flex flex-wrap gap-2">
+            {[
+              ['Diabetes', 'Sugar'],
+              ['Hypertension', 'BP'],
+            ].map(([c, l]) => (
+              <button key={c} type="button" onClick={() => toggleCond(c)} className={`rounded-full px-4 py-2 text-sm font-semibold ${medConds.includes(c) ? 'bg-clinic-teal text-white' : 'border border-clinic-teal/25 bg-white text-clinic-ink/75'}`}>
+                {medConds.includes(c) ? '✓ ' : ''}
+                {l}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setMedical({ ...medical, blood_thinners: medical.blood_thinners === 'Yes' ? '' : 'Yes' })}
+              className={`rounded-full px-4 py-2 text-sm font-semibold ${medical.blood_thinners === 'Yes' ? 'bg-clinic-teal text-white' : 'border border-clinic-teal/25 bg-white text-clinic-ink/75'}`}
+            >
+              {medical.blood_thinners === 'Yes' ? '✓ ' : ''}Blood thinner
+            </button>
           </div>
-          {p.hasPlanned && p.perms.money && (
-            <a href={`/admin/patients/${p.patient.id}/estimate`} target="_blank" className="mt-3 inline-block text-xs font-semibold text-clinic-teal underline">
-              Treatment plan ka estimate (print)
-            </a>
-          )}
-          {!showForm && !done && (
-            <button type="button" onClick={() => setShowForm(true)} className="mt-3 text-xs font-semibold text-clinic-teal underline">
-              Aaj dobara naya visit shuru karein
-            </button>
-          )}
-          {done && (
-            <button type="button" onClick={() => window.location.reload()} className="mt-3 text-xs font-semibold text-clinic-teal underline">
-              Aaj dobara naya visit shuru karein
-            </button>
-          )}
-        </div>
-      )}
-
-      {showForm && !done && (
-        <>
+          <div>
+            <label className="text-xs font-medium text-clinic-ink/70">Kisi dawa / cheez se allergy?</label>
+            <input value={(medical.allergies as string) ?? ''} onChange={(e) => setMedical({ ...medical, allergies: e.target.value })} placeholder="Nahi hai to khali chhor dein" className={input} />
+          </div>
+        </fieldset>
+      </section>
+    ) : null
+  const blk_head = (
+    <>
           {(p.doctors.length > 0 || doctor) && (
             <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-clinic-teal/10 bg-white px-4 py-3 text-sm">
               <label htmlFor="visit-doctor" className="font-semibold text-clinic-ink/70">
@@ -911,20 +977,32 @@ export default function VisitWorkspace(p: Props) {
             </label>
           )}
           {p.consentAt && <p className="px-1 text-xs text-clinic-ink/50">✓ Ijazat (consent) li ja chuki hai — {fmtDate(p.consentAt.slice(0, 10))}</p>}
+    </>
+  )
+  const blk_med = (
+    <>
           {/* 2. MEDICAL HISTORY */}
-          <Section n={secNo()} title="Sehat ki history (Medical History)" collapsed={!p.isFirstVisit} hint="Allergy, sugar, BP, dil ki bimari, blood thinner. Pehli visit par zaroor bharein.">
+          <Section title="Sehat ki history (Medical History)" hint="Allergy, sugar, BP, dil ki bimari, blood thinner. Pehli visit par zaroor bharein.">
             <HistoryFields column="medical_history" data={medical} onChange={setMedical} canEdit={canEdit} />
           </Section>
 
+    </>
+  )
+  const blk_den = (
+    <>
           {/* 3. DENTAL HISTORY */}
           {!homeo && (
-            <Section n={secNo()} title="Daanton ki pichli history (Dental History)" collapsed={!p.isFirstVisit}>
+            <Section title="Daanton ki pichli history (Dental History)" collapsed={!p.isFirstVisit}>
               <HistoryFields column="dental_history" data={dental} onChange={setDental} canEdit={canEdit} />
             </Section>
           )}
 
+    </>
+  )
+  const blk_cc = (
+    <>
           {/* 4. CHIEF COMPLAINT */}
-          <Section n={secNo()} title="Takleef (Chief Complaint)" hint="Patient ko kya takleef hai, kab se.">
+          <Section title="Takleef (Chief Complaint)" hint="Patient ko kya takleef hai, kab se.">
             <fieldset disabled={!canEdit} className="grid gap-3">
               <div className="flex flex-wrap gap-2">
                 {complaintList.map((c) => (
@@ -971,8 +1049,12 @@ export default function VisitWorkspace(p: Props) {
             </fieldset>
           </Section>
 
+    </>
+  )
+  const blk_exam = (
+    <>
           {/* 5. CLINICAL EXAMINATION */}
-          <Section n={secNo()} title="Muaina (Examination)" hint="Doctor ka muaina: masoorhe, muh, jabda.">
+          <Section title="Muaina (Examination)" hint="Doctor ka muaina: masoorhe, muh, jabda.">
             <fieldset disabled={!canEdit} className="grid gap-3 sm:grid-cols-3">
               {FINDINGS.map((f) => (
                 <div key={f.k}>
@@ -983,15 +1065,23 @@ export default function VisitWorkspace(p: Props) {
             </fieldset>
           </Section>
 
+    </>
+  )
+  const blk_chart = (
+    <>
           {/* 6. DENTAL CHART */}
           {!homeo && (
-            <Section n={secNo()} title="Dental Chart">
-              <ToothChart age={p.patient.age} selected={sel} onSelect={pickTeeth} marks={marks} onMarks={setMarks} old={p.chartRecords} canEdit={canEdit} renderExtra={renderToothWork} />
+            <Section title="Dental Chart">
+              <ToothChart age={p.patient.age} selected={sel} onSelect={pickTeeth} marks={marks} onMarks={setMarks} old={p.chartRecords} canEdit={canEdit} renderExtra={renderToothWork} onWork={onChartWork} />
             </Section>
           )}
 
+    </>
+  )
+  const blk_xray = (
+    <>
           {/* 7. X-RAY */}
-          <Section n={secNo()} title="X-ray / Investigation">
+          <Section title="X-ray / Investigation">
             <div className="mb-3">
               <label className="text-xs font-medium text-clinic-ink/70">X-ray / report mein kya nazar aaya</label>
               <textarea rows={2} disabled={!canEdit} value={findings.radiographic ?? ''} onChange={(e) => setFindings({ ...findings, radiographic: e.target.value })} placeholder="Caries, bone loss, periapical ..." className={input} />
@@ -999,8 +1089,12 @@ export default function VisitWorkspace(p: Props) {
             {p.xraySlot}
           </Section>
 
+    </>
+  )
+  const blk_dx = (
+    <>
           {/* 8. DIAGNOSIS */}
-          <Section n={secNo()} title="Diagnosis (masla)" hint="Daant par tap karke chart ke panel se jorein. Yahan sab ek jagah nazar aata hai, badalna ho to likh kar badlein.">
+          <Section title="Diagnosis (masla)" hint="Daant par tap karke chart ke panel se jorein. Yahan sab ek jagah nazar aata hai, badalna ho to likh kar badlein.">
             <datalist id="diag-list">
               {diagList.map((d) => (
                 <option key={d} value={d} />
@@ -1020,14 +1114,18 @@ export default function VisitWorkspace(p: Props) {
               ))}
               {canEdit && (
                 <button type="button" onClick={() => setDiags([...diags, { text: '', teeth: sel.length === 1 ? [...sel] : [] }])} className="justify-self-start rounded-full border border-clinic-teal/30 px-4 py-1.5 text-sm font-semibold text-clinic-teal">
-                  + Diagnosis
+                  {homeo ? '+ Diagnosis' : '+ Poore munh ka masla (daant ke baghair)'}
                 </button>
               )}
             </div>
           </Section>
 
+    </>
+  )
+  const blk_tx = (
+    <>
           {/* 9. TREATMENT */}
-          <Section n={secNo()} title="Aaj ka kaam aur Plan (Treatment)" hint="Kaam chart ke panel se jorein. Yahan qeemat, samaan aur note dekhein/badlein.">
+          <Section title="Aaj ka kaam aur Plan (Treatment)" hint="Kaam chart ke panel se jorein. Yahan qeemat, samaan aur note dekhein/badlein.">
             <datalist id="cat-list">
               {p.catalog
                 .filter((c) => (homeo ? c.department !== 'dental' : c.department !== 'homeopathic'))
@@ -1066,6 +1164,13 @@ export default function VisitWorkspace(p: Props) {
                                 </button>
                                 <button type="button" onClick={() => setConfirmDone(null)} className="text-clinic-ink/60 underline">
                                   Nahi
+                                </button>
+                              </span>
+                            ) : completeOnFinish[t.id] ? (
+                              <span className="inline-flex flex-wrap items-center gap-2 rounded-lg bg-emerald-50 px-2 py-1.5 text-emerald-900">
+                                ✓ &quot;Visit mukammal karein&quot; dabate hi ye treatment mukammal ho jayegi.
+                                <button type="button" onClick={() => setCompleteOnFinish((m) => ({ ...m, [t.id]: false }))} className="text-clinic-ink/60 underline">
+                                  Wapas
                                 </button>
                               </span>
                             ) : (
@@ -1166,7 +1271,7 @@ export default function VisitWorkspace(p: Props) {
                     <button type="button" onClick={() => updRow(r.key, { planned: true })} className={`rounded-full px-3 py-1 text-xs font-semibold ${r.planned ? 'bg-amber-500 text-white' : 'border border-clinic-ink/20 text-clinic-ink/60'}`}>
                       Sirf plan (baad mein)
                     </button>
-                    <input value={r.notes} onChange={(e) => updRow(r.key, { notes: e.target.value })} placeholder="Note (optional)" className="min-w-0 flex-1 rounded-lg border border-clinic-teal/20 px-3 py-1.5 text-sm" />
+                    <input value={r.notes} onChange={(e) => updRow(r.key, { notes: e.target.value })} placeholder="Note (optional)" className="min-w-[9rem] flex-1 rounded-lg border border-clinic-teal/20 px-3 py-1.5 text-sm" />
                   </div>
                   {!r.planned && r.catalog_id && canEdit && p.canSeeRecipes && p.materials[r.catalog_id] === undefined && (
                     <p className="text-xs text-amber-700" data-testid="no-recipe">Is treatment ka samaan (recipe) abhi nahi likha — Price List mein likh dein to stock khud kate ga.</p>
@@ -1221,9 +1326,13 @@ export default function VisitWorkspace(p: Props) {
             </div>
           </Section>
 
+    </>
+  )
+  const blk_rx = (
+    <>
           {/* 10. PRESCRIPTION */}
           {p.perms.rx && (
-            <Section n={secNo()} title="Dawa / Prescription (optional)">
+            <Section title="Dawa / Prescription (optional)">
           <div className="flex flex-wrap items-center gap-2">
             {(['dental', 'homeopathic'] as const).map((c) => (
               <button key={c} type="button" onClick={() => setRxCat(c)} className={`rounded-full px-4 py-1.5 text-sm font-semibold ${rxCat === c ? 'bg-clinic-teal text-white' : 'border border-clinic-teal/25 text-clinic-ink/70'}`}>
@@ -1357,9 +1466,14 @@ export default function VisitWorkspace(p: Props) {
             </Section>
           )}
 
+    </>
+  )
+  const blk_bill = (
+    <>
           {/* 11. BILL */}
           {p.perms.money && (
-            <Section n={secNo()} title="Bill / Paisa" hint="Aaj ka kaam, discount aur kitne paise mile. Reception ya doctor, jo bhi paise le.">
+            <Section title="Bill / Paisa" hint="Aaj ka kaam, discount aur kitne paise mile. Reception ya doctor, jo bhi paise le.">
+              {(p.perms.collect || p.perms.owner) && <VisitRewards patientId={p.patient.id} />}
               <div className="grid gap-2 text-sm">
                 {treatTotal > 0 && (
                   <p className="flex justify-between">
@@ -1425,8 +1539,8 @@ export default function VisitWorkspace(p: Props) {
                           <option value="jazzcash">JazzCash</option>
                         </select>
                         <input type="number" min={0} max={dueNow} value={paid} onChange={(e) => setPaid(e.target.value)} className="w-28 rounded-lg border border-clinic-teal/20 px-2 py-1.5 text-right" />
-                        <button type="button" onClick={() => setPaid(String(dueNow))} className="text-xs text-clinic-teal">
-                          poora
+                        <button type="button" onClick={() => setPaid(String(dueNow))} className="rounded-full bg-clinic-teal px-3 py-1.5 text-xs font-semibold text-white">
+                          Poora mil gaya ({money(dueNow)})
                         </button>
                       </span>
                     </div>
@@ -1446,8 +1560,12 @@ export default function VisitWorkspace(p: Props) {
             </Section>
           )}
 
+    </>
+  )
+  const blk_next = (
+    <>
           {/* 12. NEXT APPOINTMENT */}
-          <Section n={secNo()} title="Aage kya (agli appointment / recall)">
+          <Section title="Aage kya (agli appointment / recall)">
             <fieldset disabled={!canEdit} className="grid gap-3 sm:grid-cols-3">
               <div>
                 <label className="text-xs font-medium text-clinic-ink/70">Tareekh <span className="font-normal text-clinic-ink/45">(aakhri visit ho to khali chhodein)</span></label>
@@ -1498,23 +1616,154 @@ export default function VisitWorkspace(p: Props) {
             ) : null}
           </Section>
 
-          {/* SAVE / FINISH */}
-          {canEdit && (
-            <div className="sticky bottom-0 z-10 -mx-4 border-t border-clinic-teal/15 bg-white/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
-              {msg && <p className={`mb-2 rounded-lg px-3 py-2 text-sm ${msg.ok ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-700'}`}>{msg.t}</p>}
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-xs text-clinic-ink/50">Aaj {fmtDate(todayKarachi())}</p>
-                <div className="flex gap-2">
-                  <button onClick={save} disabled={!!busy} className="rounded-full border-2 border-clinic-teal px-5 py-2.5 text-sm font-semibold text-clinic-teal disabled:opacity-50">
-                    {busy === 'save' ? 'Save ho raha hai...' : 'Draft save'}
-                  </button>
-                  <button onClick={finish} disabled={!!busy} className="rounded-full bg-clinic-teal px-6 py-2.5 text-sm font-semibold text-white disabled:opacity-50">
-                    {busy === 'finish' ? 'Mukammal ho raha hai...' : 'Visit mukammal karein ✓'}
-                  </button>
-                </div>
-              </div>
+    </>
+  )
+
+  return (
+    <div data-visit-root className="grid min-w-0 grid-cols-1 gap-4">
+      {fin && (
+        <div className="rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-4">
+          <p className="font-semibold text-emerald-800">✓ Aaj ka visit mukammal ho gaya</p>
+          {msg && <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">{msg.t}</p>}
+          <div className="mt-3 flex flex-wrap gap-2 text-sm">
+            {fin.prescription_id && (
+              <a href={`/admin/prescriptions/${fin.prescription_id}/print`} target="_blank" className="rounded-full bg-clinic-teal px-5 py-2.5 font-semibold text-white">
+                Prescription PDF
+              </a>
+            )}
+            {p.patient.phone && (
+              <a
+                href={messageLink('visit_thanks', { full_name: p.patient.full_name, phone: p.patient.phone, gender: (p.patient as { gender?: string | null }).gender ?? null }, {}, tpl)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-full bg-whatsapp px-5 py-2.5 font-semibold text-white"
+              >
+                WhatsApp
+              </a>
+            )}
+            {fin.hasInvoice && p.perms.money && (
+              <a href={`/admin/visits/${fin.id}/invoice`} target="_blank" className="rounded-full bg-clinic-teal px-5 py-2.5 font-semibold text-white">
+                Invoice PDF
+              </a>
+            )}
+            {fin.hasInvoice && p.perms.collect && p.balance > 0 && <PaymentDialog patient={p.patient} balance={p.balance} />}
+          </div>
+          {p.hasPlanned && p.perms.money && (
+            <a href={`/admin/patients/${p.patient.id}/estimate`} target="_blank" className="mt-3 inline-block text-xs font-semibold text-clinic-teal underline">
+              Treatment plan ka estimate (print)
+            </a>
+          )}
+          {(p.perms.collect || p.perms.owner) && fin.hasInvoice && (
+            <div className="mt-3">
+              <VisitRewards patientId={p.patient.id} visitId={fin.id} />
             </div>
           )}
+          {!showForm && !done && (
+            <button type="button" onClick={() => setShowForm(true)} className="mt-3 text-xs font-semibold text-clinic-teal underline">
+              Aaj dobara naya visit shuru karein
+            </button>
+          )}
+          {done && (
+            <button type="button" onClick={() => window.location.reload()} className="mt-3 text-xs font-semibold text-clinic-teal underline">
+              Aaj dobara naya visit shuru karein
+            </button>
+          )}
+        </div>
+      )}
+
+      {!showForm && !done && !p.finishedToday && canEdit && (
+        <section className="rounded-2xl border border-clinic-teal/15 bg-white p-4 text-center">
+          <p className="text-sm text-clinic-ink/70">Marez ka record neeche dekh sakte hain. Aaj ka visit likhna ho to:</p>
+          <button type="button" onClick={() => setShowForm(true)} className="mt-3 w-full rounded-full bg-clinic-teal px-6 py-3.5 text-base font-semibold text-white sm:w-auto">
+            + Naya visit shuru karein
+          </button>
+        </section>
+      )}
+
+      {showForm && !done && (
+        <>
+          <Stepper />
+          <div className={stepCls(1)}>
+            {blk_head}
+            {vs('medical') && blk_med}
+            {vs('dental') && !homeo && blk_den}
+            {healthCard}
+            {blk_cc}
+            {vs('exam') && blk_exam}
+            {vs('xray') && blk_xray}
+            {moreOpts.length > 0 && (
+              <div className="rounded-2xl border border-dashed border-clinic-teal/30 bg-white/60 p-3">
+                <button type="button" onClick={() => setMore(!more)} aria-expanded={more} className="flex w-full items-center justify-between gap-2 text-left text-sm font-semibold text-clinic-teal">
+                  <span>Zaroorat par {more ? '▴' : '▾'}</span>
+                  <span className="text-xs font-normal text-clinic-ink/55">{moreOpts.join(', ')}</span>
+                </button>
+                {more && (
+                  <div className="mt-3 grid gap-4">
+                    {!vs('medical') && blk_med}
+                    {!vs('dental') && !homeo && blk_den}
+                    {!vs('exam') && blk_exam}
+                    {!vs('xray') && blk_xray}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          <div className={stepCls(2)}>
+            {!homeo && blk_chart}
+            {blk_dx}
+            {blk_tx}
+          </div>
+          {p.perms.rx && (
+            <div className={stepCls(3)}>
+              <section className="rounded-2xl border border-clinic-teal/10 bg-white p-4 sm:p-5">
+                <h2 className="font-display text-lg font-semibold text-clinic-ink">Dawa likhni hai?</h2>
+                <div className="mt-3 flex gap-2">
+                  <button type="button" onClick={() => setWantRx(true)} className={`flex-1 rounded-full px-5 py-3 text-base font-semibold ${rxOn ? 'bg-clinic-teal text-white' : 'border border-clinic-teal/30 text-clinic-teal'}`}>
+                    Haan
+                  </button>
+                  <button
+                    type="button"
+                    disabled={lines.length > 0}
+                    onClick={() => setWantRx(false)}
+                    className={`flex-1 rounded-full px-5 py-3 text-base font-semibold disabled:opacity-40 ${!rxOn ? 'bg-clinic-teal text-white' : 'border border-clinic-teal/30 text-clinic-teal'}`}
+                  >
+                    Nahi
+                  </button>
+                </div>
+                {!rxOn && <p className="mt-2 text-xs text-clinic-ink/55">Is visit mein koi dawa nahi likhi jayegi. Agla qadam dabayein.</p>}
+              </section>
+              {rxOn && blk_rx}
+            </div>
+          )}
+          <div className={stepCls(4)}>
+            {blk_bill}
+            {blk_next}
+          </div>
+          {/* QADAM / SAVE / FINISH */}
+          <div className="sticky bottom-[calc(3.6rem+env(safe-area-inset-bottom))] z-10 -mx-4 border-t border-clinic-teal/15 bg-white/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:bottom-0">
+            {msg && <p className={`mb-2 rounded-lg px-3 py-2 text-sm ${msg.ok ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-700'}`}>{msg.t}</p>}
+            <div className="flex items-center justify-between gap-2">
+              <p className="min-w-0 whitespace-nowrap text-[11px] text-clinic-ink/55">{saving ? 'Save ho raha hai...' : savedAt ? '✓ Save ho gaya' : `Aaj ${fmtDate(todayKarachi())}`}</p>
+              <div className="flex shrink-0 items-center gap-2">
+                {stepPos > 0 && (
+                  <button type="button" onClick={() => goStep(stepIds[stepPos - 1])} className="rounded-full px-2 py-2.5 text-sm font-semibold text-clinic-ink/60">
+                    ← Pichla
+                  </button>
+                )}
+                {stepPos < stepIds.length - 1 ? (
+                  <button type="button" onClick={() => goStep(stepIds[stepPos + 1])} className="rounded-full bg-clinic-teal px-6 py-3 text-base font-semibold text-white">
+                    Agla →
+                  </button>
+                ) : (
+                  canEdit && (
+                    <button type="button" onClick={finish} disabled={!!busy} className="rounded-full bg-emerald-600 px-4 py-3 text-base font-semibold text-white disabled:opacity-50">
+                      {busy === 'finish' ? 'Mukammal ho raha hai...' : 'Visit khatam karein ✓'}
+                    </button>
+                  )
+                )}
+              </div>
+            </div>
+          </div>
         </>
       )}
     </div>

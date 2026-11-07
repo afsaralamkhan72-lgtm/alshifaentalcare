@@ -94,7 +94,7 @@ export default function MyAttendance() {
       {res && <p className={`mt-2 rounded-lg p-2 text-sm ${res.ok ? 'bg-emerald-50 text-emerald-900' : 'bg-red-50 text-red-700'}`}>{res.message}</p>}
       {askKind && (
         <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
-          <input value={why} onChange={(e) => setWhy(e.target.value)} maxLength={200} placeholder="Doctor sahab ko wajah likhein" className="min-w-0 flex-1 rounded-lg border border-sky-300 px-2 py-1.5" />
+          <input value={why} onChange={(e) => setWhy(e.target.value)} maxLength={200} placeholder="Doctor sahab ko wajah likhein" className="min-w-[9rem] flex-1 rounded-lg border border-sky-300 px-2 py-1.5" />
           <button type="button" disabled={busy || why.trim().length < 3} onClick={request} className="rounded-full bg-sky-700 px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-40">
             Darkhwast bhejein
           </button>

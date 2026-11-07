@@ -60,6 +60,7 @@ export default function ToothChart({
   canEdit,
   pickOnly = false,
   renderExtra,
+  onWork,
 }: {
   age: number | null
   selected: string[]
@@ -71,6 +72,8 @@ export default function ToothChart({
   pickOnly?: boolean
   /** Is daant ke liye masla / kaam likhne ka hissa (visit mein) */
   renderExtra?: (tooth: string) => React.ReactNode
+  /** Chart par kaam (filling, RCT ...) lagane/hatane par: bill wali treatment ki qatar bhi ban/hat jaye */
+  onWork?: (condition: string, teeth: string[], planned: boolean, on: boolean) => void
 }) {
   const [mode, setMode] = useState<Mode>(() => {
     if (selected.some(isPrimary) && selected.some((t) => !isPrimary(t))) return 'both'
@@ -118,6 +121,7 @@ export default function ToothChart({
     if (allHave) {
       // wohi nishan wahi halat mein dobara dabane par hat jata hai
       onMarks(marks.filter((m) => !(targets.includes(m.tooth) && m.condition === c)))
+      if (WORK.includes(c)) onWork?.(c, targets, false, false)
       return
     }
     const kept = marks.map((m) => (targets.includes(m.tooth) && m.condition === c ? { ...m, state: markState } : m))
@@ -125,6 +129,7 @@ export default function ToothChart({
       .filter((t) => !marks.some((m) => same(m, t)))
       .map((tooth) => ({ tooth, condition: c, surfaces: [] as string[], state: markState }))
     onMarks([...kept, ...add])
+    if (WORK.includes(c) && markState !== 'existing') onWork?.(c, targets, markState === 'planned', true)
     setPlanLater(false)
   }
   function toggleSurface(s: string) {
@@ -186,7 +191,7 @@ export default function ToothChart({
           {mode === 'milk' ? 'Doodh ke daant (A–E)' : mode === 'both' ? 'Pakke (1–8) aur doodh ke (A–E) daant' : 'Pakke daant (1–8)'}
         </span>
         {canSwitch && (
-          <div className="flex overflow-hidden rounded-full border border-clinic-teal/30 text-xs font-semibold">
+          <div className="flex max-w-full overflow-hidden rounded-full border border-clinic-teal/30 text-xs font-semibold">
             {(
               [
                 ['adult', 'Adult (32 Teeth)'],
@@ -194,7 +199,7 @@ export default function ToothChart({
                 ['both', 'Dono'],
               ] as [Mode, string][]
             ).map(([k, l]) => (
-              <button key={k} type="button" onClick={() => setMode(k)} aria-pressed={mode === k} className={`px-3 py-1 ${mode === k ? 'bg-clinic-teal text-white' : 'text-clinic-teal'}`}>
+              <button key={k} type="button" onClick={() => setMode(k)} aria-pressed={mode === k} className={`whitespace-nowrap px-2.5 py-1 text-[11px] sm:px-3 sm:text-xs ${mode === k ? 'bg-clinic-teal text-white' : 'text-clinic-teal'}`}>
                 {l}
               </button>
             ))}

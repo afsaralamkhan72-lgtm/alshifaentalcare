@@ -171,6 +171,24 @@ export default function AppointmentBoard({
       setSaving(false)
       return setErr('Pehle patient chunein (ya "list mein nahi" dabakar naya likhein).')
     }
+    // Aik hi din aur waqt par pehle se appointment ho to batayein (rokna nahi, sirf pooch lein)
+    if (form.preferred_time && form.preferred_date) {
+      const { data: clash } = await supabase
+        .from('appointments')
+        .select('patient_name')
+        .eq('preferred_date', form.preferred_date)
+        .eq('preferred_time', form.preferred_time)
+        .is('deleted_at', null)
+        .not('status', 'in', '(cancelled,completed,no_show)')
+        .limit(3)
+      if (clash && clash.length > 0) {
+        const names = clash.map((c) => c.patient_name).join(', ')
+        if (!confirm(`Is waqt (${form.preferred_time}) par pehle se appointment hai: ${names}.\nPhir bhi is patient ki appointment save karein?`)) {
+          setSaving(false)
+          return
+        }
+      }
+    }
     const who = picked ? { patient_name: picked.full_name, phone: picked.phone, department: picked.department === 'homeopathic' ? 'homeopathic' : 'dental', patient_id: picked.id } : {}
     const { error } = await supabase.from('appointments').insert({ ...form, ...who, preferred_time: form.preferred_time || null, status: nowHere && form.preferred_date === todayKarachi() ? 'arrived' : 'confirmed', ...(nowHere && form.preferred_date === todayKarachi() ? { arrived_at: new Date().toISOString() } : {}), source: 'walk-in' })
     setSaving(false)

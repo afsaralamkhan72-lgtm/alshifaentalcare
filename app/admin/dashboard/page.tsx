@@ -275,7 +275,7 @@ async function MonthSection({ month, currentMonth, canSeeMoney }: { month: strin
           <p className="text-sm text-clinic-ink/60">{monthLabel}</p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Link
             href={`/admin/dashboard?month=${shiftMonth(month, -1)}`}
             className="rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm text-clinic-ink/70"
@@ -310,16 +310,10 @@ async function MonthSection({ month, currentMonth, canSeeMoney }: { month: strin
         </div>
       </div>
 
-      <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-5">
+      <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-3">
         <StatCard label="Kul patients" value={stats.totalPatients} />
         <StatCard label="Dental patients" value={stats.dentalCount} accent="teal" />
         <StatCard label="Homeopathic patients" value={stats.homeoCount} accent="amber" />
-        {canSeeMoney && (
-          <>
-            <StatCard label={`Wasooli (${monthLabel})`} value={`Rs. ${stats.income.toLocaleString()}`} accent="green" />
-            <StatCard label={`Kharche (${monthLabel})`} value={`Rs. ${stats.expense.toLocaleString()}`} accent="red" />
-          </>
-        )}
       </div>
 
       {(lowStock.length > 0 || expiring.length > 0) && (
@@ -344,7 +338,9 @@ async function MonthSection({ month, currentMonth, canSeeMoney }: { month: strin
 
       {/* Income kahan se aa rahi hai */}
       {canSeeMoney && (
-      <div className="mt-8 grid gap-6 lg:grid-cols-2">
+      <details className="mt-8">
+      <summary className="cursor-pointer rounded-xl border border-clinic-teal/15 bg-white px-4 py-3 text-sm font-semibold text-clinic-teal">Mahine ka hisaab (treatment aur department) ▾</summary>
+      <div className="mt-4 grid gap-6 lg:grid-cols-2">
         <section className="rounded-2xl border border-clinic-teal/10 bg-white p-6">
           <p className="font-display font-semibold text-clinic-ink">
             Kaun si treatment zyada ho rahi hai
@@ -427,6 +423,7 @@ async function MonthSection({ month, currentMonth, canSeeMoney }: { month: strin
           </Link>
         </section>
       </div>
+      </details>
       )}
 
       <div className="mt-8">

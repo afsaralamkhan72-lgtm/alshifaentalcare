@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import ToothPicker from './ToothPicker'
@@ -58,13 +58,13 @@ export default function LabCaseForm({
   const startT = treatments.find((t) => t.id === defaultTreatmentId)
   const [treatmentId, setTreatmentId] = useState(startT?.id ?? '')
   const [pq, setPq] = useState('')
-  const [pResults, setPResults] = useState<PatientOption[]>(patients.slice(0, 8))
+  const [pResults, setPResults] = useState<PatientOption[]>([])
 
   async function searchPatients(v: string) {
     setPq(v)
     const q = v.replace(/[%,()*\\"']/g, ' ').trim()
     if (q.length < 2) {
-      setPResults(patients.slice(0, 8))
+      setPResults([])
       return
     }
     const supabase = createClient()
@@ -80,9 +80,11 @@ export default function LabCaseForm({
   const [labName, setLabName] = useState('')
   const [labWhatsapp, setLabWhatsapp] = useState('')
   const [saveLab, setSaveLab] = useState(true)
+  const LAST_LAB = 'alshifa-last-lab'
 
   const [workType, setWorkType] = useState(() => WORK_TYPES.find((w) => startT && new RegExp(w.split(' ')[0], 'i').test(startT.name)) ?? '')
   const [teeth, setTeeth] = useState<string[]>(treatments.find((t) => t.id === defaultTreatmentId)?.teeth ?? [])
+  const [showChart, setShowChart] = useState(teeth.length === 0)
   const [shade, setShade] = useState('')
   const [material, setMaterial] = useState('')
   const [ponticDesign, setPonticDesign] = useState('')
@@ -105,6 +107,18 @@ export default function LabCaseForm({
       setSaveLab(true)
     }
   }
+
+  // Pichli baar wala lab (ya aik hi lab ho to wahi) pehle se chuna ho; badalna ho to list se
+  useEffect(() => {
+    if (labId || labs.length === 0) return
+    let last = ''
+    try {
+      last = localStorage.getItem(LAST_LAB) ?? ''
+    } catch {}
+    const pick = labs.find((l) => l.id === last) ?? (labs.length === 1 ? labs[0] : null)
+    if (pick) pickLab(pick.id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [labs.length])
 
   function daysAhead(n: number) {
     const d = new Date(impressionDate)
@@ -173,6 +187,9 @@ export default function LabCaseForm({
     }
 
     setOpen(false)
+    try {
+      if (finalLabId) localStorage.setItem(LAST_LAB, finalLabId)
+    } catch {}
     router.push(`/admin/lab/${created.id}`)
   }
 
@@ -334,9 +351,22 @@ export default function LabCaseForm({
                 <label className="text-sm font-medium text-clinic-ink">
                   Tooth Numbers (FDI), chart par click karein
                 </label>
-                <div className="mt-2">
-                  <ToothPicker selected={teeth} onChange={setTeeth} />
-                </div>
+                {teeth.length > 0 && !showChart ? (
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                    {teeth.map((t) => (
+                      <span key={t} className="rounded-full bg-clinic-mint px-3 py-1 font-semibold text-clinic-teal">
+                        {t}
+                      </span>
+                    ))}
+                    <button type="button" onClick={() => setShowChart(true)} className="text-xs text-clinic-teal underline">
+                      Daant badlein
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mt-2">
+                    <ToothPicker selected={teeth} onChange={setTeeth} />
+                  </div>
+                )}
               </div>
 
               {/* Work details */}
@@ -371,6 +401,11 @@ export default function LabCaseForm({
                     ))}
                   </select>
                 </div>
+              </div>
+
+              <details className="rounded-xl border border-clinic-teal/15 p-3">
+                <summary className="cursor-pointer text-sm font-semibold text-clinic-teal">Aur tafseel (shade, design, hidayat)</summary>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 <div>
                   <label className="text-sm font-medium text-clinic-ink">Shade</label>
                   <input
@@ -389,8 +424,8 @@ export default function LabCaseForm({
                     className={inputClass}
                   />
                 </div>
-              </div>
-
+                </div>
+                <div className="mt-3">
               <div>
                 <label className="text-sm font-medium text-clinic-ink">Instructions for Lab</label>
                 <textarea
@@ -401,6 +436,9 @@ export default function LabCaseForm({
                   className={inputClass}
                 />
               </div>
+
+                </div>
+              </details>
 
               <div className="grid gap-3 sm:grid-cols-3">
                 <div>

@@ -64,7 +64,6 @@ export default async function TreatmentsPage({ searchParams }: { searchParams: P
           <p className="rounded-2xl border border-dashed border-clinic-teal/20 bg-white p-8 text-center text-sm text-clinic-ink/50">Is list mein koi treatment nahi.</p>
         )}
         {rows.map((r) => {
-          const missed = r.next_date == null && r.status === 'active'
           return (
             <Link
               key={r.id}
@@ -88,8 +87,8 @@ export default async function TreatmentsPage({ searchParams }: { searchParams: P
               </div>
               <div className="text-sm">
                 <p className="text-xs text-clinic-ink/50">Agla visit</p>
-                <p className={r.next_date === today ? 'font-semibold text-clinic-teal' : missed ? 'text-amber-700' : 'text-clinic-ink'}>
-                  {r.next_date ? `${fmtDate(r.next_date)}${r.next_time ? ' ' + r.next_time : ''}` : missed ? 'Tareekh nahi di' : '—'}
+                <p className={r.next_date === today ? 'font-semibold text-clinic-teal' : 'text-clinic-ink/60'}>
+                  {r.next_date ? `${fmtDate(r.next_date)}${r.next_time ? ' ' + r.next_time : ''}` : '—'}
                 </p>
               </div>
               {canMoney && (

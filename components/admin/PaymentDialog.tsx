@@ -51,7 +51,7 @@ export default function PaymentDialog({
         Payment lein
       </button>
       {open && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" role="dialog" aria-label="Payment lein">
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" role="dialog" aria-label="Payment lein">
           <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-clinic-sand p-4 sm:rounded-2xl sm:p-5">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -69,6 +69,7 @@ export default function PaymentDialog({
             {rows && rows.length > 0 && (
               <DuesList
                 rows={rows}
+                openFirst
                 onPaid={() => {
                   setOpen(false)
                 }}

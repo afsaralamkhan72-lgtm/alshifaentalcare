@@ -3,6 +3,7 @@ import RecallList, { type RecallRow } from '@/components/admin/RecallList'
 import DormantList, { type DormantPatient } from '@/components/admin/DormantList'
 import { todayKarachi } from '@/lib/karachi'
 import { requireAnyPerm } from '@/lib/auth'
+import FollowTabs from '@/components/admin/FollowTabs'
 
 export default async function RecallPage() {
   await requireAnyPerm('clinical.view')
@@ -33,6 +34,13 @@ export default async function RecallPage() {
       </div>
     )
   }
+
+  // 60 din se zyada door ke recall: yahan nahi dikhte, magar maujood hain (patient ko ghalat fehmi na ho)
+  const { count: laterCount } = await supabase
+    .from('recalls')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'active')
+    .gt('next_due', horizon)
 
   // Drop recalls whose patient is in the recycle bin
   const rows = ((data ?? []) as unknown as RecallRow[]).filter(
@@ -72,6 +80,7 @@ export default async function RecallPage() {
 
   return (
     <div>
+      <FollowTabs active="recall" />
       <h1 className="font-display text-2xl font-semibold text-clinic-ink">Recall</h1>
       <p className="mt-1 text-sm text-clinic-ink/60">
         Jin patients ko dobara bulana hai, scaling, check-up, ortho review.
@@ -101,6 +110,11 @@ export default async function RecallPage() {
         Agle 60 din ({dueSoon.length})
       </h2>
       <RecallList rows={dueSoon} />
+      {(laterCount ?? 0) > 0 && (
+        <p className="mt-2 text-sm text-clinic-ink/60">
+          Is ke ilawa {laterCount} recall aur save hain, jin ki tareekh 60 din se zyada door hai. Un ki baari aane par ye yahan aa jayenge.
+        </p>
+      )}
 
       <h2 className="mt-10 font-display text-lg font-semibold text-clinic-ink">
         6 Mahine Se Nahi Aaye

@@ -89,20 +89,50 @@ export default function AttendanceToday({
       {err && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">{err}</p>}
       {msg && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">{msg}</p>}
 
-      {suspects.map((d) => (
-        <div key={d} className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-          <p className="font-semibold">Kya {dateLabel(d)} ko clinic band tha?</p>
-          <p className="text-xs">Us din na hazri lagi, na visit, na payment, na appointment. Band din ki katauti nahi lagti.</p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <button type="button" disabled={busy === 'day' + d} onClick={() => setDay(d, true, 'Clinic band (tasdeeq)', 'Us din ko clinic band likh diya')} className="rounded-full bg-amber-600 px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-40">
-              Haan, band tha
+      {suspects.length > 0 && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          <p className="font-semibold">
+            {suspects.length === 1 ? `Kya ${dateLabel(suspects[0])} ko clinic band thi?` : `${suspects.length} din ki hazri nahi lagi. Kya clinic band thi?`}
+          </p>
+          <p className="text-xs">Un dinon par na hazri lagi, na visit, na payment, na appointment. Band din ki katauti nahi lagti.</p>
+          {suspects.length > 1 && (
+            <button
+              type="button"
+              disabled={busy === 'dayall'}
+              onClick={async () => {
+                setBusy('dayall')
+                setErr('')
+                setMsg('')
+                const sb = createClient()
+                const res = await Promise.all(suspects.map((d) => sb.rpc('clinic_set_days', { p_from: d, p_to: d, p_closed: false, p_reason: 'Khuli thi (tasdeeq)' })))
+                setBusy('')
+                const bad = res.filter((x) => x.error)
+                if (bad.length) setErr(`${res.length - bad.length} din save hue, ${bad.length} nahi: ` + friendlyError(bad[0].error!.message))
+                else setMsg('Sab din khuli din likh diye')
+                router.refresh()
+              }}
+              className="mt-2 rounded-full bg-amber-600 px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+            >
+              Sab din khuli thi
             </button>
-            <button type="button" disabled={busy === 'day' + d} onClick={() => setDay(d, false, 'Khuli thi (tasdeeq)', 'Theek hai, khuli din hi rahega')} className="rounded-full border border-amber-600 px-4 py-1.5 text-xs font-semibold text-amber-800 disabled:opacity-40">
-              Nahi, khuli thi
-            </button>
-          </div>
+          )}
+          <ul className="mt-2 grid gap-1.5">
+            {suspects.map((d) => (
+              <li key={d} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white/60 px-2 py-1.5">
+                <span>{dateLabel(d)}</span>
+                <span className="flex gap-2">
+                  <button type="button" disabled={busy === 'day' + d} onClick={() => setDay(d, true, 'Clinic band (tasdeeq)', 'Us din ko clinic band likh diya')} className="rounded-full bg-amber-600 px-3 py-1 text-xs font-semibold text-white disabled:opacity-60">
+                    Band thi
+                  </button>
+                  <button type="button" disabled={busy === 'day' + d} onClick={() => setDay(d, false, 'Khuli thi (tasdeeq)', 'Theek hai, khuli din hi rahega')} className="rounded-full border border-amber-600 px-3 py-1 text-xs font-semibold text-amber-800 disabled:opacity-60">
+                    Khuli thi
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
-      ))}
+      )}
 
       {requests.length > 0 && (
         <section className="rounded-2xl border border-sky-200 bg-sky-50 p-4">

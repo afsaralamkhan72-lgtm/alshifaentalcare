@@ -38,17 +38,41 @@ export default function DuesList({
   rows,
   tone,
   onPaid,
+  openFirst,
 }: {
   rows: DueRow[]
   tone?: 'overdue' | 'today'
   onPaid?: () => void
+  /** aik hi baqaya ho to "Payment Mili" dabaye baghair seedha raqam wala form khol de */
+  openFirst?: boolean
 }) {
   const router = useRouter()
   const tpl = useTemplates()
   const [busyId, setBusyId] = useState<string | null>(null)
   const [collecting, setCollecting] = useState<string | null>(null)
   const [received, setReceived] = useState('')
-  const [method, setMethod] = useState('cash')
+  const [method, setMethodRaw] = useState('cash')
+  const setMethod = (m: string) => {
+    setMethodRaw(m)
+    try {
+      localStorage.setItem('alshifa-pay-method', m)
+    } catch {}
+  }
+  useEffect(() => {
+    try {
+      const m = localStorage.getItem('alshifa-pay-method')
+      if (m && ['cash', 'bank', 'easypaisa', 'jazzcash'].includes(m)) setMethodRaw(m)
+    } catch {}
+  }, [])
+  useEffect(() => {
+    if (openFirst && rows.length === 1) {
+      setCollecting(rows[0].id)
+      setPayKey(crypto.randomUUID())
+      setReceived('')
+    }
+    // sirf pehli dafa khulne par
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openFirst, rows.length])
   const [error, setError] = useState('')
   const [payKey, setPayKey] = useState('')
   const [disc, setDisc] = useState('')
@@ -219,7 +243,7 @@ export default function DuesList({
                   Rate Rs. {Number(row.rate ?? 0).toLocaleString()}
                   {Number(row.discount_amount) > 0 &&
                     ` · Discount Rs. ${Number(row.discount_amount).toLocaleString()}`}
-                  {` · Mila Rs. ${Number(row.amount).toLocaleString()}`}
+                  {` · Mila Rs. ${(Number(row.rate ?? 0) > 0 ? Math.max(0, Number(row.rate) - Number(row.discount_amount ?? 0) - Number(row.balance_due ?? 0)) : Number(row.amount)).toLocaleString()}`}
                 </p>
               </div>
 
@@ -246,6 +270,13 @@ export default function DuesList({
                   onChange={(e) => setReceived(e.target.value)}
                   className="w-32 rounded-lg border border-clinic-teal/30 px-3 py-1.5 text-sm"
                 />
+                <button
+                  type="button"
+                  onClick={() => setReceived(String(Math.max(0, Number(row.balance_due) - (Number(disc) || 0))))}
+                  className="rounded-full border border-clinic-teal/40 px-3 py-1.5 text-xs font-semibold text-clinic-teal"
+                >
+                  Poora
+                </button>
                 <select
                   value={method}
                   onChange={(e) => setMethod(e.target.value)}

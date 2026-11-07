@@ -102,6 +102,10 @@ async function TodayTab({ date, today, rules }: { date: string; today: string; r
     supabase.rpc('clinic_closed_suspects'),
   ])
   if (dayRes.error) return <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{dayRes.error.message}</p>
+  // Jin mahinon ki salary tayyar (lock) ho chuki hai un ke din badal nahi sakte, is liye un par sawal nahi
+  const lockedRes = await supabase.from('payroll_periods').select('period')
+  const locked = new Set(((lockedRes.data ?? []) as { period: string }[]).map((x) => x.period))
+  const suspectDays = ((susRes.data ?? []) as { day: string }[]).map((x) => x.day).filter((d) => !locked.has(d.slice(0, 7)))
   return (
     <AttendanceToday
       date={date}
@@ -109,7 +113,7 @@ async function TodayTab({ date, today, rules }: { date: string; today: string; r
       rows={(dayRes.data ?? []) as DayRow[]}
       leaveTypes={(ltRes.data ?? []) as LeaveType[]}
       requests={(reqRes.data ?? []) as unknown as ReqRow[]}
-      suspects={((susRes.data ?? []) as { day: string }[]).map((x) => x.day)}
+      suspects={suspectDays}
       graceMin={rules.grace_minutes}
     />
   )

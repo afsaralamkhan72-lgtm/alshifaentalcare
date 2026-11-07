@@ -14,7 +14,7 @@ export default function ReceiptHost() {
   }, [])
   if (!ask) return null
   return (
-    <div className="fixed inset-x-3 bottom-3 z-50 mx-auto max-w-md shadow-xl print:hidden">
+    <div className="fixed inset-x-3 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-50 lg:bottom-3 mx-auto max-w-md shadow-xl print:hidden">
       <ReceiptPrompt patientId={ask.patientId} amount={ask.amount} method={ask.method} onClose={() => setAsk(null)} />
     </div>
   )

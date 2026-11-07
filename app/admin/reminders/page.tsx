@@ -1,3 +1,4 @@
+import FollowTabs from '@/components/admin/FollowTabs'
 import { createClient } from '@/lib/supabase/server'
 import { requireAnyPerm } from '@/lib/auth'
 import { addDays, fmtDate, todayKarachi } from '@/lib/karachi'
@@ -93,6 +94,7 @@ export default async function RemindersPage() {
 
   return (
     <div>
+      <FollowTabs active="reminders" />
       <h1 className="font-display text-2xl font-semibold text-clinic-ink">Yaad-dahani</h1>
       <p className="mt-1 text-sm text-clinic-ink/60">WhatsApp dabane par message khulta hai, bhejna aap khud dabate hain. Message bhejne se pehle badal bhi sakte hain.</p>
 

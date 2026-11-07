@@ -70,7 +70,7 @@ function Classic({ d, logo, logoUrl }: { d: InvData; logo: PrintLogo; logoUrl: s
           {d.doctor && <p className="text-clinic-ink/60">Dr: {d.doctor}</p>}
         </div>
       </div>
-      <table className="mt-5 w-full text-sm">
+      <div className="mt-5 overflow-x-auto"><table className="w-full text-sm">
         <thead className="bg-clinic-mint text-left text-clinic-ink/60">
           <tr>
             <th className="px-3 py-2">Treatment</th>
@@ -91,7 +91,7 @@ function Classic({ d, logo, logoUrl }: { d: InvData; logo: PrintLogo; logoUrl: s
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
       <div className="mt-4 ml-auto grid max-w-xs gap-1 text-sm">
         <p className="flex justify-between"><span className="text-clinic-ink/60">Subtotal</span><span>{money(d.subtotal)}</span></p>
         {d.discountAmount > 0 && (

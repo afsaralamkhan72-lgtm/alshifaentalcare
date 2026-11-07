@@ -1,12 +1,12 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requireAnyPerm } from '@/lib/auth'
-import { fmtDate, money } from '@/lib/karachi'
+import { fmtDate, money, todayKarachi } from '@/lib/karachi'
 
 export default async function InvoicesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string }>
+  searchParams: Promise<{ q?: string; status?: string; when?: string }>
 }) {
   await requireAnyPerm('billing.view')
   const params = await searchParams
@@ -21,7 +21,26 @@ export default async function InvoicesPage({
 
   if (params.status === 'due') q = q.gt('balance', 0)
   else if (params.status === 'void') q = q.eq('status', 'void')
-  if (params.q) q = q.ilike('invoice_number', `%${params.q.replace(/[,%]/g, '')}%`)
+  const today = todayKarachi()
+  if (params.when === 'today') q = q.eq('invoice_date', today)
+  else if (params.when === 'week') {
+    const d = new Date(`${today}T00:00:00Z`)
+    d.setUTCDate(d.getUTCDate() - 6)
+    q = q.gte('invoice_date', d.toISOString().slice(0, 10))
+  }
+  const term = (params.q ?? '').replace(/[,%()]/g, '').trim()
+  if (term) {
+    // Invoice number ya patient ka naam / phone / MR number
+    const { data: pts } = await supabase
+      .from('patients')
+      .select('id')
+      .or(`full_name.ilike.%${term}%,phone.ilike.%${term}%,mr_number.ilike.%${term}%`)
+      .limit(50)
+    const ids = (pts ?? []).map((x: { id: string }) => x.id)
+    q = ids.length
+      ? q.or(`invoice_number.ilike.%${term}%,patient_id.in.(${ids.join(',')})`)
+      : q.ilike('invoice_number', `%${term}%`)
+  }
 
   const { data, error } = await q
 
@@ -58,7 +77,12 @@ export default async function InvoicesPage({
       </p>
 
       <form className="mt-4 flex flex-wrap gap-2">
-        <input name="q" defaultValue={params.q ?? ''} placeholder="Invoice number (jaise 1001)" className="min-w-[200px] flex-1 rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm" />
+        <input name="q" defaultValue={params.q ?? ''} placeholder="Invoice number ya patient ka naam / phone" className="min-w-[200px] flex-1 rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm" />
+        <select name="when" defaultValue={params.when ?? ''} className="rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm">
+          <option value="">Har tareekh</option>
+          <option value="today">Aaj</option>
+          <option value="week">Is hafte</option>
+        </select>
         <select name="status" defaultValue={params.status ?? ''} className="rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm">
           <option value="">Sab</option>
           <option value="due">Baqaya wale</option>

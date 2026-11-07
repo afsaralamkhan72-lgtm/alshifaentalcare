@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { requirePerm } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
+import PatientPicker from '@/components/admin/PatientPicker'
 
 interface PrescriptionItem {
   name_en?: string
@@ -31,9 +32,7 @@ export default async function PrescriptionsPage() {
     <div>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="font-display text-2xl font-semibold text-clinic-ink">Prescriptions</h1>
-        <Link href="/admin/patients" className="rounded-full bg-clinic-teal px-4 py-2 text-sm font-semibold text-white">
-          + Naya
-        </Link>
+        <PatientPicker />
       </div>
       <p className="mt-1 text-xs text-clinic-ink/50">Naya prescription: patient chunein, us ki visit mein dawaiyan likhein. Phir yahan nazar aayegi.</p>
       <p className="mt-1 text-sm text-clinic-ink/60">

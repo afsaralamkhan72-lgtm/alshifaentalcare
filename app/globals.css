@@ -103,7 +103,24 @@
     height: auto;
   }
   .admin-shell main {
-    overflow-wrap: anywhere;
+    /* 'anywhere' se table ke column ek ek harf tak sikud jate the; 'break-word' sirf bohat lambe lafz todta hai */
+    overflow-wrap: break-word;
+  }
+  /* Table: apni poori chaurai le, aur dabba (overflow-x-auto) side mein scroll ho */
+  .admin-shell .overflow-x-auto > table {
+    width: max-content;
+    min-width: 100%;
+  }
+  .admin-shell .overflow-x-auto > table.table-fit {
+    width: 100%;
+  }
+  .admin-shell .overflow-x-auto > table th,
+  .admin-shell .overflow-x-auto > table td {
+    max-width: 18rem;
+  }
+  /* Grid ka bachcha apni jagah se bahar na phaile (page side mein na khinche) */
+  .admin-shell .grid > * {
+    min-width: 0;
   }
   .admin-shell table th,
   .admin-shell table td {

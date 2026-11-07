@@ -245,7 +245,7 @@ export default function AttendanceSettings({
         <div className="mt-3 flex flex-wrap items-end gap-2 text-sm">
           <label className="grid gap-0.5 text-xs">Se<input type="date" value={cd.from} onChange={(e) => setCd({ ...cd, from: e.target.value, to: cd.to < e.target.value ? e.target.value : cd.to })} className={inp} /></label>
           <label className="grid gap-0.5 text-xs">Tak<input type="date" min={cd.from} value={cd.to} onChange={(e) => setCd({ ...cd, to: e.target.value })} className={inp} /></label>
-          <label className="grid min-w-0 flex-1 gap-0.5 text-xs">Wajah<input value={cd.why} onChange={(e) => setCd({ ...cd, why: e.target.value })} placeholder="jaise Eid ki chhutti" className={`${inp} w-full min-w-0`} /></label>
+          <label className="grid min-w-[10rem] flex-1 gap-0.5 text-xs">Wajah<input value={cd.why} onChange={(e) => setCd({ ...cd, why: e.target.value })} placeholder="jaise Eid ki chhutti" className={`${inp} w-full min-w-0`} /></label>
           <button type="button" disabled={busy === 'cd'} onClick={() => rpc('cd', 'clinic_set_days', { p_from: cd.from, p_to: cd.to, p_closed: true, p_reason: cd.why || null }, 'Din band likh diye')} className={btn}>
             Band karein
           </button>
@@ -273,7 +273,7 @@ export default function AttendanceSettings({
           ))}
         </ul>
         <div className="mt-3 flex flex-wrap items-end gap-2 text-sm">
-          <label className="grid min-w-0 flex-1 gap-0.5 text-xs">Nayi qism<input value={nl.name} onChange={(e) => setNl({ ...nl, name: e.target.value })} placeholder="jaise Bimari ki chhutti" className={`${inp} w-full min-w-0`} /></label>
+          <label className="grid min-w-0 basis-full gap-0.5 text-xs sm:basis-0 sm:flex-1">Nayi qism<input value={nl.name} onChange={(e) => setNl({ ...nl, name: e.target.value })} placeholder="jaise Bimari ki chhutti" className={`${inp} w-full min-w-0`} /></label>
           <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={nl.paid} onChange={(e) => setNl({ ...nl, paid: e.target.checked })} /> tankhwah ke saath</label>
           <label className="grid gap-0.5 text-xs">Saalana quota<input type="number" min={0} value={nl.quota} onChange={(e) => setNl({ ...nl, quota: e.target.value })} placeholder="khali = hadd nahi" className={`${inp} w-32`} /></label>
           <button type="button" disabled={busy === 'ltn' || !nl.name.trim()} onClick={async () => { if (await rpc('ltn', 'leave_type_save', { p_id: null, p_name: nl.name, p_paid: nl.paid, p_quota: nl.quota === '' ? null : Number(nl.quota), p_active: true }, 'Nayi qism jur gayi')) setNl({ name: '', paid: true, quota: '' }) }} className={btn}>
@@ -322,7 +322,7 @@ function LeaveRow({ t, onSave }: { t: LeaveType; onSave: (v: { name: string; pai
   const [v, setV] = useState({ name: t.name, paid: t.paid, quota: t.yearly_quota == null ? '' : String(t.yearly_quota), active: t.active })
   return (
     <li className="flex flex-wrap items-center gap-2 rounded-xl border border-clinic-teal/15 p-2 text-sm">
-      <input value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} className={`${inp} min-w-0 flex-1`} />
+      <input value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} className={`${inp} min-w-0 basis-full sm:basis-0 sm:flex-1`} aria-label="Chhutti ki qism ka naam" />
       <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={v.paid} onChange={(e) => setV({ ...v, paid: e.target.checked })} /> tankhwah ke saath</label>
       <input type="number" min={0} value={v.quota} onChange={(e) => setV({ ...v, quota: e.target.value })} placeholder="quota" className={`${inp} w-24`} aria-label="Saalana quota" />
       <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={v.active} onChange={(e) => setV({ ...v, active: e.target.checked })} /> chalu</label>

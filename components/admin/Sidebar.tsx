@@ -13,8 +13,10 @@ interface NavItem {
   roles: Role[]
   /** receptionist ko ye link tab dikhe jab ye permission ho (in mein se koi aik) */
   perm?: string | string[]
-  /** Bara button (main 6) */
+  /** Bara button (main 5) */
   big?: boolean
+  /** Is button ke andar ke doosre pages (active nishan ke liye) */
+  also?: string[]
 }
 interface NavGroup {
   title: string
@@ -31,30 +33,31 @@ const GROUPS: NavGroup[] = [
       { href: '/admin/dashboard', label: 'Home', roles: ALL, big: true },
       { href: '/admin/patients', label: 'Patients', roles: ALL, perm: 'patients.view', big: true },
       { href: '/admin/appointments', label: 'Appointments', roles: ALL, perm: 'appointments.view', big: true },
-      { href: '/admin/treatments', label: 'Treatments', roles: ALL, perm: ['clinical.view', 'billing.view'], big: true },
       { href: '/admin/lab', label: 'Lab', roles: ALL, perm: 'lab.view', big: true },
-      { href: '/admin/accounts', label: 'Accounts', roles: ALL, perm: ['billing.view', 'reports.view', 'expenses.manage'], big: true },
+      { href: '/admin/accounts', label: 'Accounts', roles: ALL, perm: ['billing.view', 'reports.view', 'expenses.manage'], big: true, also: ['/admin/dues', '/admin/invoices', '/admin/closing', '/admin/expenses', '/admin/billing'] },
     ],
   },
   {
-    title: 'Aur',
+    title: 'Marez',
     items: [
-      { href: '/admin/prescriptions', label: 'Prescriptions', roles: ALL, perm: 'prescriptions.view' },
-      { href: '/admin/reminders', label: 'Yaad-dahani', roles: ALL, perm: ['prescriptions.view', 'clinical.view'] },
-      { href: '/admin/recall', label: 'Recall', roles: ALL, perm: 'clinical.view' },
+      { href: '/admin/treatments', label: 'Treatments', roles: ALL, perm: ['clinical.view', 'billing.view'] },
+      { href: '/admin/recall', label: 'Yaad-dahani / Recall', roles: ALL, perm: ['prescriptions.view', 'clinical.view'], also: ['/admin/reminders'] },
       { href: '/admin/loyalty', label: 'Loyalty', roles: ALL, perm: 'patients.view' },
+      { href: '/admin/prescriptions', label: 'Purani Prescriptions', roles: ALL, perm: 'prescriptions.view' },
+    ],
+  },
+  {
+    title: 'Clinic',
+    items: [
       { href: '/admin/inventory', label: 'Stock', roles: ALL, perm: 'inventory.view' },
-      { href: '/admin/expenses', label: 'Kharche', roles: ALL, perm: 'expenses.manage' },
-      { href: '/admin/insights', label: 'Insights', roles: OWNER },
-      { href: '/admin/payroll', label: 'Salary', roles: OWNER },
-      { href: '/admin/attendance', label: 'Hazri', roles: OWNER },
-      { href: '/admin/settings', label: 'Settings', roles: ALL, perm: 'settings.manage' },
+      { href: '/admin/summary', label: 'Reports', roles: ALL, perm: 'reports.view', also: ['/admin/reports', '/admin/insights', '/admin/ledger-check'] },
+      { href: '/admin/team', label: 'Staff', roles: OWNER, also: ['/admin/payroll', '/admin/attendance', '/admin/staff'] },
     ],
   },
   {
     title: 'Setup',
     items: [
-      { href: '/admin/staff', label: 'Staff aur Permissions', roles: ['admin'] },
+      { href: '/admin/settings', label: 'Settings', roles: ALL, perm: 'settings.manage' },
       { href: '/admin/cms', label: 'Website', roles: ['admin'] },
       { href: '/admin/audit', label: 'Audit Log', roles: ['admin'] },
       { href: '/admin/recycle-bin', label: 'Recycle Bin', roles: ['admin'] },
@@ -67,6 +70,8 @@ const ICONS: Record<string, string> = {
   '/admin/dashboard': 'M3 11l9-8 9 8M5 10v10h5v-6h4v6h5V10',
   '/admin/patients': 'M16 11a4 4 0 10-8 0 4 4 0 008 0zM4 21c0-4 3.5-6 8-6s8 2 8 6',
   '/admin/appointments': 'M4 6h16v14H4zM4 10h16M8 3v5M16 3v5',
+  '/admin/team': 'M9 11a3 3 0 100-6 3 3 0 000 6zM3 20c0-3 2.5-5 6-5s6 2 6 5M17 11a2.5 2.5 0 100-5M18 15c2 .3 3 2 3 5',
+  '/admin/summary': 'M4 20V10M10 20V4M16 20v-8M22 20H2',
   '/admin/treatments': 'M12 4c-2-2-6-1-6 3 0 4 1 8 2 12 1 0 1.5-4 4-4s3 4 4 4c1-4 2-8 2-12 0-4-4-5-6-3z',
   '/admin/lab': 'M9 3h6M10 3v6l-5 9a2 2 0 002 3h10a2 2 0 002-3l-5-9V3',
   '/admin/accounts': 'M3 7h18v12H3zM3 11h18M7 15h3',
@@ -106,12 +111,14 @@ export default function Sidebar({ role, perms }: { role: Role; perms: string[] }
 
   // Sab se lambi matching raah ko active maanein (Invoices vs Invoices/[id] wagera)
   const flat = GROUPS.flatMap((g) => g.items)
+  const matches = flat.flatMap((i) => [i.href, ...(i.also ?? [])].map((h) => ({ owner: i.href, h })))
   const activeHref =
-    flat
-      .filter((i) => pathname === i.href || pathname.startsWith(`${i.href}/`))
-      .sort((a, b) => b.href.length - a.href.length)[0]?.href ?? ''
+    matches
+      .filter((m) => pathname === m.h || pathname.startsWith(`${m.h}/`))
+      .sort((a, b) => b.h.length - a.h.length)[0]?.owner ?? ''
 
-  const quick = GROUPS[0].items.filter((i) => allowed(i, role, perms) && i.href !== '/admin/lab' && i.href !== '/admin/treatments').slice(0, 4)
+  // Phone ki neeche wali patti: Home, Patients, Appts, Lab, Accounts (jo allowed ho) + Menu
+  const quick = GROUPS[0].items.filter((i) => allowed(i, role, perms)).slice(0, 5)
 
   return (
     <>
