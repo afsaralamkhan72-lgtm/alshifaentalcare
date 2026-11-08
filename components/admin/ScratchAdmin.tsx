@@ -9,7 +9,7 @@ import { friendlyError } from '@/lib/errors'
 type Prize = { id: string; title: string; kind: 'percent' | 'amount' | 'free' | 'none'; value: number | null; treatment_names: string[]; weight: number; is_active: boolean }
 type Card = { id: string; title: string; kind: string; value: number | null; treatment_names: string[]; card_date: string; expires_at: string | null; patient: { id: string; full_name: string } | null }
 
-const kt = (k: string, v: number | null) => (k === 'percent' ? ${v}% discount : k === 'amount' ? Rs.${v} discount : k === 'free' ? 'Muft' : 'Koi inaam nahi')
+const kt = (k: string, v: number | null) => (k === 'percent' ? v + '% discount' : k === 'amount' ? 'Rs.' + v + ' discount' : k === 'free' ? 'Muft' : 'Koi inaam nahi')
 
 type PF = { title: string; kind: Prize['kind']; value: string; treatments: string; weight: string }
 const pfOf = (p: Prize): PF => ({ title: p.title, kind: p.kind, value: p.value == null ? '' : String(p.value), treatments: p.treatment_names.join(', '), weight: String(p.weight) })
@@ -20,7 +20,7 @@ function PrizeFields({ f, setF }: { f: PF; setF: (v: PF) => void }) {
   const lab = 'grid gap-0.5 text-xs font-medium text-clinic-ink/70'
   return (
     <>
-      <label className={${lab} sm:col-span-2}>Naam (mareez ko ye dikhega)
+      <label className={lab + ' sm:col-span-2'}>Naam (mareez ko ye dikhega)
         <input required minLength={2} maxLength={80} placeholder="jaise 10% discount" value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} className={input} />
       </label>
       <label className={lab}>Kism
@@ -108,7 +108,7 @@ export default function ScratchAdmin({ owner, enabled, days, prizes, cards }: { 
           <ul className="divide-y divide-clinic-ink/10">
             {cards.map((c) => (
               <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
-                <span><Link className="font-medium underline" href={/admin/patients/${c.patient?.id}}>{c.patient?.full_name}</Link> — <strong>{c.title}</strong> ({kt(c.kind, c.value)}{c.treatment_names.length ? , ${c.treatment_names.join('/')} : ''}) · {c.expires_at ? ${c.expires_at.slice(0, 10)} tak : ''}</span>
+                <span><Link className="font-medium underline" href={'/admin/patients/' + (c.patient?.id ?? '')}>{c.patient?.full_name}</Link> — <strong>{c.title}</strong> ({kt(c.kind, c.value)}{c.treatment_names.length ? ', ' + c.treatment_names.join('/') : ''}) · {c.expires_at ? c.expires_at.slice(0, 10) + ' tak' : ''}</span>
                 <button disabled={busy} onClick={() => run(() => sb.rpc('scratch_redeem', { p_card: c.id, p_note: null }), 'Inaam de diya gaya darj ho gaya')} className="rounded-lg bg-clinic-teal px-3 py-1.5 text-white disabled:opacity-60">Inaam diya</button>
               </li>
             ))}
@@ -120,8 +120,8 @@ export default function ScratchAdmin({ owner, enabled, days, prizes, cards }: { 
       {owner && (
         <div className="mt-5 grid gap-4">
           <div className="flex flex-wrap items-center gap-3 text-sm">
-            <span className={rounded-full px-3 py-1 ${enabled ? 'bg-emerald-50 text-emerald-700' : 'bg-clinic-ink/5 text-clinic-ink/60'}}>{enabled ? 'Chalu hai' : 'Band hai'}</span>
-            <label className="flex items-center gap-2">Inaam kitne din chale <input type="number" min={1} max={365} value={d} onChange={(e) => setD(e.target.value)} className={${input} w-20} /></label>
+            <span className={'rounded-full px-3 py-1 ' + (enabled ? 'bg-emerald-50 text-emerald-700' : 'bg-clinic-ink/5 text-clinic-ink/60')}>{enabled ? 'Chalu hai' : 'Band hai'}</span>
+            <label className="flex items-center gap-2">Inaam kitne din chale <input type="number" min={1} max={365} value={d} onChange={(e) => setD(e.target.value)} className={input + ' w-20'} /></label>
             <button disabled={busy} onClick={() => saveCfg(!enabled)} className="rounded-full bg-clinic-teal px-4 py-1.5 font-semibold text-white disabled:opacity-60">{enabled ? 'Band karein' : 'Chalu karein'}</button>
             {enabled && <button disabled={busy} onClick={() => saveCfg(true)} className="text-clinic-teal underline">din mehfooz</button>}
           </div>
@@ -142,7 +142,7 @@ export default function ScratchAdmin({ owner, enabled, days, prizes, cards }: { 
                     </form>
                   ) : (
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className={p.is_active ? '' : 'opacity-50'}><strong>{p.title}</strong> · {kt(p.kind, p.value)}{p.treatment_names.length ? ` (${p.treatment_names.join('/')})` : ''} · kitni baar nikle {p.weight}{p.is_active && total > 0 ? ` (taqreeban ${Math.round((p.weight / total) * 100)}%)` : ''}{p.is_active ? '' : ' · band'}</span>
+                      <span className={p.is_active ? '' : 'opacity-50'}><strong>{p.title}</strong> · {kt(p.kind, p.value)}{p.treatment_names.length ? ' (' + p.treatment_names.join('/') + ')' : ''} · kitni baar nikle {p.weight}{p.is_active && total > 0 ? ' (taqreeban ' + Math.round((p.weight / total) * 100) + '%)' : ''}{p.is_active ? '' : ' · band'}</span>
                       {delId === p.id ? (
                         <span className="flex items-center gap-2 text-xs">
                           <span className="font-semibold text-red-700">Pakka hatayein?</span>
