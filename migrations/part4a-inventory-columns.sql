@@ -1,3 +1,4 @@
+alter table public.inventory add column if not exists item_group text;
 alter table public.inventory add column if not exists description text;
 alter table public.inventory add column if not exists deleted_at timestamptz;
 alter table public.inventory add column if not exists merged_into uuid references public.inventory(id);
