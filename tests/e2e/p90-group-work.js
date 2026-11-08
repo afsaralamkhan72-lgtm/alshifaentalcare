@@ -4,15 +4,13 @@ let pid=await L.newPatient(p,'Group Test '+Date.now().toString().slice(-4),'0308
 await p.goto('http://localhost:3055/admin/patients/'+pid,{waitUntil:'domcontentloaded'});await p.waitForTimeout(1800);
 const st=p.getByRole('button',{name:/Naya visit shuru/});if(await st.count()){await st.click();await p.waitForTimeout(800)}
 await p.getByRole('button',{name:'Agla →'}).click();await p.waitForTimeout(900);
-for(const n of ['Upper Right Central Incisor','Upper Right Lateral Incisor','Upper Right Canine','Upper Left Central Incisor'])
-  {await p.locator('[aria-label^="'+n+'"]').first().click();await p.waitForTimeout(250)}
-console.log('cards before:',await p.locator('[data-testid=tooth-card]').count());
-await p.locator('[data-testid=group-work]').getByRole('button',{name:'+ PFM Bridge',exact:true}).click();await p.waitForTimeout(500);
-console.log('cards after bridge:',await p.locator('[data-testid=tooth-card]').count(),'group rows:',await p.locator('[data-testid=group-row]').count());
-const gr=p.locator('[data-testid=group-row]').first();
-await gr.getByPlaceholder('Qeemat Rs.').fill('20000');
+await L.addGroup(p,{teeth:['Upper Right Central Incisor','Upper Right Lateral Incisor','Upper Right Canine','Upper Left Central Incisor'],kind:'bridge',type:'PFM Bridge'});
+console.log('tooth cards:',await p.locator('[data-testid=tooth-card]').count(),'group cards:',await p.locator('[data-testid=group-card]').count());
+const gr=p.locator('[data-testid=group-card]').first();
+await gr.getByLabel('Qeemat',{exact:true}).fill('20000');
 console.log('group text:',(await gr.innerText()).replace(/\n/g,' | ').slice(0,200));
-await p.locator('[data-testid=group-work]').getByRole('button',{name:/\+ Complete Denture/}).first().click();await p.waitForTimeout(400);
+await L.addGroup(p,{kind:'denture',complete:true});
+console.log('denture cards:',await p.locator('[data-testid=denture-card]').count());
 await p.getByRole('button',{name:'Agla →'}).click();await p.waitForTimeout(600);
 await p.getByRole('button',{name:'Agla →'}).click();await p.waitForTimeout(600);
 await p.locator('text=Aaj kitne mile').first().locator('xpath=following::input[1]').fill('0');

@@ -513,13 +513,11 @@ export default function VisitWorkspace(p: Props) {
 
   // ---- Chart ke panel se: is daant ka masla (diagnosis) aur kaam (treatment) ----
   const [workPlanned, setWorkPlanned] = useState(false)
-  // Chune hue daant chart band karne par bhi card mein rehte hain (jab tak "Is daant ko hatao" na dabayein)
-  const [workSel, setWorkSel] = useState<string[]>([])
-  useEffect(() => {
-    if (sel.length) setWorkSel((w) => [...new Set([...w, ...sel])])
-  }, [sel])
-  const [dxQ, setDxQ] = useState<Record<string, string>>({})
-  const [txQ, setTxQ] = useState<Record<string, string>>({})
+  const [entTx, setEntTx] = useState('')
+  const [entDx, setEntDx] = useState('')
+  const [entType, setEntType] = useState('')
+  const [entMode, setEntMode] = useState<'each' | 'whole'>('each')
+  const [entDKind, setEntDKind] = useState<'partial' | 'complete'>('partial')
   const eq = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
   function addDxTooth(text: string, tooth: string) {
     const tx = text.trim()
@@ -553,18 +551,19 @@ export default function VisitWorkspace(p: Props) {
     })
   }
   /** Kai daanton ka ek hi kaam (Bridge, Partial Denture): ek hi qatar, ek hi qeemat, har daant ka alag card nahi */
-  function addGroupWork(name: string) {
+  function addGroupWork(name: string, pickedTeeth: string[], mode: 'each' | 'whole' = 'each') {
     const nm = name.trim()
-    const picked = (sel.length >= 2 ? sel : workSel).slice()
-    if (!nm || picked.length < 2) return
-    const teeth = picked.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+    if (!nm || pickedTeeth.length < 2) return
+    const teeth = pickedTeeth.slice().sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
     const c = p.catalog.find((x) => eq(x.name, nm))
     const mats: Record<string, string> = {}
     if (c) for (const m of p.materials[c.id] ?? []) mats[m.inventory_id] = String(m.default_qty)
+    const g = c ? Number(c.price) || 0 : 0
+    const price = c ? String(mode === 'each' ? g * teeth.length : g) : ''
+    const note = g > 0 ? (mode === 'each' ? `${g} x ${teeth.length} daant` : 'Poore kaam ki ek qeemat') : ''
     setRows((rs) => [
-      // jo daant is group mein aa gaye unki alag qatarein hata do (jaise pehle se lagi filling), group wali qatar baqi
       ...rs.flatMap((r) => (r.applies !== 'tooth' || r.group ? [r] : (() => { const tt = r.teeth.filter((x) => !teeth.includes(x)); return tt.length ? [{ ...r, teeth: tt, price: autoPrice(r, tt) }] : [] })())),
-      { key: newKey(), name: c?.name ?? nm, catalog_id: c?.id ?? null, teeth, price: c ? String(c.price * teeth.length) : '', planned: workPlanned, notes: c && c.price > 0 ? `${c.price} x ${teeth.length} daant` : '', mats, applies: 'tooth', unit: null, manual: true, jaw: '', group: true, gmode: 'each', gunit: c ? Number(c.price) || 0 : 0 },
+      { key: newKey(), name: c?.name ?? nm, catalog_id: c?.id ?? null, teeth, price, planned: workPlanned, notes: note, mats, applies: 'tooth', unit: null, manual: true, jaw: '', group: true, gmode: mode, gunit: g },
     ])
   }
   function setGroupMode(key: string, mode: 'each' | 'whole') {
@@ -588,14 +587,6 @@ export default function VisitWorkspace(p: Props) {
       }),
     )
   }
-  // Masla chunne par kaam ki tajweez: Price List ke naam se (naam hard-coded nahi, list mein jo mile)
-  const TX_RULES: [RegExp, RegExp][] = [
-    [/caries|cavity/i, /filling/i],
-    [/pulpitis|necrosis|periapical|abscess/i, /root canal|\brct\b/i],
-    [/fracture|broken/i, /crown/i],
-    [/calculus|tartar|plaque|gingivitis/i, /scaling/i],
-    [/mobility|impact|non-?restorable|periodontitis/i, /extraction/i],
-  ]
   const dentalCat = p.catalog.filter((c) => c.department !== 'homeopathic')
   // Chart par kaam ka nishan lagane se bill wali treatment ki qatar khud ban jati hai (aur hatane par hat jati hai)
   const WORK_RX: Record<string, RegExp> = { filling: /filling/i, rct: /root canal|\brct\b/i, crown: /crown/i, bridge: /bridge/i, extraction: /extraction/i, implant: /implant/i, denture: /denture/i }
@@ -610,97 +601,6 @@ export default function VisitWorkspace(p: Props) {
       for (const r of rows) if (r.applies === 'tooth' && rx.test(r.name)) for (const t of teeth) if (r.teeth.includes(t)) removeTxTooth(r.key, t)
     }
   }
-  function renderToothWork(tooth: string) {
-    const myDx = diags.filter((d) => (d.teeth ?? []).includes(tooth)).map((d) => d.text)
-    const myRows = rows.filter((r) => r.applies === 'tooth' && r.teeth.includes(tooth))
-    const sugg: string[] = []
-    for (const dx of myDx) for (const [dr, tr] of TX_RULES) if (dr.test(dx)) {
-      const hit = dentalCat.find((c) => tr.test(c.name) && (c.applies_to ?? 'tooth') === 'tooth')
-      if (hit && !sugg.includes(hit.name) && !myRows.some((r) => eq(r.name, hit.name))) sugg.push(hit.name)
-    }
-    const quick: string[] = []
-    for (const k of [/filling/i, /root canal|\brct\b/i, /crown/i, /extraction/i, /implant/i]) {
-      const hit = dentalCat.find((c) => k.test(c.name) && (c.applies_to ?? 'tooth') === 'tooth')
-      if (hit && !quick.includes(hit.name) && !sugg.includes(hit.name)) quick.push(hit.name)
-    }
-    const chip = (on: boolean) => `rounded-full px-2.5 py-1 text-xs font-semibold ${on ? 'bg-sky-700 text-white' : 'border border-sky-300 bg-white text-sky-900'}`
-    return (
-      <div className="grid gap-3 rounded-xl border border-sky-200 bg-white p-2.5" data-testid="tooth-work">
-        <div className="grid gap-1.5">
-          <p className="text-xs font-bold text-clinic-ink">Masla (Diagnosis)</p>
-          <div className="flex flex-wrap gap-1.5">
-            {diagList.slice(0, 8).map((d) => {
-              const on = myDx.some((x) => eq(x, d))
-              return (
-                <button key={d} type="button" aria-pressed={on} onClick={() => (on ? removeDxTooth(d, tooth) : addDxTooth(d, tooth))} className={chip(on)}>
-                  {on ? '✓ ' : ''}
-                  {d}
-                </button>
-              )
-            })}
-            {myDx.filter((x) => !diagList.slice(0, 8).some((d) => eq(d, x))).map((x) => (
-              <button key={x} type="button" aria-pressed onClick={() => removeDxTooth(x, tooth)} className={chip(true)}>
-                ✓ {x}
-              </button>
-            ))}
-          </div>
-          <input
-            list="diag-list"
-            value={dxQ[tooth] ?? ''}
-            onChange={(e) => setDxQ((q) => ({ ...q, [tooth]: e.target.value }))}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault()
-                addDxTooth(dxQ[tooth] ?? '', tooth)
-                setDxQ((q) => ({ ...q, [tooth]: '' }))
-              }
-            }}
-            placeholder="Aur masla likhein, phir Enter"
-            className="rounded-lg border border-clinic-teal/20 px-2.5 py-1.5 text-xs"
-          />
-        </div>
-        <div className="grid gap-1.5">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs font-bold text-clinic-ink">Kaam (Treatment)</p>
-          </div>
-          {sugg.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1.5 text-xs">
-              <span className="text-clinic-ink/60">Masle ke hisab se:</span>
-              {sugg.map((n) => (
-                <button key={n} type="button" onClick={() => addTxTooth(n, tooth, workPlanned)} className="rounded-full border border-clinic-teal/50 bg-clinic-mint px-2.5 py-1 font-semibold text-clinic-teal">
-                  + {n}
-                </button>
-              ))}
-            </div>
-          )}
-          {quick.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {quick.map((n) => (
-                <button key={n} type="button" onClick={() => addTxTooth(n, tooth, workPlanned)} className="rounded-full border border-sky-300 bg-white px-2.5 py-1 text-xs font-semibold text-sky-900">
-                  + {n}
-                </button>
-              ))}
-            </div>
-          )}
-          <input
-            list="cat-list"
-            value={txQ[tooth] ?? ''}
-            onChange={(e) => setTxQ((q) => ({ ...q, [tooth]: e.target.value }))}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault()
-                addTxTooth(txQ[tooth] ?? '', tooth, workPlanned)
-                setTxQ((q) => ({ ...q, [tooth]: '' }))
-              }
-            }}
-            placeholder="Koi aur kaam (list se chunein), phir Enter"
-            className="rounded-lg border border-clinic-teal/20 px-2.5 py-1.5 text-xs"
-          />
-        </div>
-      </div>
-    )
-  }
-
   function pickCatalog(r: TRow, name: string) {
     const c = p.catalog.find((x) => x.name.toLowerCase() === name.trim().toLowerCase())
     const mats: Record<string, string> = {}
@@ -1352,9 +1252,64 @@ export default function VisitWorkspace(p: Props) {
                   )}
                 </div>
   )
-  const mouthCat = dentalCat.filter((c) => (c.applies_to ?? 'tooth') === 'mouth')
-  const toothIds = [...new Set([...workSel, ...sel, ...diags.flatMap((d) => d.teeth ?? []), ...rows.filter((r) => r.applies === 'tooth').flatMap((r) => r.teeth)])].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+  const uniqNames = (xs: string[]) => { const seen = new Set<string>(); return xs.filter((n) => { const k = n.trim().toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true }) }
+  const toothCat = dentalCat.filter((c) => (c.applies_to ?? 'tooth') === 'tooth')
+  const bridgeNames = uniqNames(toothCat.filter((c) => /bridge/i.test(c.name)).map((c) => c.name))
+  const partialNames = uniqNames(dentalCat.filter((c) => /partial denture|flexible denture/i.test(c.name) && !/complete/i.test(c.name) && !/adjust|repair|reline|relining/i.test(c.name)).map((c) => c.name))
+  const completeNames = uniqNames(dentalCat.filter((c) => /complete denture/i.test(c.name)).map((c) => c.name))
+  const singleNames = uniqNames(toothCat.filter((c) => !/bridge|denture/i.test(c.name)).map((c) => c.name))
+  const quickNames: string[] = []
+  for (const k of [/filling/i, /root canal|\brct\b/i, /crown/i, /extraction/i, /implant/i]) {
+    const hit = singleNames.find((n) => k.test(n))
+    if (hit && !quickNames.includes(hit)) quickNames.push(hit)
+  }
+  const selTeeth = sel.slice().sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+  const isGrp = entTx === 'GRP:bridge' || entTx === 'GRP:denture'
+  const isComplete = entTx === 'GRP:denture' && entDKind === 'complete'
+  const grpNames = entTx === 'GRP:bridge' ? bridgeNames : entDKind === 'complete' ? completeNames : partialNames
+  const catPrice = (n: string) => Number(p.catalog.find((x) => eq(x.name, n))?.price) || 0
+  function resetEntry() {
+    setEntTx('')
+    setEntDx('')
+    setEntType('')
+    setEntMode('each')
+    pickTeeth([])
+  }
+  function applyEntry() {
+    if (!canEdit) return
+    if (isGrp) {
+      const nm = entType || grpNames[0] || ''
+      if (isComplete) {
+        addCompleteDenture(nm || 'Complete Denture')
+      } else {
+        if (selTeeth.length < 2) return
+        addGroupWork(nm || (entTx === 'GRP:bridge' ? 'Bridge' : 'Partial Denture'), selTeeth, entMode)
+        if (entDx.trim()) for (const t of selTeeth) addDxTooth(entDx, t)
+      }
+      resetEntry()
+      return
+    }
+    if (!entTx.trim() && !entDx.trim()) return
+    for (const t of selTeeth) {
+      if (entTx.trim()) addTxTooth(entTx, t, workPlanned)
+      if (entDx.trim()) addDxTooth(entDx, t)
+    }
+    resetEntry()
+  }
+  const grpPreview = (() => {
+    if (!isGrp) return null
+    const nm = entType || grpNames[0] || ''
+    const u = catPrice(nm)
+    if (isComplete) return u
+    if (u <= 0) return 0
+    return entMode === 'each' ? u * selTeeth.length : u
+  })()
+  const singlePreview = !isGrp && entTx ? catPrice(entTx) * selTeeth.length : null
+  const groupTeethSet = new Set(rows.filter((r) => r.group).flatMap((r) => r.teeth))
   const ccOf = (t: string) => (findings['cc_' + t] ?? '').split(',').map((x) => x.trim()).filter(Boolean)
+  const cardTeeth = [...new Set([...diags.flatMap((d) => d.teeth ?? []), ...rows.filter((r) => r.applies === 'tooth' && !r.group).flatMap((r) => r.teeth), ...Object.keys(findings).filter((k) => k.startsWith('cc_') && ccOf(k.slice(3)).length).map((k) => k.slice(3))])].filter((t) => !groupTeethSet.has(t)).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+  const dxOfTooth = (t: string) => diags.filter((d) => (d.teeth ?? []).includes(t)).map((d) => d.text)
+  const mouthCat = dentalCat.filter((c) => (c.applies_to ?? 'tooth') === 'mouth')
   function toggleCc(t: string, c: string) {
     const cur = ccOf(t)
     const next = cur.includes(c) ? cur.filter((x) => x !== c) : [...cur, c]
@@ -1362,90 +1317,183 @@ export default function VisitWorkspace(p: Props) {
   }
   function clearTooth(t: string) {
     setDiags((ds) => ds.flatMap((d) => { const tt = (d.teeth ?? []).filter((x) => x !== t); return (d.teeth ?? []).includes(t) ? (tt.length ? [{ ...d, teeth: tt }] : []) : [d] }))
-    setRows((rs) => rs.flatMap((r) => { if (r.applies !== 'tooth' || !r.teeth.includes(t)) return [r]; const tt = r.teeth.filter((x) => x !== t); return tt.length ? [{ ...r, teeth: tt, price: autoPrice(r, tt) }] : [] }))
+    setRows((rs) => rs.flatMap((r) => { if (r.applies !== 'tooth' || r.group || !r.teeth.includes(t)) return [r]; const tt = r.teeth.filter((x) => x !== t); return tt.length ? [{ ...r, teeth: tt, price: autoPrice(r, tt) }] : [] }))
     setFindings((f) => { const n = { ...f }; delete n['cc_' + t]; return n })
-    setWorkSel((w) => w.filter((x) => x !== t))
     pickTeeth(sel.filter((x) => x !== t))
   }
+  /** Chhoti qatar: kaam ka naam, qeemat, hatao. Baqi tafseel (note, samaan, lab) "Aur" mein */
+  const miniRow = (r: TRow) => (
+    <div key={r.key} className="grid gap-1.5 rounded-xl bg-sky-50/60 p-2" data-testid="mini-row">
+      <div className="flex items-center gap-2">
+        <p className="min-w-0 flex-1 text-sm font-semibold text-clinic-ink">{r.name || 'Naya kaam'}{r.planned ? <span className="ml-1.5 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">sirf plan</span> : null}</p>
+        {p.perms.bill ? (
+          <label className="flex shrink-0 items-center gap-1 text-xs text-clinic-ink/60">
+            Rs.
+            <input aria-label="Qeemat" type="number" min={0} disabled={!canEdit} value={r.price} onChange={(e) => updRow(r.key, { price: e.target.value, manual: true })} className="w-24 rounded-lg border border-clinic-teal/20 px-2 py-1.5 text-sm font-semibold text-clinic-ink" />
+          </label>
+        ) : null}
+        {canEdit && <button type="button" onClick={() => setRows(rows.filter((x) => x.key !== r.key))} className="shrink-0 text-xs text-red-600 underline">hatao</button>}
+      </div>
+      {p.perms.bill && Number(r.price) === 0 && r.catalog_id && <p className="text-[11px] text-amber-700">Is ki qeemat Price List mein nahi hai. Upar Rs. mein likhein, visit khatam hone par Price List mein khud save ho jayegi.</p>}
+      <details data-testid="row-more">
+        <summary className="cursor-pointer text-[11px] font-semibold text-clinic-teal">Aur (note, samaan, lab)</summary>
+        <div className="mt-1.5">{rowCard(r)}</div>
+      </details>
+    </div>
+  )
   const blk_work = !homeo ? (
-    <Section title="Har daant ka hisaab" hint="Chart par daant chunein. Har daant ka apna card: takleef, masla, kaam. Bill khud banta hai.">
-      {toothIds.length === 0 && <p className="text-sm text-clinic-ink/55">Upar chart par daant par tap karein. Poore muh ka kaam (jaise scaling) neeche &quot;Poore muh ka kaam&quot; mein hai.</p>}
+    <Section title="Daant aur kaam" hint="Chart par daant chunein, masla likhein, kaam chunein. Har daant ka chhota card bante hai, bill khud.">
       {canEdit && (
-        <div className="grid gap-2 rounded-2xl border-2 border-violet-200 bg-violet-50/40 p-3" data-testid="group-work">
-          <p className="text-sm font-bold text-clinic-ink">Bridge / Denture (kai daanton ka ek hi kaam)</p>
-          <p className="text-xs text-clinic-ink/60">Chart par kai daant chunein, phir yahan Bridge ya Partial Denture dabayein. Ek hi kaam, ek hi qeemat banegi, har daant ka alag card nahi. Poori jabde ki denture ke liye &quot;Complete Denture&quot; dabayein.</p>
-          {(() => {
-            const uniq = (xs: string[]) => { const seen = new Set<string>(); return xs.filter((n) => { const k = n.trim().toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true }) }
-            const cat = dentalCat.filter((c) => (c.applies_to ?? 'tooth') === 'tooth')
-            const bridges = uniq(cat.filter((c) => /bridge/i.test(c.name)).map((c) => c.name))
-            const partials = uniq(dentalCat.filter((c) => /partial denture|flexible denture/i.test(c.name) && !/complete/i.test(c.name) && !/adjust|repair|reline|relining/i.test(c.name)).map((c) => c.name))
-            const completes = uniq(dentalCat.filter((c) => /complete denture/i.test(c.name)).map((c) => c.name))
-            const two = (sel.length >= 2 ? sel : workSel).length >= 2
-            const chipCls = 'rounded-full border border-violet-300 bg-white px-3 py-1.5 text-xs font-semibold text-violet-900 disabled:opacity-40'
-            const grp = (title: string, names: string[], fallback: string, add: (n: string) => void, needTwo: boolean) => (
-              <div className="grid gap-1">
-                <p className="text-[11px] font-semibold text-clinic-ink/60">{title}</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {(names.length ? names : [fallback]).map((n) => (
-                    <button key={n} type="button" disabled={needTwo && !two} onClick={() => add(n)} className={chipCls}>
-                      + {n}
+        <div className="grid gap-3 rounded-2xl border-2 border-clinic-teal/25 bg-clinic-mint/30 p-3" data-testid="entry-panel">
+          {selTeeth.length === 0 && !isComplete ? (
+            <p className="text-sm text-clinic-ink/60" data-testid="entry-empty">Upar chart par daant par tap karein (ek ya kai). Phir yahan masla aur kaam chunein.</p>
+          ) : (
+            <p className="text-sm font-semibold text-clinic-ink" data-testid="entry-teeth">
+              Chune daant: <span className="text-clinic-teal">{selTeeth.length ? selTeeth.map(toothLabel).join(', ') : '—'}</span>
+            </p>
+          )}
+          <div className="grid gap-1.5">
+            <label className="text-xs font-bold text-clinic-ink" htmlFor="entry-dx">Masla (Diagnosis) <span className="font-normal text-clinic-ink/50">likhein ya list se chunein</span></label>
+            <div className="flex flex-wrap gap-1.5">
+              {diagList.slice(0, 6).map((d) => (
+                <button key={d} type="button" aria-pressed={eq(entDx, d)} onClick={() => setEntDx(eq(entDx, d) ? '' : d)} className={`rounded-full px-2.5 py-1 text-xs font-semibold ${eq(entDx, d) ? 'bg-sky-700 text-white' : 'border border-sky-300 bg-white text-sky-900'}`}>
+                  {eq(entDx, d) ? '✓ ' : ''}{d}
+                </button>
+              ))}
+            </div>
+            <input id="entry-dx" data-testid="entry-dx" list="diag-list" value={entDx} onChange={(e) => setEntDx(e.target.value)} placeholder="Masla (zaroori nahi)" className="rounded-lg border border-clinic-teal/25 bg-white px-3 py-2 text-sm" />
+          </div>
+          <div className="grid gap-1.5">
+            <p className="text-xs font-bold text-clinic-ink">Kaam (Treatment)</p>
+            <div className="flex flex-wrap gap-1.5" role="group" aria-label="Kaam">
+              {quickNames.map((n) => (
+                <button key={n} type="button" data-testid="quick-tx" aria-pressed={entTx === n} onClick={() => { setEntTx(entTx === n ? '' : n); setEntType('') }} className={`min-h-10 rounded-full px-3.5 py-1.5 text-sm font-semibold ${entTx === n ? 'bg-clinic-teal text-white' : 'border border-clinic-teal/40 bg-white text-clinic-teal'}`}>
+                  {entTx === n ? '✓ ' : ''}{n}
+                </button>
+              ))}
+              {([['GRP:bridge', 'Bridge'], ['GRP:denture', 'Denture']] as const).map(([k, l]) => (
+                <button key={k} type="button" data-testid={'grp-' + k.slice(4)} aria-pressed={entTx === k} onClick={() => { setEntTx(entTx === k ? '' : k); setEntType('') }} className={`min-h-10 rounded-full px-3.5 py-1.5 text-sm font-semibold ${entTx === k ? 'bg-violet-700 text-white' : 'border-2 border-violet-300 bg-white text-violet-900'}`}>
+                  {entTx === k ? '✓ ' : ''}{l}
+                </button>
+              ))}
+            </div>
+            {!isGrp && (
+              <select aria-label="Koi aur kaam" data-testid="entry-tx-select" value={quickNames.includes(entTx) ? '' : entTx} onChange={(e) => setEntTx(e.target.value)} className="rounded-lg border border-clinic-teal/25 bg-white px-3 py-2 text-sm">
+                <option value="">Koi aur kaam (list se)…</option>
+                {singleNames.map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+            )}
+          </div>
+          {isGrp && (
+            <div className="grid gap-2 rounded-xl border border-violet-200 bg-white p-2.5" data-testid="group-work">
+              {entTx === 'GRP:denture' && (
+                <div className="flex flex-wrap gap-1.5" role="group" aria-label="Denture ki qism">
+                  {([['partial', 'Kuch daanton ki'], ['complete', 'Poori jabde ki']] as const).map(([k, l]) => (
+                    <button key={k} type="button" data-testid={'dkind-' + k} aria-pressed={entDKind === k} onClick={() => { setEntDKind(k); setEntType('') }} className={`rounded-full px-3 py-1 text-xs font-semibold ${entDKind === k ? 'bg-violet-700 text-white' : 'border border-violet-300 bg-white text-violet-900'}`}>
+                      {entDKind === k ? '✓ ' : ''}{l}
                     </button>
                   ))}
                 </div>
-              </div>
-            )
-            return (
-              <>
-                {grp('Bridge ki type (qeemat Price List se khud aayegi)', bridges, 'Bridge', addGroupWork, true)}
-                {grp('Partial / Flexible Denture (kai daant)', partials, 'Partial Denture', addGroupWork, true)}
-                {grp('Poori jabde ki Denture', completes, 'Complete Denture', addCompleteDenture, false)}
-              </>
-            )
-          })()}
-          {(sel.length >= 2 ? sel : workSel).length < 2 && <p className="text-[11px] text-clinic-ink/55">Bridge / Partial Denture ke liye kam az kam 2 daant chunein.</p>}
-          {rows.filter((r) => r.applies === 'jaw' && /denture/i.test(r.name) && Number(r.price) === 0 && p.perms.bill).map((r) => (<p key={'jw' + r.key} className="text-[11px] text-amber-700">{r.name}: qeemat Price List mein nahi hai. Neeche likhein, khud save ho jayegi.</p>))}
-          {rows.filter((r) => r.group).map((r) => (
-            <div key={r.key} className="grid gap-1.5" data-testid="group-row">
-              <p className="text-xs font-semibold text-violet-900">Daant: {r.teeth.map(toothLabel).join(', ')}</p>
-              <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Qeemat ka tareeqa">
+              )}
+              <select aria-label="Qism" data-testid="grp-type" value={entType || grpNames[0] || ''} onChange={(e) => setEntType(e.target.value)} className="rounded-lg border border-violet-300 bg-white px-3 py-2 text-sm">
+                {(grpNames.length ? grpNames : [entTx === 'GRP:bridge' ? 'Bridge' : isComplete ? 'Complete Denture' : 'Partial Denture']).map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+              {!isComplete && (
+                <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Qeemat ka tareeqa">
+                  <span className="text-[11px] font-semibold text-clinic-ink/60">Qeemat:</span>
+                  {(['each', 'whole'] as const).map((m) => (
+                    <button key={m} type="button" aria-pressed={entMode === m} data-testid={'gmode-' + m} onClick={() => setEntMode(m)} className={`rounded-full px-3 py-1 text-xs font-semibold ${entMode === m ? 'bg-violet-700 text-white' : 'border border-violet-300 bg-white text-violet-900'}`}>
+                      {entMode === m ? '✓ ' : ''}{m === 'each' ? 'Har daant ki' : 'Poore ki ek'}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {!isComplete && selTeeth.length < 2 && <p className="text-[11px] text-clinic-ink/55">{entTx === 'GRP:bridge' ? 'Bridge' : 'Is Denture'} ke liye kam az kam 2 daant chunein.</p>}
+              {isComplete && <p className="text-[11px] text-clinic-ink/55">Poori jabde ki Denture ke liye daant chunna zaroori nahi. Upar, Neeche ya Dono card mein chunein.</p>}
+            </div>
+          )}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex gap-1" role="group" aria-label="Aaj ya plan">
+              <button type="button" aria-pressed={!workPlanned} onClick={() => setWorkPlanned(false)} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${!workPlanned ? 'bg-emerald-600 text-white' : 'border border-clinic-ink/20 bg-white text-clinic-ink/60'}`}>Aaj karna hai</button>
+              <button type="button" aria-pressed={workPlanned} onClick={() => setWorkPlanned(true)} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${workPlanned ? 'bg-amber-500 text-white' : 'border border-clinic-ink/20 bg-white text-clinic-ink/60'}`}>Sirf plan</button>
+            </div>
+            {p.perms.bill && (isGrp ? grpPreview != null : singlePreview != null && entTx !== '') && (
+              <p className="text-sm font-semibold text-clinic-ink" data-testid="entry-bill">
+                Bill: {(isGrp ? grpPreview : singlePreview) ? money((isGrp ? grpPreview : singlePreview) as number) : 'Price List mein nahi (card mein likhein)'}
+              </p>
+            )}
+            <button
+              type="button"
+              data-testid="entry-add"
+              onClick={applyEntry}
+              disabled={isGrp ? (!isComplete && selTeeth.length < 2) : selTeeth.length === 0 || (!entTx.trim() && !entDx.trim())}
+              className="ml-auto min-h-11 rounded-full bg-clinic-teal px-5 py-2 text-sm font-semibold text-white disabled:opacity-40"
+            >
+              Card banayein
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="grid gap-3 sm:grid-cols-2" data-testid="cards">
+        {rows.filter((r) => r.group).map((r) => {
+          const dxs = [...new Set(r.teeth.flatMap(dxOfTooth))]
+          return (
+            <div key={r.key} data-testid="group-card" className="grid content-start gap-2 rounded-2xl border-2 border-violet-300 bg-white p-3 sm:col-span-2">
+              <p className="font-display text-base font-semibold text-clinic-ink">{r.teeth.length > 3 ? `${r.teeth.length} daant: ${r.teeth.join(', ')}` : r.teeth.map(toothLabel).join(', ')}</p>
+              {dxs.length > 0 && <p className="text-xs text-clinic-ink/70">Masla: {dxs.join(', ')}</p>}
+              <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Qeemat ka tareeqa" data-testid="group-row">
                 <span className="text-[11px] font-semibold text-clinic-ink/60">Qeemat:</span>
                 {(['each', 'whole'] as const).map((m) => (
-                  <button key={m} type="button" aria-pressed={(r.gmode ?? 'each') === m} data-testid={'gmode-' + m} onClick={() => setGroupMode(r.key, m)} className={`rounded-full px-3 py-1 text-xs font-semibold ${(r.gmode ?? 'each') === m ? 'bg-violet-700 text-white' : 'border border-violet-300 bg-white text-violet-900'}`}>
-                    {(r.gmode ?? 'each') === m ? '✓ ' : ''}{m === 'each' ? 'Har daant ki qeemat' : 'Poore ki ek qeemat'}
+                  <button key={m} type="button" disabled={!canEdit} aria-pressed={(r.gmode ?? 'each') === m} data-testid={'cardmode-' + m} onClick={() => setGroupMode(r.key, m)} className={`rounded-full px-3 py-1 text-xs font-semibold ${(r.gmode ?? 'each') === m ? 'bg-violet-700 text-white' : 'border border-violet-300 bg-white text-violet-900'}`}>
+                    {(r.gmode ?? 'each') === m ? '✓ ' : ''}{m === 'each' ? 'Har daant ki' : 'Poore ki ek'}
                   </button>
                 ))}
               </div>
-              {p.perms.bill && Number(r.price) === 0 && <p className="text-[11px] text-amber-700">Is ki qeemat Price List mein nahi hai. Neeche Qeemat mein likhein; visit khatam hone par Price List mein khud save ho jayegi (agli dafa khud aayegi).</p>}
-              {rowCard(r)}
+              {miniRow(r)}
+              {/bridge/i.test(r.name) && <p className="text-[11px] text-clinic-ink/50">Chart par sahaare ke daant firozi aur beech ke (pontic) peele nazar aate hain.</p>}
             </div>
-          ))}
-        </div>
-      )}
-      <div className="grid gap-3">
-        {toothIds.map((t) => {
+          )
+        })}
+        {rows.filter((r) => r.applies === 'jaw' && /denture/i.test(r.name)).map((r) => (
+          <div key={r.key} data-testid="denture-card" className="grid content-start gap-2 rounded-2xl border-2 border-violet-300 bg-white p-3 sm:col-span-2">
+            <p className="font-display text-base font-semibold text-clinic-ink">{r.name}</p>
+            {rowCard(r)}
+          </div>
+        ))}
+        {cardTeeth.map((t) => {
           const myRows = rows.filter((r) => r.applies === 'tooth' && !r.group && r.teeth.includes(t))
+          const myDx = dxOfTooth(t)
           const myCc = ccOf(t)
-          const inGroup = rows.find((r) => r.group && r.teeth.includes(t))
-          if (inGroup) return null
           return (
-            <div key={t} data-testid="tooth-card" className="grid gap-2.5 rounded-2xl border-2 border-sky-200 bg-white p-3">
+            <div key={t} data-testid="tooth-card" className="grid content-start gap-2 rounded-2xl border-2 border-sky-200 bg-white p-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="font-display text-base font-semibold text-clinic-ink">{toothLabel(t)}</p>
                 {canEdit && <button type="button" onClick={() => clearTooth(t)} className="text-xs text-red-600 underline">Is daant ko hatao</button>}
               </div>
-              <div className="grid gap-1.5">
-                <p className="text-xs font-bold text-clinic-ink">Takleef</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {complaintList.slice(0, 8).map((c) => (
-                    <button key={c} type="button" disabled={!canEdit} aria-pressed={myCc.includes(c)} onClick={() => toggleCc(t, c)} className={`rounded-full px-2.5 py-1 text-xs font-semibold ${myCc.includes(c) ? 'bg-sky-700 text-white' : 'border border-sky-300 bg-white text-sky-900'}`}>
-                      {myCc.includes(c) ? '✓ ' : ''}
-                      {c}
-                    </button>
-                  ))}
-                </div>
+              <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                <span className="font-bold text-clinic-ink">Masla:</span>
+                {myDx.length === 0 && <span className="text-clinic-ink/45">—</span>}
+                {myDx.map((x) => (
+                  <button key={x} type="button" disabled={!canEdit} onClick={() => removeDxTooth(x, t)} aria-label={`${x} hatao`} className="rounded-full bg-sky-700 px-2.5 py-1 font-semibold text-white">
+                    {x} ×
+                  </button>
+                ))}
               </div>
-              {canEdit ? renderToothWork(t) : null}
-              {myRows.length > 0 && <div className="grid gap-2">{myRows.map((r) => rowCard(r))}</div>}
+              {myRows.length > 0 && <div className="grid gap-1.5">{myRows.map((r) => miniRow(r))}</div>}
+              {myRows.length === 0 && <p className="text-[11px] text-clinic-ink/50">Abhi koi kaam nahi, sirf masla likha hai.</p>}
+              {canEdit && (
+                <details data-testid="takleef-box" open={myCc.length > 0}>
+                  <summary className="cursor-pointer text-[11px] font-semibold text-clinic-teal">Takleef likhein (zaroori nahi){myCc.length ? ` · ${myCc.length}` : ''}</summary>
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {complaintList.slice(0, 8).map((c) => (
+                      <button key={c} type="button" aria-pressed={myCc.includes(c)} onClick={() => toggleCc(t, c)} className={`rounded-full px-2.5 py-1 text-xs font-semibold ${myCc.includes(c) ? 'bg-sky-700 text-white' : 'border border-sky-300 bg-white text-sky-900'}`}>
+                        {myCc.includes(c) ? '✓ ' : ''}{c}
+                      </button>
+                    ))}
+                  </div>
+                </details>
+              )}
             </div>
           )
         })}
@@ -1554,7 +1602,7 @@ export default function VisitWorkspace(p: Props) {
                   }}
                 />
               )}
-              {(homeo ? rows : rows.filter((r) => !(r.applies === 'tooth' && r.teeth.length > 0))).map((r) => rowCard(r))}
+              {(homeo ? rows : rows.filter((r) => !(r.applies === 'tooth' && r.teeth.length > 0) && !(r.applies === 'jaw' && /denture/i.test(r.name)))).map((r) => rowCard(r))}
               {canEdit && (p.extraItems ?? []).length > 0 && (
                 <div className="rounded-xl border border-dashed border-clinic-teal/30 p-3 text-xs" data-testid="extras">
                   <p className="font-semibold text-clinic-ink">Doctor khud chunein (agar kuch alag use hua)</p>

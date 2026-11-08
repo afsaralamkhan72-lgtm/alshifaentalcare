@@ -19,14 +19,14 @@ async function fin(p){
   console.log('== width',w);
   const pid=await go(p,'Zr ');
   const before=await p.locator('main').first().boundingBox();const tc=await p.locator('[aria-label^="Upper Right Central"]').first().boundingBox();
-  await p.locator('[data-testid=group-work]').getByRole('button',{name:'+ Zirconia Bridge',exact:true}).click();await p.waitForTimeout(500);
-  const gr=p.locator('[data-testid=group-row]').first();
-  const val=async()=>await gr.getByPlaceholder('Qeemat Rs.').inputValue();
+  await p.getByTestId('grp-bridge').click();await p.getByTestId('grp-type').selectOption('Zirconia Bridge');await p.getByTestId('entry-add').click();await p.waitForTimeout(500);
+  const gr=p.locator('[data-testid=group-card]').first();
+  const val=async()=>await gr.getByLabel('Qeemat',{exact:true}).inputValue();
   console.log(' each:',await val());
-  await gr.getByTestId('gmode-whole').click();await p.waitForTimeout(200);console.log(' whole:',await val());
-  await gr.getByTestId('gmode-each').click();await p.waitForTimeout(200);console.log(' each again:',await val());
+  await gr.getByTestId('cardmode-whole').click();await p.waitForTimeout(200);console.log(' whole:',await val());
+  await gr.getByTestId('cardmode-each').click();await p.waitForTimeout(200);console.log(' each again:',await val());
   const after=await p.locator('main').first().boundingBox();const tc2=await p.locator('[aria-label^="Upper Right Central"]').first().boundingBox();
-  console.log(' tooth box same:',tc.x===tc2.x&&tc.width===tc2.width&&tc.height===tc2.height,tc.width,tc2.width);
+  console.log(' tooth box same:',tc.width===tc2.width&&tc.height===tc2.height,JSON.stringify(tc),JSON.stringify(tc2));
   const cols=await p.evaluate(()=>{const o={};document.querySelectorAll('span.absolute.inset-0').forEach(e=>{const f=e.style.backgroundColor;if(f)o[f]=(o[f]||0)+1});return o});
   console.log(' colours:',JSON.stringify(cols));
   console.log(' overflow:',await p.evaluate(()=>document.documentElement.scrollWidth>document.documentElement.clientWidth));
@@ -36,14 +36,14 @@ async function fin(p){
    console.log(' invoice:',L.q(`select total,paid_amount from invoices where patient_id='${pid}'`));
    // PFM zero price, typed price saved to list
    const p2=r.p; const pid2=await go(p2,'Pf ');
-   await p2.locator('[data-testid=group-work]').getByRole('button',{name:'+ PFM Bridge',exact:true}).click();await p2.waitForTimeout(500);
-   await p2.locator('[data-testid=group-row]').first().getByTestId('gmode-whole').click();
-   await p2.locator('[data-testid=group-row]').first().getByPlaceholder('Qeemat Rs.').fill('12000');
+   await p2.getByTestId('grp-bridge').click();await p2.getByTestId('grp-type').selectOption('PFM Bridge');await p2.getByTestId('entry-add').click();await p2.waitForTimeout(500);
+   await p2.locator('[data-testid=group-card]').first().getByTestId('cardmode-whole').click();
+   await p2.locator('[data-testid=group-card]').first().getByLabel('Qeemat',{exact:true}).fill('12000');
    await fin(p2);
    console.log(' catalog PFM:',L.q("select price from treatment_catalog where name='PFM Bridge'"));
    // complete denture Both
    const pid3=await go(p2,'Dn ');
-   const chips=await p2.locator('[data-testid=group-work] button').allInnerTexts();console.log(' chips:',chips.join(' | '));
+   await p2.getByTestId('grp-denture').click();await p2.getByTestId('dkind-complete').click();console.log(' complete types:',(await p2.getByTestId('grp-type').locator('option').allInnerTexts()).join(' | '));
   }
   await r.b.close?.();
  }

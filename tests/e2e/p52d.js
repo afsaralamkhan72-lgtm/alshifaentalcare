@@ -4,12 +4,7 @@ const pid=await L.newPatient(p,'Mouth Test '+Date.now().toString().slice(-4),'03
 await p.goto('http://localhost:3055/admin/patients/'+pid,{waitUntil:'domcontentloaded'});await p.waitForTimeout(1800);
 const st=p.getByRole('button',{name:/Naya visit shuru/});if(await st.count()){await st.click();await p.waitForTimeout(800)}
 await p.getByRole('button',{name:'Agla →'}).click();await p.waitForTimeout(900);
-await p.locator('[aria-label^="Upper Right Central Incisor"]').first().click();await p.waitForTimeout(300);
-await p.locator('[aria-label^="Upper Left Central Incisor"]').first().click();await p.waitForTimeout(400);
-const bk=p.getByRole('button',{name:/Band karein/});if(await bk.count())await bk.first().click();await p.waitForTimeout(300);
-const c=p.locator('[data-testid=tooth-card]');
-await c.nth(0).getByRole('button',{name:/Dental caries/}).click();
-await c.nth(0).getByRole('button',{name:/Composite Filling/}).first().click();
+await L.addCard(p,{teeth:['Upper Right Central Incisor'],dx:'Dental caries',quick:/Composite Filling/});
 await p.getByRole('button',{name:/Scaling & Polishing/}).first().click();await p.waitForTimeout(400);
 await p.screenshot({path:'/tmp/prst/m1.png',fullPage:false});
 console.log('overflowX', await p.evaluate(()=>document.documentElement.scrollWidth>document.documentElement.clientWidth+2));

@@ -14,6 +14,7 @@ import VisitWorkspace, { type VisitRow, type MedOpt } from '@/components/admin/v
 import type { CatalogOpt, MaterialOpt, TItem, TVisit } from '@/components/admin/visit/types'
 import PatientPhotoGallery, { type PatientPhoto } from '@/components/admin/PatientPhotoGallery'
 import type { Plan as PayPlan, PlanItem } from '@/components/admin/PaymentPlan'
+import ArchiveCardView, { type ArchiveCard } from '@/components/admin/ArchiveCardView'
 import TreatmentCards, { type Stage, type LabLite } from '@/components/admin/TreatmentCards'
 import TreatmentPlanCard, { type Installment, type Plan } from '@/components/admin/TreatmentPlanCard'
 import { todayKarachi, money, fmtDate } from '@/lib/karachi'
@@ -152,6 +153,8 @@ export default async function PatientDetailPage({ params, searchParams }: Props)
       : Promise.resolve({ data: [], error: null }),
   ])
   const tplRes = await supabase.from('message_templates').select('key, body')
+  const archRes = canClinical ? await supabase.from('patient_archive_cards').select('*').eq('patient_id', id).maybeSingle() : { data: null }
+  const archiveCard = (archRes.data as ArchiveCard | null) ?? null
   const tpl = mapTemplates(tplRes.data as { key: string; body: string }[] | null)
   const pf = { full_name: patient.full_name, phone: patient.phone, gender: patient.gender as string | null }
   // Aaj ki halat (intezar -> doctor -> bill -> ho gaya) aur family
@@ -336,6 +339,8 @@ export default async function PatientDetailPage({ params, searchParams }: Props)
           </div>
         )}
       </section>
+
+      {archiveCard && <ArchiveCardView card={archiveCard} canMoney={canMoney} />}
 
       {!canClinical && !canMoney && !can('appointments.view') && (
         <p className="text-sm text-clinic-ink/60">Aap ko is patient ka record dekhne ki permission nahi.</p>

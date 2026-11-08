@@ -21,3 +21,15 @@ exports.visit=async(p,pid,o)=>{await p.goto('http://localhost:3055/admin/patient
  else if(o.pay!=null){await p.locator('text=Aaj kitne mile').first().locator('xpath=following::input[1]').fill(String(o.pay))}
  await p.getByRole('button',{name:/Visit khatam karein/}).click();await p.waitForTimeout(3500);
  return (await p.evaluate(()=>document.body.innerText.includes('Aaj ka visit mukammal ho gaya')));};
+exports.tap=async(p,n)=>{await p.locator('[aria-label^="'+n+'"]').first().click();await p.waitForTimeout(250)};
+exports.addCard=async(p,o)=>{for(const n of o.teeth)await exports.tap(p,n);
+ if(o.dx)await p.getByTestId('entry-dx').fill(o.dx);
+ if(o.quick)await p.getByTestId('quick-tx').filter({hasText:o.quick}).first().click();
+ if(o.pick)await p.getByTestId('entry-tx-select').selectOption(o.pick);
+ await p.getByTestId('entry-add').click();await p.waitForTimeout(400)};
+exports.addGroup=async(p,o)=>{for(const n of o.teeth||[])await exports.tap(p,n);
+ await p.getByTestId(o.kind==='bridge'?'grp-bridge':'grp-denture').click();
+ if(o.kind==='denture'&&o.complete)await p.getByTestId('dkind-complete').click();
+ if(o.type)await p.getByTestId('grp-type').selectOption(o.type);
+ if(o.mode)await p.getByTestId('gmode-'+o.mode).click();
+ await p.getByTestId('entry-add').click();await p.waitForTimeout(500)};

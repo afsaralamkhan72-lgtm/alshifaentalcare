@@ -4,14 +4,10 @@ const pid=await L.newPatient(p,'Card Test '+Date.now().toString().slice(-4),'030
 await p.goto('http://localhost:3055/admin/patients/'+pid,{waitUntil:'domcontentloaded'});await p.waitForTimeout(1800);
 const st=p.getByRole('button',{name:/Naya visit shuru/});if(await st.count()){await st.click();await p.waitForTimeout(800)}
 await p.getByRole('button',{name:'Agla →'}).click();await p.waitForTimeout(900);
-await p.locator('[aria-label^="Upper Right Central Incisor"]').first().click();await p.waitForTimeout(300);
-await p.locator('[aria-label^="Upper Left Central Incisor"]').first().click();await p.waitForTimeout(500);
+await L.addCard(p,{teeth:['Upper Right Central Incisor'],dx:'Dental caries',quick:/Composite Filling/});
+await L.addCard(p,{teeth:['Upper Left Central Incisor'],dx:'Pulp necrosis',quick:/Root Canal/});
 console.log('cards',await p.locator('[data-testid=tooth-card]').count());
 const c=p.locator('[data-testid=tooth-card]');
-await c.nth(0).getByRole('button',{name:/Dental caries/}).click();
-await c.nth(0).getByRole('button',{name:/\+ Composite Filling/}).first().click();
-await c.nth(1).getByRole('button',{name:/Pulp necrosis/}).click();
-console.log((await c.nth(1).innerText()).replace(/\n+/g,' | ').slice(0,700));await c.nth(1).getByRole('button',{name:/Root Canal/}).first().click();await p.waitForTimeout(500);
 console.log('--- cards text ---');console.log((await c.nth(0).innerText()).replace(/\n+/g,' | ').slice(0,500));console.log((await c.nth(1).innerText()).replace(/\n+/g,' | ').slice(0,500));
 await p.screenshot({path:'/tmp/prst/p52a.png',fullPage:false});
 await p.getByRole('button',{name:'Agla →'}).click();await p.waitForTimeout(600);

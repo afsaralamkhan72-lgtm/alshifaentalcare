@@ -13,6 +13,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import PrintSettings from '@/components/admin/PrintSettings'
 import { getPrintCfg } from '@/lib/printSettings'
 import BackupPanel from '@/components/admin/BackupPanel'
+import DataCleanupPanel from '@/components/admin/DataCleanupPanel'
 import MessageTemplatesManager from '@/components/admin/MessageTemplatesManager'
 import { OPTION_KINDS } from '@/lib/clinicOptions'
 import VisitShowSettings, { type VisitShow } from '@/components/admin/VisitShowSettings'
@@ -28,6 +29,7 @@ const SECTIONS = [
   { k: 'print', l: 'Print, Logo aur QR' },
   { k: 'notify', l: 'Phone notification', owner: true },
   { k: 'backup', l: 'Backup (data ki copy)' },
+  { k: 'space', l: 'Jagah aur purana data', owner: true },
   { k: 'other', l: 'Reminder' },
 ]
 
@@ -128,6 +130,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           {s === 'lists' && <ClinicOptionsManager kinds={OPTION_KINDS} rows={(optRes.data ?? []) as OptRow[]} missing={Boolean(optRes.error)} />}
           {s === 'messages' && <MessageTemplatesManager rows={(msgRes.data ?? []) as { key: string; body: string }[]} missing={Boolean(msgRes.error)} />}
           {s === 'backup' && <BackupPanel last={(bkRes.data as { value?: unknown } | null)?.value ? String((bkRes.data as { value: unknown }).value) : null} />}
+          {s === 'space' && isOwner && <DataCleanupPanel />}
           {s === 'other' && <ReminderSetting days={days} />}
         </div>
       </div>

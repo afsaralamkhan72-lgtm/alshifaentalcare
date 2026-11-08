@@ -11,7 +11,7 @@ const card=p.locator('[data-testid=tooth-card]').first();
 console.log('card has filling row:', (await card.innerText()).includes('Composite Filling'));
 // remove via chart toggle
 await p.locator('button[aria-pressed]:has-text("Filling")').first().click();await p.waitForTimeout(400);
-console.log('after unmark has filling row:', (await card.innerText()).includes('Composite Filling'));
+console.log('after unmark cards left:', await p.locator('[data-testid=tooth-card]').count());
 // 2) homeopathic visit
 await p.goto('http://localhost:3055/admin/patients',{waitUntil:'networkidle'});
 await p.getByRole('button',{name:'+ Naya Patient'}).click();await p.waitForTimeout(400);
