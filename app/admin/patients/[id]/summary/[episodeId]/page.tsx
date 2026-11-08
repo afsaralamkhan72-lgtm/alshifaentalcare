@@ -7,10 +7,7 @@ import { CLINIC, timingsLine } from '@/clinic.config'
 import ClinicLogo from '@/components/ClinicLogo'
 import HistoryPrintButton from '@/components/admin/HistoryPrintButton'
 import { toothLabel } from '@/lib/teeth'
-
-function fmt(d: string | null) {
-  return d ? new Date(d).toLocaleDateString('en-GB') : '—'
-}
+import { fmtDate } from '@/lib/karachi'
 
 export default async function TreatmentSummaryPage({
   params,
@@ -134,11 +131,11 @@ export default async function TreatmentSummaryPage({
             <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
               <div>
                 <p className="text-xs font-medium text-clinic-ink/70">Shuru</p>
-                <p className="font-medium text-clinic-ink">{fmt(episode.started_on)}</p>
+                <p className="font-medium text-clinic-ink">{fmtDate(episode.started_on)}</p>
               </div>
               <div>
                 <p className="text-xs font-medium text-clinic-ink/70">Mukammal</p>
-                <p className="font-medium text-clinic-ink">{fmt(episode.completed_on)}</p>
+                <p className="font-medium text-clinic-ink">{fmtDate(episode.completed_on)}</p>
               </div>
               <div>
                 <p className="text-xs font-medium text-clinic-ink/70">Total Visits</p>

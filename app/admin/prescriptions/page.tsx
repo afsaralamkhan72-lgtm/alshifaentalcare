@@ -58,7 +58,7 @@ export default async function PrescriptionsPage() {
                         {patient.full_name}
                       </Link>
                     ) : (
-                      'Unknown'
+                      'Patient ka naam nahi'
                     )}{' '}
                     <span className="text-xs text-clinic-ink/40">{patient?.mr_number}</span>
                   </p>

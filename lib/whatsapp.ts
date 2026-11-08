@@ -1,5 +1,6 @@
 // Clinic's WhatsApp number in international format (no +, no spaces/dashes)
 import { CLINIC } from '@/clinic.config'
+import { toInternationalPKNumber } from '@/lib/phone'
 // 0342-2078639 -> 92 342 2078639
 const CLINIC_WHATSAPP_NUMBER = CLINIC.phone.whatsapp
 
@@ -35,13 +36,7 @@ export function buildWhatsAppLink({
   return `https://wa.me/${number}?text=${encodeURIComponent(message)}`
 }
 
-/** Converts a local PK number (0300-1234567 / 03001234567) to international format (923001234567) */
-export function toInternationalPKNumber(phone: string): string {
-  const digits = phone.replace(/[^0-9]/g, '')
-  if (digits.startsWith('92')) return digits
-  if (digits.startsWith('0')) return `92${digits.slice(1)}`
-  return `92${digits}`
-}
+export { toInternationalPKNumber }
 
 interface PrescriptionItem {
   name_en: string

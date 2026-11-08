@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { todayKarachi } from '@/lib/karachi'
+import { todayKarachi, fmtDate } from '@/lib/karachi'
 
 interface PatientHit {
   id: string
@@ -58,10 +58,6 @@ function extractName(q: string) {
     .split(/\s+/)
     .filter((w) => w && !STOPWORDS.has(w) && w.length > 1)
   return words.join(' ').trim()
-}
-
-function fmt(d: string | null) {
-  return d ? new Date(d).toLocaleDateString('en-GB') : '—'
 }
 
 /** Minimal typing for the browser's built-in speech recognition */
@@ -224,14 +220,14 @@ export default function AssistantBar() {
       if (!data || data.length === 0) {
         lines.push({ label: 'Last visit', value: 'Koi visit record nahi' })
       } else {
-        lines.push({ label: 'Last visit', value: `${fmt(data[0].visit_date)}, ${data[0].procedure ?? 'Visit'}` })
+        lines.push({ label: 'Last visit', value: `${fmtDate(data[0].visit_date)}, ${data[0].procedure ?? 'Visit'}` })
         if (data[0].notes) lines.push({ label: 'Notes', value: data[0].notes })
         const next = data.find((v) => v.next_visit)?.next_visit
-        lines.push({ label: 'Next visit', value: next ? fmt(next) : 'Set nahi hai' })
+        lines.push({ label: 'Next visit', value: next ? fmtDate(next) : 'Set nahi hai' })
         if (data[1]) {
           lines.push({
             label: 'Us se pehle',
-            value: `${fmt(data[1].visit_date)}, ${data[1].procedure ?? 'Visit'}`,
+            value: `${fmtDate(data[1].visit_date)}, ${data[1].procedure ?? 'Visit'}`,
           })
         }
       }
@@ -281,7 +277,7 @@ export default function AssistantBar() {
         if (nextDue) {
           lines.push({
             label: 'Next installment',
-            value: `Rs. ${Number(nextDue.amount).toLocaleString()}, ${fmt(nextDue.due_date)}`,
+            value: `Rs. ${Number(nextDue.amount).toLocaleString()}, ${fmtDate(nextDue.due_date)}`,
           })
         }
         if (overdue.length > 0) {
@@ -312,7 +308,7 @@ export default function AssistantBar() {
         for (const rx of data) {
           const items = (rx.items ?? []) as { name_en?: string; name_ur?: string }[]
           lines.push({
-            label: fmt(rx.prescribed_date),
+            label: fmtDate(rx.prescribed_date),
             value: items.map((i) => i.name_en || i.name_ur).filter(Boolean).join(' · ') || '—',
           })
         }
@@ -333,7 +329,7 @@ export default function AssistantBar() {
       } else {
         for (const a of data) {
           lines.push({
-            label: fmt(a.preferred_date),
+            label: fmtDate(a.preferred_date),
             value: `${a.treatment_name ?? 'Consultation'}, ${a.status}`,
           })
         }
@@ -361,10 +357,10 @@ export default function AssistantBar() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-clinic-teal/20 px-3 py-1.5 text-xs text-clinic-ink/50 transition-colors hover:border-clinic-teal hover:text-clinic-teal"
+        className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-clinic-teal/20 px-3 py-1.5 min-h-[36px] text-xs text-clinic-ink/50 transition-colors hover:border-clinic-teal hover:text-clinic-teal"
       >
-        <span className="sm:hidden">Ask ?</span>
-        <span className="hidden sm:inline">Ask about a patient</span>
+        <span className="sm:hidden">Poochein</span>
+        <span className="hidden sm:inline">Patient ke baare mein poochein</span>
         <kbd className="hidden rounded bg-clinic-mint px-1.5 py-0.5 text-[10px] font-semibold text-clinic-teal sm:inline">
           Ctrl K
         </kbd>

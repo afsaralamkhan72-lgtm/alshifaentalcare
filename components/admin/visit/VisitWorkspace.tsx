@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { fmtDate, money, todayKarachi, addDays } from '@/lib/karachi'
 import { toothTitle as toothLabel } from '@/lib/teeth'
@@ -136,7 +136,7 @@ interface Props {
   xraySlot?: ReactNode
   plansSlot?: ReactNode
   pastRx?: { id: string; date: string; names: string; items?: { name: string; potency: string; dose: string; frequency: string; duration: string; instructions: string }[] }[]
-  perms: { clinicalView: boolean; clinicalEdit: boolean; bill: boolean; collect: boolean; money: boolean; owner: boolean; discountMax: number; rx: boolean }
+  perms: { clinicalView: boolean; clinicalEdit: boolean; bill: boolean; collect: boolean; money: boolean; owner: boolean; discountMax: number; rx: boolean; lab?: boolean }
 }
 
 const DURATIONS = ['Aaj se', '2-3 din', '1 hafta', '2 hafte', '1 mahina', '1 mahine se zyada']
@@ -440,10 +440,30 @@ export default function VisitWorkspace(p: Props) {
   const updRow = (key: string, patch: Partial<TRow>) => setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)))
   const updOld = (id: string, patch: Partial<OldRow>) => setOld((o) => ({ ...o, [id]: { ...{ tick: false, notes: '', price: '' }, ...o[id], ...patch } }))
 
+  const continueId = useSearchParams().get('continue')
+  // Treatment ke card se "Visit N shuru karein": visit khule aur wahi treatment pehle se tick ho
+  useEffect(() => {
+    if (typeof window === 'undefined' || !canEdit) return
+    const id = continueId
+    if (!id) return
+    const t = live.find((x) => x.id === id)
+    window.history.replaceState(null, '', window.location.pathname)
+    if (!t) return
+    setShowForm(true)
+    setStep(2)
+    updOld(id, { tick: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [continueId])
+
   // ---- Chart ke panel se: is daant ka masla (diagnosis) aur kaam (treatment) ----
   const [workPlanned, setWorkPlanned] = useState(false)
-  const [dxQ, setDxQ] = useState('')
-  const [txQ, setTxQ] = useState('')
+  // Chune hue daant chart band karne par bhi card mein rehte hain (jab tak "Is daant ko hatao" na dabayein)
+  const [workSel, setWorkSel] = useState<string[]>([])
+  useEffect(() => {
+    if (sel.length) setWorkSel((w) => [...new Set([...w, ...sel])])
+  }, [sel])
+  const [dxQ, setDxQ] = useState<Record<string, string>>({})
+  const [txQ, setTxQ] = useState<Record<string, string>>({})
   const eq = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
   function addDxTooth(text: string, tooth: string) {
     const tx = text.trim()
@@ -465,15 +485,9 @@ export default function VisitWorkspace(p: Props) {
     const c = p.catalog.find((x) => eq(x.name, nm))
     const applies: Applies = c?.applies_to ?? 'tooth'
     setRows((rs) => {
-      const i = rs.findIndex((r) => eq(r.name, nm) && r.planned === planned && r.applies === applies)
-      if (i >= 0 && applies === 'tooth') {
-        return rs.map((r, j) => {
-          if (j !== i || r.teeth.includes(tooth)) return r
-          const teeth = [...r.teeth, tooth]
-          return { ...r, teeth, price: autoPrice(r, teeth) }
-        })
-      }
-      if (i >= 0) return rs
+      // Har daant ka apna alag kaam aur apni alag bill ki qatar
+      if (applies === 'tooth' && rs.some((r) => eq(r.name, nm) && r.applies === 'tooth' && r.teeth.includes(tooth))) return rs
+      if (applies !== 'tooth' && rs.some((r) => eq(r.name, nm) && r.planned === planned && r.applies === applies)) return rs
       const mats: Record<string, string> = {}
       if (c) for (const m of p.materials[c.id] ?? []) mats[m.inventory_id] = String(m.default_qty)
       const teeth = applies === 'tooth' ? [tooth] : []
@@ -530,7 +544,7 @@ export default function VisitWorkspace(p: Props) {
     return (
       <div className="grid gap-3 rounded-xl border border-sky-200 bg-white p-2.5" data-testid="tooth-work">
         <div className="grid gap-1.5">
-          <p className="text-xs font-bold text-clinic-ink">1. Is daant ka masla (Diagnosis)</p>
+          <p className="text-xs font-bold text-clinic-ink">Masla (Diagnosis)</p>
           <div className="flex flex-wrap gap-1.5">
             {diagList.slice(0, 8).map((d) => {
               const on = myDx.some((x) => eq(x, d))
@@ -549,13 +563,13 @@ export default function VisitWorkspace(p: Props) {
           </div>
           <input
             list="diag-list"
-            value={dxQ}
-            onChange={(e) => setDxQ(e.target.value)}
+            value={dxQ[tooth] ?? ''}
+            onChange={(e) => setDxQ((q) => ({ ...q, [tooth]: e.target.value }))}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault()
-                addDxTooth(dxQ, tooth)
-                setDxQ('')
+                addDxTooth(dxQ[tooth] ?? '', tooth)
+                setDxQ((q) => ({ ...q, [tooth]: '' }))
               }
             }}
             placeholder="Aur masla likhein, phir Enter"
@@ -564,11 +578,7 @@ export default function VisitWorkspace(p: Props) {
         </div>
         <div className="grid gap-1.5">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs font-bold text-clinic-ink">2. Is daant ka kaam (Treatment)</p>
-            <span className="inline-flex overflow-hidden rounded-full border border-clinic-ink/20 text-[11px] font-semibold">
-              <button type="button" aria-pressed={!workPlanned} onClick={() => setWorkPlanned(false)} className={`px-2.5 py-1 ${!workPlanned ? 'bg-emerald-600 text-white' : 'text-clinic-ink/60'}`}>Aaj ho gaya</button>
-              <button type="button" aria-pressed={workPlanned} onClick={() => setWorkPlanned(true)} className={`px-2.5 py-1 ${workPlanned ? 'bg-amber-500 text-white' : 'text-clinic-ink/60'}`}>Plan</button>
-            </span>
+            <p className="text-xs font-bold text-clinic-ink">Kaam (Treatment)</p>
           </div>
           {sugg.length > 0 && (
             <div className="flex flex-wrap items-center gap-1.5 text-xs">
@@ -591,34 +601,19 @@ export default function VisitWorkspace(p: Props) {
           )}
           <input
             list="cat-list"
-            value={txQ}
-            onChange={(e) => setTxQ(e.target.value)}
+            value={txQ[tooth] ?? ''}
+            onChange={(e) => setTxQ((q) => ({ ...q, [tooth]: e.target.value }))}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault()
-                addTxTooth(txQ, tooth, workPlanned)
-                setTxQ('')
+                addTxTooth(txQ[tooth] ?? '', tooth, workPlanned)
+                setTxQ((q) => ({ ...q, [tooth]: '' }))
               }
             }}
             placeholder="Koi aur kaam (list se chunein), phir Enter"
             className="rounded-lg border border-clinic-teal/20 px-2.5 py-1.5 text-xs"
           />
-          {myRows.length > 0 && (
-            <div className="grid gap-1">
-              {myRows.map((r) => (
-                <div key={r.key} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-sky-50 px-2.5 py-1.5 text-xs">
-                  <span className="font-semibold text-clinic-ink">
-                    {r.name}
-                    <span className={`ml-2 rounded-full px-2 py-0.5 text-[10px] ${r.planned ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{r.planned ? 'plan' : 'aaj ho gaya'}</span>
-                    {p.perms.bill && r.unit != null && <span className="ml-2 text-clinic-ink/60">Rs. {r.unit}</span>}
-                  </span>
-                  <button type="button" onClick={() => removeTxTooth(r.key, tooth)} className="text-red-600 underline">hatao</button>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
-        <p className="text-[11px] text-clinic-ink/55">Qeemat, samaan aur note neeche &quot;Aaj ka kaam&quot; mein dikhte hain.</p>
       </div>
     )
   }
@@ -629,9 +624,16 @@ export default function VisitWorkspace(p: Props) {
     if (c) for (const m of p.materials[c.id] ?? []) mats[m.inventory_id] = String(m.default_qty)
     if (!c) return updRow(r.key, { name, catalog_id: null, mats: {} })
     const applies: Applies = c.applies_to ?? 'tooth'
-    const teeth = applies === 'tooth' ? (r.teeth.length ? r.teeth : [...sel]) : []
+    const teeth = applies === 'tooth' ? (r.teeth.length ? r.teeth : sel.slice(0, 1)) : []
     const next = { applies, unit: applies === 'tooth' ? c.price : null, manual: false, price: String(c.price) }
     updRow(r.key, { name, catalog_id: c.id, mats, teeth, applies, unit: next.unit, manual: false, price: autoPrice(next, teeth) })
+    // Har daant ki alag qatar: baqi chune hue daanton ki apni qatar
+    if (applies === 'tooth' && r.teeth.length === 0 && sel.length > 1) {
+      setRows((rs) => [
+        ...rs,
+        ...sel.slice(1).map((t): TRow => ({ ...r, key: newKey(), name, catalog_id: c.id, mats: { ...mats }, teeth: [t], applies, unit: next.unit, manual: false, price: autoPrice(next, [t]) })),
+      ])
+    }
   }
   function setRowTeeth(r: TRow, t: string[]) {
     updRow(r.key, { teeth: t, price: autoPrice(r, t) })
@@ -870,7 +872,7 @@ export default function VisitWorkspace(p: Props) {
   /* ---------- 4 qadam ---------- */
   const vs = (k: 'medical' | 'dental' | 'exam' | 'xray') =>
     Boolean(p.visitShow?.[k]) ||
-    (k === 'exam' && Object.entries(findings).some(([key, val]) => key !== 'radiographic' && String(val ?? '').trim() !== '')) ||
+    (k === 'exam' && Object.entries(findings).some(([key, val]) => key !== 'radiographic' && !key.startsWith('cc_') && String(val ?? '').trim() !== '')) ||
     (k === 'xray' && String(findings.radiographic ?? '').trim() !== '')
   const moreOpts = [
     !vs('medical') && 'Sehat history',
@@ -1072,7 +1074,7 @@ export default function VisitWorkspace(p: Props) {
           {/* 6. DENTAL CHART */}
           {!homeo && (
             <Section title="Dental Chart">
-              <ToothChart age={p.patient.age} selected={sel} onSelect={pickTeeth} marks={marks} onMarks={setMarks} old={p.chartRecords} canEdit={canEdit} renderExtra={renderToothWork} onWork={onChartWork} />
+              <ToothChart age={p.patient.age} selected={sel} onSelect={pickTeeth} marks={marks} onMarks={setMarks} old={p.chartRecords} canEdit={canEdit} noPlan onWork={onChartWork} />
             </Section>
           )}
 
@@ -1094,14 +1096,14 @@ export default function VisitWorkspace(p: Props) {
   const blk_dx = (
     <>
           {/* 8. DIAGNOSIS */}
-          <Section title="Diagnosis (masla)" hint="Daant par tap karke chart ke panel se jorein. Yahan sab ek jagah nazar aata hai, badalna ho to likh kar badlein.">
+          <Section title={homeo ? 'Diagnosis (masla)' : 'Poore munh ka masla (daant ke baghair)'} hint={homeo ? 'Patient ka masla likhein ya list se chunein.' : 'Daant wala masla upar har daant ke card mein hai. Yahan sirf wo masla jo kisi daant ka nahi.'}>
             <datalist id="diag-list">
               {diagList.map((d) => (
                 <option key={d} value={d} />
               ))}
             </datalist>
             <div className="grid gap-3">
-              {diags.map((d, i) => (
+              {diags.map((d, i) => ((homeo || (d.teeth ?? []).length === 0) ? (
                 <div key={i} className="grid gap-1.5 rounded-xl border border-clinic-teal/10 p-2.5">
                   <div className="flex gap-2">
                     <input list={homeo ? undefined : 'diag-list'} value={d.text} disabled={!canEdit} onChange={(e) => setDiags(diags.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)))} placeholder="Diagnosis" className="w-full rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm outline-none focus:border-clinic-teal" />
@@ -1111,7 +1113,7 @@ export default function VisitWorkspace(p: Props) {
                   </div>
                   {!homeo && <TeethTags all={sel} picked={d.teeth ?? []} disabled={!canEdit} onChange={(t) => setDiags(diags.map((x, j) => (j === i ? { ...x, teeth: t } : x)))} />}
                 </div>
-              ))}
+              ) : null))}
               {canEdit && (
                 <button type="button" onClick={() => setDiags([...diags, { text: '', teeth: sel.length === 1 ? [...sel] : [] }])} className="justify-self-start rounded-full border border-clinic-teal/30 px-4 py-1.5 text-sm font-semibold text-clinic-teal">
                   {homeo ? '+ Diagnosis' : '+ Poore munh ka masla (daant ke baghair)'}
@@ -1122,10 +1124,180 @@ export default function VisitWorkspace(p: Props) {
 
     </>
   )
+  const rowCard = (r: TRow) => (
+                <div key={r.key} className="grid gap-2 rounded-xl border border-clinic-teal/20 p-3">
+                  <div className="grid gap-2 sm:grid-cols-[1fr_9rem_auto]">
+                    <input list="cat-list" value={r.name} onChange={(e) => pickCatalog(r, e.target.value)} placeholder="Treatment (list se chunein ya likhein)" className="rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm" />
+                    {p.perms.bill ? <input type="number" min={0} value={r.price} onChange={(e) => updRow(r.key, { price: e.target.value, manual: true })} placeholder="Qeemat Rs." className="rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm" /> : <span />}
+                    <button type="button" onClick={() => setRows(rows.filter((x) => x.key !== r.key))} className="text-sm text-red-600">
+                      hatao
+                    </button>
+                  </div>
+                  {!homeo && (
+                    <div className="grid gap-1.5">
+                      {!r.catalog_id && (
+                      <div className="flex flex-wrap items-center gap-2 text-xs">
+                        <span className="text-clinic-ink/60">Kaise lagti hai:</span>
+                        {(Object.keys(APPLIES_LABEL) as Applies[]).map((a) => (
+                          <button
+                            key={a}
+                            type="button"
+                            onClick={() => setRowApplies(r, a)}
+                            aria-pressed={r.applies === a}
+                            className={`rounded-full px-2.5 py-1 font-semibold ${r.applies === a ? 'bg-clinic-teal text-white' : 'border border-clinic-teal/25 text-clinic-ink/70'}`}
+                          >
+                            {APPLIES_LABEL[a]}
+                          </button>
+                        ))}
+                      </div>
+                      )}
+                      {r.applies === 'tooth' && (
+                        <>
+                          {(!r.catalog_id || r.teeth.length === 0) && <TeethTags all={sel} picked={r.teeth} disabled={!canEdit} onChange={(t) => setRowTeeth(r, t)} />}
+                          {sel.length === 0 && r.teeth.length === 0 && <p className="text-[11px] text-amber-700">Upar chart par daant par tap karke kaam jorein, ya "daant badlein" dabayein.</p>}
+                          {r.unit != null && !r.manual && r.teeth.length > 1 && (
+                            <p className="text-[11px] text-clinic-ink/60">
+                              Har daant {money(r.unit)} × {r.teeth.length} daant = {money(r.unit * r.teeth.length)}
+                            </p>
+                          )}
+                        </>
+                      )}
+                      {r.applies === 'jaw' && (
+                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                          <span className="text-clinic-ink/60">Kaun sa jabda:</span>
+                          {(['Upar', 'Neeche', 'Upar aur Neeche'] as const).map((j) => (
+                            <button key={j} type="button" onClick={() => updRow(r.key, { jaw: r.jaw === j ? '' : j })} aria-pressed={r.jaw === j} className={`rounded-full px-2.5 py-1 font-semibold ${r.jaw === j ? 'bg-clinic-teal text-white' : 'border border-clinic-teal/25 text-clinic-ink/70'}`}>
+                              {j}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {r.applies === 'mouth' && (
+                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                          <span className="text-clinic-ink/60">Kitna:</span>
+                          {(['Poora muh', 'Aadha muh'] as const).map((k) => {
+                            const half = r.notes.startsWith('Aadha muh')
+                            const on = k === 'Aadha muh' ? half : !half
+                            return (
+                              <button
+                                key={k}
+                                type="button"
+                                aria-pressed={on}
+                                onClick={() => {
+                                  const cat = p.catalog.find((c) => c.id === r.catalog_id)
+                                  const rest = r.notes.replace(/^Aadha muh\s*—?\s*/, '')
+                                  if (k === 'Aadha muh') updRow(r.key, { notes: ('Aadha muh' + (rest ? ' — ' + rest : '')), price: '', manual: true })
+                                  else updRow(r.key, { notes: rest, price: cat ? String(cat.price) : r.price, manual: false })
+                                }}
+                                className={`rounded-full px-2.5 py-1 font-semibold ${on ? 'bg-clinic-teal text-white' : 'border border-clinic-teal/25 text-clinic-ink/70'}`}
+                              >
+                                {k}
+                              </button>
+                            )
+                          })}
+                          {r.notes.startsWith('Aadha muh') && !r.price && <span className="text-amber-700">Aadhe muh ki qeemat khud likhein.</span>}
+                        </div>
+                      )}
+                      {(r.applies === 'mouth' || r.applies === 'once') && <p className="text-[11px] text-clinic-ink/55">{r.applies === 'mouth' ? 'Poore muh ka kaam, daant chunne ki zaroorat nahi.' : 'Aik dafa ka charge, daant chunne ki zaroorat nahi.'}</p>}
+                    </div>
+                  )}
+                  {!homeo && canEdit && /root canal|\brct\b|pulpectomy/i.test(r.name) && r.teeth.length > 0 && (
+                    <button type="button" onClick={() => setNextStep({ id: r.key, name: r.name, teeth: [...r.teeth] })} className="justify-self-start rounded-full border border-amber-400 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-900">
+                      Is ke baad Crown lagayein →
+                    </button>
+                  )}
+                  {!homeo && canEdit && p.perms.lab && r.teeth.length > 0 && /crown|bridge|denture|veneer|onlay|inlay|post\s*&?\s*core|night\s*guard|retainer/i.test(r.name) && (
+                    <a
+                      href={`/admin/lab?patient=${p.patient.id}&teeth=${encodeURIComponent(r.teeth.join(','))}&work=${encodeURIComponent(r.name)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      data-testid="lab-send"
+                      className="justify-self-start rounded-full border border-clinic-teal bg-clinic-mint px-3 py-1 text-xs font-semibold text-clinic-teal"
+                    >
+                      Lab ko bhejein →
+                    </a>
+                  )}
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
+                    {r.planned && (
+                      <>
+                    <button type="button" onClick={() => updRow(r.key, { planned: false })} className={`rounded-full px-3 py-1 text-xs font-semibold ${!r.planned ? 'bg-emerald-600 text-white' : 'border border-clinic-ink/20 text-clinic-ink/60'}`}>
+                      Aaj ho gayi
+                    </button>
+                    <button type="button" onClick={() => updRow(r.key, { planned: true })} className={`rounded-full px-3 py-1 text-xs font-semibold ${r.planned ? 'bg-amber-500 text-white' : 'border border-clinic-ink/20 text-clinic-ink/60'}`}>
+                      Sirf plan (baad mein)
+                    </button>
+                      </>
+                    )}
+                    <input value={r.notes} onChange={(e) => updRow(r.key, { notes: e.target.value })} placeholder="Note (optional)" className="min-w-[9rem] flex-1 rounded-lg border border-clinic-teal/20 px-3 py-1.5 text-sm" />
+                  </div>
+                  {!r.planned && r.catalog_id && canEdit && p.canSeeRecipes && p.materials[r.catalog_id] === undefined && (
+                    <p className="text-xs text-amber-700" data-testid="no-recipe">Is treatment ka samaan (recipe) abhi nahi likha — Price List mein likh dein to stock khud kate ga.</p>
+                  )}
+                  {!r.planned && r.catalog_id && (p.materials[r.catalog_id] ?? []).length > 0 && (
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-clinic-ink/70">
+                      <span>Samaan:</span>
+                      {(p.materials[r.catalog_id] ?? []).map((m) => (
+                        <label key={m.inventory_id} className="flex items-center gap-1">
+                          {m.name}
+                          <input type="number" min={0} value={r.mats[m.inventory_id] ?? ''} onChange={(e) => updRow(r.key, { mats: { ...r.mats, [m.inventory_id]: e.target.value } })} className="w-14 rounded border border-clinic-teal/20 px-1.5 py-1" />
+                          {m.unit}
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+  )
+  const mouthCat = dentalCat.filter((c) => (c.applies_to ?? 'tooth') === 'mouth')
+  const toothIds = [...new Set([...workSel, ...sel, ...diags.flatMap((d) => d.teeth ?? []), ...rows.filter((r) => r.applies === 'tooth').flatMap((r) => r.teeth)])].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+  const ccOf = (t: string) => (findings['cc_' + t] ?? '').split(',').map((x) => x.trim()).filter(Boolean)
+  function toggleCc(t: string, c: string) {
+    const cur = ccOf(t)
+    const next = cur.includes(c) ? cur.filter((x) => x !== c) : [...cur, c]
+    setFindings((f) => ({ ...f, ['cc_' + t]: next.join(', ') }))
+  }
+  function clearTooth(t: string) {
+    setDiags((ds) => ds.flatMap((d) => { const tt = (d.teeth ?? []).filter((x) => x !== t); return (d.teeth ?? []).includes(t) ? (tt.length ? [{ ...d, teeth: tt }] : []) : [d] }))
+    setRows((rs) => rs.flatMap((r) => { if (r.applies !== 'tooth' || !r.teeth.includes(t)) return [r]; const tt = r.teeth.filter((x) => x !== t); return tt.length ? [{ ...r, teeth: tt, price: autoPrice(r, tt) }] : [] }))
+    setFindings((f) => { const n = { ...f }; delete n['cc_' + t]; return n })
+    setWorkSel((w) => w.filter((x) => x !== t))
+    pickTeeth(sel.filter((x) => x !== t))
+  }
+  const blk_work = !homeo ? (
+    <Section title="Har daant ka hisaab" hint="Chart par daant chunein. Har daant ka apna card: takleef, masla, kaam. Bill khud banta hai.">
+      {toothIds.length === 0 && <p className="text-sm text-clinic-ink/55">Upar chart par daant par tap karein. Poore muh ka kaam (jaise scaling) neeche &quot;Poore muh ka kaam&quot; mein hai.</p>}
+      <div className="grid gap-3">
+        {toothIds.map((t) => {
+          const myRows = rows.filter((r) => r.applies === 'tooth' && r.teeth.includes(t))
+          const myCc = ccOf(t)
+          return (
+            <div key={t} data-testid="tooth-card" className="grid gap-2.5 rounded-2xl border-2 border-sky-200 bg-white p-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-display text-base font-semibold text-clinic-ink">{toothLabel(t)}</p>
+                {canEdit && <button type="button" onClick={() => clearTooth(t)} className="text-xs text-red-600 underline">Is daant ko hatao</button>}
+              </div>
+              <div className="grid gap-1.5">
+                <p className="text-xs font-bold text-clinic-ink">Takleef</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {complaintList.slice(0, 8).map((c) => (
+                    <button key={c} type="button" disabled={!canEdit} aria-pressed={myCc.includes(c)} onClick={() => toggleCc(t, c)} className={`rounded-full px-2.5 py-1 text-xs font-semibold ${myCc.includes(c) ? 'bg-sky-700 text-white' : 'border border-sky-300 bg-white text-sky-900'}`}>
+                      {myCc.includes(c) ? '✓ ' : ''}
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {canEdit ? renderToothWork(t) : null}
+              {myRows.length > 0 && <div className="grid gap-2">{myRows.map((r) => rowCard(r))}</div>}
+            </div>
+          )
+        })}
+      </div>
+    </Section>
+  ) : null
   const blk_tx = (
     <>
           {/* 9. TREATMENT */}
-          <Section title="Aaj ka kaam aur Plan (Treatment)" hint="Kaam chart ke panel se jorein. Yahan qeemat, samaan aur note dekhein/badlein.">
+          <Section title={homeo ? 'Aaj ka kaam (Treatment)' : 'Poore muh ka kaam aur baqi kaam'} hint={homeo ? 'Qeemat, samaan aur note yahan likhein.' : 'Daant wale kaam upar har daant ke card mein hain. Yahan scaling, polishing, whitening jaise kaam.'}>
             <datalist id="cat-list">
               {p.catalog
                 .filter((c) => (homeo ? c.department !== 'dental' : c.department !== 'homeopathic'))
@@ -1134,6 +1306,20 @@ export default function VisitWorkspace(p: Props) {
                 ))}
             </datalist>
             <div className="grid gap-3">
+              {!homeo && canEdit && mouthCat.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                  <span className="text-clinic-ink/60">Poore muh ka kaam:</span>
+                  {mouthCat.map((c) => {
+                    const on = rows.some((r) => r.catalog_id === c.id)
+                    return (
+                      <button key={c.id} type="button" aria-pressed={on} onClick={() => (on ? setRows(rows.filter((r) => r.catalog_id !== c.id)) : addTxTooth(c.name, '', false))} className={`rounded-full px-3 py-1.5 font-semibold ${on ? 'bg-clinic-teal text-white' : 'border border-clinic-teal/30 text-clinic-teal'}`}>
+                        {on ? '✓ ' : '+ '}
+                        {c.name}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
               {live.length > 0 && (
                 <div className="grid gap-2">
                   <p className="text-xs font-semibold text-clinic-ink/60">Pehle se chalti / plan wali treatments</p>
@@ -1210,86 +1396,7 @@ export default function VisitWorkspace(p: Props) {
                   }}
                 />
               )}
-              {rows.map((r) => (
-                <div key={r.key} className="grid gap-2 rounded-xl border border-clinic-teal/20 p-3">
-                  <div className="grid gap-2 sm:grid-cols-[1fr_9rem_auto]">
-                    <input list="cat-list" value={r.name} onChange={(e) => pickCatalog(r, e.target.value)} placeholder="Treatment (list se chunein ya likhein)" className="rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm" />
-                    {p.perms.bill ? <input type="number" min={0} value={r.price} onChange={(e) => updRow(r.key, { price: e.target.value, manual: true })} placeholder="Qeemat Rs." className="rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm" /> : <span />}
-                    <button type="button" onClick={() => setRows(rows.filter((x) => x.key !== r.key))} className="text-sm text-red-600">
-                      hatao
-                    </button>
-                  </div>
-                  {!homeo && (
-                    <div className="grid gap-1.5">
-                      <div className="flex flex-wrap items-center gap-2 text-xs">
-                        <span className="text-clinic-ink/60">Kaise lagti hai:</span>
-                        {(Object.keys(APPLIES_LABEL) as Applies[]).map((a) => (
-                          <button
-                            key={a}
-                            type="button"
-                            onClick={() => setRowApplies(r, a)}
-                            aria-pressed={r.applies === a}
-                            className={`rounded-full px-2.5 py-1 font-semibold ${r.applies === a ? 'bg-clinic-teal text-white' : 'border border-clinic-teal/25 text-clinic-ink/70'}`}
-                          >
-                            {APPLIES_LABEL[a]}
-                          </button>
-                        ))}
-                      </div>
-                      {r.applies === 'tooth' && (
-                        <>
-                          <TeethTags all={sel} picked={r.teeth} disabled={!canEdit} onChange={(t) => setRowTeeth(r, t)} />
-                          {sel.length === 0 && r.teeth.length === 0 && <p className="text-[11px] text-amber-700">Upar chart par daant par tap karke kaam jorein, ya "daant badlein" dabayein.</p>}
-                          {r.unit != null && !r.manual && r.teeth.length > 1 && (
-                            <p className="text-[11px] text-clinic-ink/60">
-                              Har daant {money(r.unit)} × {r.teeth.length} daant = {money(r.unit * r.teeth.length)}
-                            </p>
-                          )}
-                        </>
-                      )}
-                      {r.applies === 'jaw' && (
-                        <div className="flex flex-wrap items-center gap-2 text-xs">
-                          <span className="text-clinic-ink/60">Kaun sa jabda:</span>
-                          {(['Upar', 'Neeche', 'Upar aur Neeche'] as const).map((j) => (
-                            <button key={j} type="button" onClick={() => updRow(r.key, { jaw: r.jaw === j ? '' : j })} aria-pressed={r.jaw === j} className={`rounded-full px-2.5 py-1 font-semibold ${r.jaw === j ? 'bg-clinic-teal text-white' : 'border border-clinic-teal/25 text-clinic-ink/70'}`}>
-                              {j}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                      {(r.applies === 'mouth' || r.applies === 'once') && <p className="text-[11px] text-clinic-ink/55">{r.applies === 'mouth' ? 'Poore muh ka kaam, daant chunne ki zaroorat nahi.' : 'Aik dafa ka charge, daant chunne ki zaroorat nahi.'}</p>}
-                    </div>
-                  )}
-                  {!homeo && canEdit && /root canal|\brct\b|pulpectomy/i.test(r.name) && r.teeth.length > 0 && (
-                    <button type="button" onClick={() => setNextStep({ id: r.key, name: r.name, teeth: [...r.teeth] })} className="justify-self-start rounded-full border border-amber-400 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-900">
-                      Is ke baad Crown lagayein →
-                    </button>
-                  )}
-                  <div className="flex flex-wrap items-center gap-2 text-sm">
-                    <button type="button" onClick={() => updRow(r.key, { planned: false })} className={`rounded-full px-3 py-1 text-xs font-semibold ${!r.planned ? 'bg-emerald-600 text-white' : 'border border-clinic-ink/20 text-clinic-ink/60'}`}>
-                      Aaj ho gayi
-                    </button>
-                    <button type="button" onClick={() => updRow(r.key, { planned: true })} className={`rounded-full px-3 py-1 text-xs font-semibold ${r.planned ? 'bg-amber-500 text-white' : 'border border-clinic-ink/20 text-clinic-ink/60'}`}>
-                      Sirf plan (baad mein)
-                    </button>
-                    <input value={r.notes} onChange={(e) => updRow(r.key, { notes: e.target.value })} placeholder="Note (optional)" className="min-w-[9rem] flex-1 rounded-lg border border-clinic-teal/20 px-3 py-1.5 text-sm" />
-                  </div>
-                  {!r.planned && r.catalog_id && canEdit && p.canSeeRecipes && p.materials[r.catalog_id] === undefined && (
-                    <p className="text-xs text-amber-700" data-testid="no-recipe">Is treatment ka samaan (recipe) abhi nahi likha — Price List mein likh dein to stock khud kate ga.</p>
-                  )}
-                  {!r.planned && r.catalog_id && (p.materials[r.catalog_id] ?? []).length > 0 && (
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-clinic-ink/70">
-                      <span>Samaan:</span>
-                      {(p.materials[r.catalog_id] ?? []).map((m) => (
-                        <label key={m.inventory_id} className="flex items-center gap-1">
-                          {m.name}
-                          <input type="number" min={0} value={r.mats[m.inventory_id] ?? ''} onChange={(e) => updRow(r.key, { mats: { ...r.mats, [m.inventory_id]: e.target.value } })} className="w-14 rounded border border-clinic-teal/20 px-1.5 py-1" />
-                          {m.unit}
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
+              {(homeo ? rows : rows.filter((r) => !(r.applies === 'tooth' && r.teeth.length > 0))).map((r) => rowCard(r))}
               {canEdit && (p.extraItems ?? []).length > 0 && (
                 <div className="rounded-xl border border-dashed border-clinic-teal/30 p-3 text-xs" data-testid="extras">
                   <p className="font-semibold text-clinic-ink">Doctor khud chunein (agar kuch alag use hua)</p>
@@ -1308,7 +1415,7 @@ export default function VisitWorkspace(p: Props) {
               )}
               {canEdit && (
                 <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={() => setRows([...rows, { key: newKey(), name: '', catalog_id: null, teeth: [...sel], price: '', planned: false, notes: '', mats: {}, applies: 'tooth', unit: null, manual: false, jaw: '' }])} className="justify-self-start rounded-full border border-clinic-teal/30 px-4 py-1.5 text-sm font-semibold text-clinic-teal">
+                <button type="button" onClick={() => setRows([...rows, { key: newKey(), name: '', catalog_id: null, teeth: [], price: '', planned: false, notes: '', mats: {}, applies: 'tooth', unit: null, manual: false, jaw: '' }])} className="justify-self-start rounded-full border border-clinic-teal/30 px-4 py-1.5 text-sm font-semibold text-clinic-teal">
                   + Treatment
                 </button>
                 {consultCat && !rows.some((r) => r.catalog_id === consultCat.id) && (
@@ -1505,7 +1612,7 @@ export default function VisitWorkspace(p: Props) {
                 {p.perms.bill && p.perms.discountMax > 0 && medTotal + extraTotal > 0 && (
                   <div>
                     <p className="flex items-center justify-between gap-2">
-                      <span>Riyayat (sirf dawa / extra par)</span>
+                      <span>Discount (sirf dawa / extra par)</span>
                       <input type="number" min={0} max={discCap} value={discount} onChange={(e) => setDiscount(e.target.value)} className="w-28 rounded-lg border border-clinic-teal/20 px-2 py-1.5 text-right" />
                     </p>
                     {!p.perms.owner || p.perms.discountMax < 100 ? (
@@ -1710,6 +1817,7 @@ export default function VisitWorkspace(p: Props) {
           </div>
           <div className={stepCls(2)}>
             {!homeo && blk_chart}
+            {blk_work}
             {blk_dx}
             {blk_tx}
           </div>

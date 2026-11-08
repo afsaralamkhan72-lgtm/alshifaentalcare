@@ -4,7 +4,7 @@ import type { PrintLogo } from '@/lib/printTemplates'
 import LetterheadFrame from '@/components/print/LetterheadFrame'
 import SoftHeader from '@/components/print/SoftHeader'
 import { dur } from '@/lib/attendanceUi'
-import { fmtDate } from '@/lib/karachi'
+import { fmtDate, moneyWhole } from '@/lib/karachi'
 
 export interface SlipData {
   period: string
@@ -34,7 +34,6 @@ export interface SlipData {
 }
 
 const KIND: Record<string, string> = { salary_due: 'Mahana tankhwah', bonus: 'Bonus / overtime', deduction: 'Katauti', advance: 'Advance (peshgi)', payout: 'Tankhwah di gayi' }
-const rs = (n: number) => `Rs. ${Math.round(Math.abs(n)).toLocaleString('en-US')}`
 
 /** Salary parchi: software ke neele-safed rang mein; letterhead ho to us par. */
 export default function SalarySlip({ d, logo, logoUrl, layout }: { d: SlipData; logo: PrintLogo; logoUrl: string | null; layout: PrintLayout }) {
@@ -64,28 +63,28 @@ export default function SalarySlip({ d, logo, logoUrl, layout }: { d: SlipData; 
 
           <div style={{ marginTop: 14, background: acc, color: '#fff', borderRadius: 12, padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 13 }}>Is mahine ki banti tankhwah (hazri ke hisab se)</span>
-            <span style={{ fontSize: 22, fontWeight: 700 }}>{rs(d.net)}</span>
+            <span style={{ fontSize: 22, fontWeight: 700 }}>{moneyWhole(Math.abs(d.net))}</span>
           </div>
 
           <p style={{ marginTop: 14, fontWeight: 700, color: acc }}>Hisab minute ke hisab se</p>
-          <Row a="Mahana tankhwah" b={rs(d.salary)} />
+          <Row a="Mahana tankhwah" b={moneyWhole(Math.abs(d.salary))} />
           <Row a={`Mahine ki kul shift: ${dur(d.monthMin)}`} b={d.rate ? `aik minute = Rs. ${d.rate.toFixed(2)}` : ''} />
-          {d.effMin < d.monthMin && <Row a={`Joining (${fmtDate(d.effFrom)}) se ${dur(d.effMin)} ka hisab`} b={rs(d.entitled)} />}
-          <Row a="Banti hui tankhwah" b={rs(d.entitled)} bold />
+          {d.effMin < d.monthMin && <Row a={`Joining (${fmtDate(d.effFrom)}) se ${dur(d.effMin)} ka hisab`} b={moneyWhole(Math.abs(d.entitled))} />}
+          <Row a="Banti hui tankhwah" b={moneyWhole(Math.abs(d.entitled))} bold />
 
           <p style={{ marginTop: 12, fontWeight: 700, color: acc }}>Katauti</p>
-          <Row a={`Late: ${dur(d.lateMin)}`} b={d.cutLate ? `- ${rs(d.cutLate)}` : '—'} />
-          <Row a={`Waqt se pehle gaye: ${dur(d.earlyMin)}`} b={d.cutEarly ? `- ${rs(d.cutEarly)}` : '—'} />
-          <Row a={`Ghair-hazri / bagair tankhwah chhutti: ${dur(d.absentMin)}`} b={d.cutAbsent ? `- ${rs(d.cutAbsent)}` : '—'} />
+          <Row a={`Late: ${dur(d.lateMin)}`} b={d.cutLate ? `- ${moneyWhole(Math.abs(d.cutLate))}` : '—'} />
+          <Row a={`Waqt se pehle gaye: ${dur(d.earlyMin)}`} b={d.cutEarly ? `- ${moneyWhole(Math.abs(d.cutEarly))}` : '—'} />
+          <Row a={`Ghair-hazri / bagair tankhwah chhutti: ${dur(d.absentMin)}`} b={d.cutAbsent ? `- ${moneyWhole(Math.abs(d.cutAbsent))}` : '—'} />
           <p style={{ marginTop: 12, fontWeight: 700, color: acc }}>Overtime</p>
-          <Row a={`Overtime: ${dur(d.otMin)}`} b={d.otAmount ? `+ ${rs(d.otAmount)}` : '—'} />
+          <Row a={`Overtime: ${dur(d.otMin)}`} b={d.otAmount ? `+ ${moneyWhole(Math.abs(d.otAmount))}` : '—'} />
 
           <p style={{ marginTop: 12, fontWeight: 700, color: acc }}>Khate ki entries (is mahine ki)</p>
           {d.entries.length === 0 && <p style={{ fontSize: 12, opacity: 0.6, padding: '6px 0' }}>Abhi koi entry nahi (mahina tayyar hone par yahan aati hain).</p>}
           {d.entries.map((e, i) => (
-            <Row key={i} a={`${fmtDate(e.date)} · ${KIND[e.kind] ?? e.kind}${e.note ? ` — ${e.note}` : ''}`} b={`${e.amount >= 0 ? '+' : '-'} ${rs(e.amount)}`} />
+            <Row key={i} a={`${fmtDate(e.date)} · ${KIND[e.kind] ?? e.kind}${e.note ? ` — ${e.note}` : ''}`} b={`${e.amount >= 0 ? '+' : '-'} ${moneyWhole(Math.abs(e.amount))}`} />
           ))}
-          {d.entries.length > 0 && <Row a="Is mahine ka khate ke mutabiq hisab" b={`${ledgerTotal >= 0 ? '' : '- '}${rs(ledgerTotal)}`} bold />}
+          {d.entries.length > 0 && <Row a="Is mahine ka khate ke mutabiq hisab" b={`${ledgerTotal >= 0 ? '' : '- '}${moneyWhole(Math.abs(ledgerTotal))}`} bold />}
 
           <p style={{ marginTop: 18, fontSize: 11, opacity: 0.6 }}>
             {CLINIC.name} · {d.timings}

@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { requireAnyPerm } from '@/lib/auth'
 import DuesList, { type DueRow } from '@/components/admin/DuesList'
 import { todayKarachi } from '@/lib/karachi'
+import SectionTabs from '@/components/admin/SectionTabs'
 
 export default async function DuesPage() {
   await requireAnyPerm('billing.view')
@@ -45,6 +46,7 @@ export default async function DuesPage() {
 
   return (
     <div>
+      <SectionTabs which="accounts" />
       <h1 className="font-display text-2xl font-semibold text-clinic-ink">Baqaya Payments</h1>
       <p className="mt-1 text-sm text-clinic-ink/60">
         Jin patients ke paise baqi hain aur kab tak dene hain.

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { failed } from '@/lib/notifyError'
 import { createClient } from '@/lib/supabase/client'
 
 export interface InvOption {
@@ -76,7 +77,8 @@ export default function TreatmentMaterials({
 
   async function remove(inventoryId: string) {
     const supabase = createClient()
-    await supabase.from('treatment_materials').delete().eq('treatment_id', treatmentId).eq('inventory_id', inventoryId)
+    const { error } = await supabase.from('treatment_materials').delete().eq('treatment_id', treatmentId).eq('inventory_id', inventoryId)
+    if (failed(error, 'Samaan hatana')) return
     load()
   }
 

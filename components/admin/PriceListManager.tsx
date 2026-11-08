@@ -1,6 +1,7 @@
 'use client'
 
 import { Fragment, useState } from 'react'
+import { failed } from '@/lib/notifyError'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { effectiveApplies } from '@/lib/applies'
@@ -119,7 +120,8 @@ export default function PriceListManager({
 
   async function toggleActive(r: CatalogRow) {
     const supabase = createClient()
-    await supabase.from('treatment_catalog').update({ is_active: !r.is_active }).eq('id', r.id)
+    const { error } = await supabase.from('treatment_catalog').update({ is_active: !r.is_active }).eq('id', r.id)
+    if (failed(error, 'Treatment on/off karna')) return
     router.refresh()
   }
 

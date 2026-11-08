@@ -3,13 +3,14 @@ import { SITE_URL } from '@/clinic.config'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
 import { fmtDate, todayKarachi } from '@/lib/karachi'
 import { adabName, mapTemplates, renderTemplate, salaamLine } from '@/lib/messageTemplates'
+import { numFmt } from '@/lib/karachi'
 
 /**
  * Statement / Rasid ka message BHEJTE WAQT database se naye sire se bana kar dete hain
  * (purane khule page ka purana hisaab nahi). Sab hisaab database ke views (patient_balances / patient_ledger) se.
  */
 const n = (v: unknown) => Number(v ?? 0)
-const rs = (v: number) => v.toLocaleString('en-US')
+const rs = (v: number) => numFmt(v)
 
 const METHOD_UR: Record<string, string> = { cash: 'نقد (Cash)', bank: 'بینک (Bank)', easypaisa: 'Easypaisa', jazzcash: 'JazzCash' }
 

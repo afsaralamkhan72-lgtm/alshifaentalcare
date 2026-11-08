@@ -4,6 +4,7 @@ import { requireAdmin } from '@/lib/auth'
 import PermissionPicker, { type PermGroup } from '@/components/admin/PermissionPicker'
 import { activateReceptionist, createStaff, setStaffActive } from './actions'
 import Link from 'next/link'
+import StaffTabs from '@/components/admin/StaffTabs'
 
 const ROLE_LABEL: Record<string, string> = {
   admin: 'Doctor / Admin',
@@ -61,7 +62,8 @@ export default async function StaffPage({
 
   return (
     <div>
-      <h1 className="font-display text-2xl font-semibold text-clinic-ink">Staff aur Permissions</h1>
+      <StaffTabs isAdmin />
+      <h1 className="font-display text-2xl font-semibold text-clinic-ink">Staff: log aur permissions</h1>
       <p className="mt-1 text-sm text-clinic-ink/60">
         Naya staff yahin se banayein, aur tick se tay karein ke wo kya dekh/kar sakta hai. Supabase mein jaane ki zaroorat nahi.
       </p>
@@ -69,21 +71,33 @@ export default async function StaffPage({
       {sp.err && <p className="mt-3 rounded-lg bg-red-50 px-4 py-2 text-sm text-red-700">{sp.err}</p>}
 
       <section className="mt-6 rounded-2xl border border-clinic-teal/10 bg-white p-5">
-        <h2 className="font-display text-lg font-semibold text-clinic-ink">Naya staff account</h2>
+        <h2 className="font-display text-lg font-semibold text-clinic-ink">Naya staff (aik hi form)</h2>
+        <p className="mt-1 text-xs text-clinic-ink/55">Is se hazri, salary aur (chaho to) login, teeno aik saath ban jate hain.</p>
         <form action={createStaff} className="mt-3 grid gap-3">
-          <div className="flex flex-wrap gap-2">
-            <input name="full_name" required placeholder="Naam" className={inputClass} />
-            <input name="phone" placeholder="Phone (optional)" className={inputClass} />
-            <input name="email" type="email" required placeholder="Email (login)" className={inputClass} autoComplete="off" />
-            <input name="password" type="password" required minLength={8} placeholder="Password (8+)" className={inputClass} autoComplete="new-password" />
-            <select name="role" className={inputClass + ' ' + 'max-w-full'} defaultValue="receptionist">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            <input name="full_name" required placeholder="Naam" aria-label="Naam" className={inputClass} />
+            <input name="title" placeholder="Ohda (jaise Dental Doctor, Clinic Staff)" aria-label="Ohda" className={inputClass} />
+            <input name="phone" placeholder="Phone (WhatsApp ke liye)" aria-label="Phone" className={inputClass} />
+            <input name="monthly_salary" type="number" min={0} placeholder="Mahana tankhwah Rs." aria-label="Mahana tankhwah" className={inputClass} />
+            <label className="grid gap-0.5 text-xs text-clinic-ink/60">Kaam shuru
+              <input name="joined_on" type="date" className={inputClass} />
+            </label>
+            <label className="grid gap-0.5 text-xs text-clinic-ink/60">Login chahiye?
+              <select name="with_login" defaultValue="yes" className={inputClass}>
+                <option value="yes">Haan, panel mein login</option>
+                <option value="no">Nahi, sirf hazri aur salary</option>
+              </select>
+            </label>
+            <input name="email" type="email" placeholder="Email (sirf login ho to)" aria-label="Email" className={inputClass} autoComplete="off" />
+            <input name="password" type="password" minLength={8} placeholder="Password 8+ (sirf login ho to)" aria-label="Password" className={inputClass} autoComplete="new-password" />
+            <select name="role" aria-label="Role" className={inputClass + ' max-w-full'} defaultValue="receptionist">
               <option value="receptionist">Reception / Assistant (permissions tick se)</option>
               <option value="doctor">Doctor (clinical + paisa, sab)</option>
             </select>
           </div>
           <PermissionPicker groups={groups} defaultChecked={receptionDefault} />
           <div>
-            <button className="rounded-full bg-clinic-teal px-5 py-2 text-sm font-semibold text-white">Account banayein</button>
+            <button className="rounded-full bg-clinic-teal px-5 py-2 text-sm font-semibold text-white">Staff banayein</button>
             <span className="ml-3 text-xs text-clinic-ink/50">Doctor ke liye ticks ki zaroorat nahi. Password staff ko khud batayein.</span>
           </div>
         </form>

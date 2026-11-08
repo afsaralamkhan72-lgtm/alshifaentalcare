@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { failed } from '@/lib/notifyError'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { money, fmtDate } from '@/lib/karachi'
@@ -106,7 +107,8 @@ export default function ExpenseManager({
 
   async function toggleCategory(c: CategoryRow) {
     const supabase = createClient()
-    await supabase.from('expense_categories').update({ is_active: !c.is_active }).eq('id', c.id)
+    const { error } = await supabase.from('expense_categories').update({ is_active: !c.is_active }).eq('id', c.id)
+    if (failed(error, 'Category badalna')) return
     router.refresh()
   }
 

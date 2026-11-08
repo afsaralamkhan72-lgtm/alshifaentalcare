@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { requireAdmin } from '@/lib/auth'
-import RecycleBinList, { type BinPatient, type BinAppointment } from '@/components/admin/RecycleBinList'
+import RecycleBinList, { type BinPatient, type BinAppointment, type BinLabCase, type BinItem } from '@/components/admin/RecycleBinList'
 
 export default async function RecycleBinPage() {
   await requireAdmin()
@@ -8,7 +8,7 @@ export default async function RecycleBinPage() {
 
   // Phase 0: auto-purge BAND. Recycle Bin se kuch khud nahi mitta.
 
-  const [patientsRes, apptRes] = await Promise.all([
+  const [patientsRes, apptRes, labRes, itemRes] = await Promise.all([
     supabase
       .from('patients')
       .select('id, mr_number, full_name, phone, department, deleted_at')
@@ -19,6 +19,12 @@ export default async function RecycleBinPage() {
       .select('id, patient_name, phone, preferred_date, preferred_time, status, deleted_at')
       .not('deleted_at', 'is', null)
       .order('deleted_at', { ascending: false }),
+    supabase
+      .from('lab_cases')
+      .select('id, case_number, lab_name, work_type, tooth_numbers, lab_paid, deleted_at, patients(full_name)')
+      .not('deleted_at', 'is', null)
+      .order('deleted_at', { ascending: false }),
+    supabase.from('inventory').select('id, item_name, category, unit, deleted_at').not('deleted_at', 'is', null).order('deleted_at', { ascending: false }),
   ])
 
   // Column missing -> phase4.sql not run yet
@@ -51,6 +57,8 @@ export default async function RecycleBinPage() {
       <RecycleBinList
         patients={(patientsRes.data ?? []) as BinPatient[]}
         appointments={(apptRes.data ?? []) as BinAppointment[]}
+        items={(itemRes.error ? [] : (itemRes.data ?? [])) as BinItem[]}
+        labCases={((labRes.data ?? []) as unknown as (Omit<BinLabCase, 'patient_name'> & { patients: { full_name: string } | null })[]).map((l) => ({ ...l, patient_name: l.patients?.full_name ?? null }))}
       />
     </div>
   )

@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { requireAnyPerm } from '@/lib/auth'
 import StatCard from '@/components/admin/StatCard'
 import { todayKarachi } from '@/lib/karachi'
+import SectionTabs from '@/components/admin/SectionTabs'
 
 const pad = (n: number) => String(n).padStart(2, '0')
 
@@ -135,6 +136,7 @@ export default async function ReportsPage({
 
   return (
     <div>
+      <SectionTabs which="reports" />
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="font-display text-2xl font-semibold text-clinic-ink">Mahine ki Report</h1>

@@ -1,7 +1,9 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { toInternationalPKNumber } from '@/lib/phone'
 import QRCode from 'qrcode'
+import VerifyQr from '@/components/print/VerifyQr'
 import { createClient } from '@/lib/supabase/client'
 import { friendlyError } from '@/lib/errors'
 import { CLINIC } from '@/clinic.config'
@@ -221,7 +223,7 @@ export default function RxPrint({
     setLink('')
   }
 
-  const waDigits = (phone ?? '').replace(/\D/g, '').replace(/^0/, '92')
+  const waDigits = toInternationalPKNumber(phone ?? '')
   function waSend(text: string) {
     window.open(`https://wa.me/${waDigits}?text=${encodeURIComponent(text)}`, '_blank', 'noopener')
   }
@@ -327,6 +329,9 @@ export default function RxPrint({
           )}
         </div>
       )}
+      <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-end' }}>
+        <VerifyQr table="prescriptions" id={rxId} />
+      </div>
     </div>
   )
 }

@@ -1,13 +1,14 @@
 'use client'
 
 import { useState } from 'react'
+import { failed } from '@/lib/notifyError'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
 import { useTemplates } from '@/lib/useTemplates'
 import { messageLink } from '@/lib/messages'
-import { todayKarachi } from '@/lib/karachi'
+import { todayKarachi, fmtDate } from '@/lib/karachi'
 
 export interface RecallRow {
   id: string
@@ -24,10 +25,6 @@ export interface RecallRow {
     mr_number: string | null
     deleted_at: string | null
   } | null
-}
-
-function fmt(d: string | null) {
-  return d ? new Date(d).toLocaleDateString('en-GB') : '—'
 }
 
 export default function RecallList({
@@ -85,8 +82,9 @@ export default function RecallList({
     if (!confirm(`${r.patients?.full_name} ka "${r.recall_type}" recall band karein?`)) return
     setBusyId(r.id)
     const supabase = createClient()
-    await supabase.from('recalls').update({ status: 'stopped' }).eq('id', r.id)
+    const { error } = await supabase.from('recalls').update({ status: 'stopped' }).eq('id', r.id)
     setBusyId(null)
+    if (failed(error, 'Recall band karna')) return
     router.refresh()
   }
 
@@ -142,7 +140,7 @@ export default function RecallList({
                 </p>
                 {r.reminders_sent > 0 && (
                   <p className="mt-1 text-xs text-amber-700">
-                    {r.reminders_sent} reminder bhej chuke ({fmt(r.last_reminded)})
+                    {r.reminders_sent} reminder bhej chuke ({fmtDate(r.last_reminded)})
                   </p>
                 )}
               </div>
@@ -154,9 +152,9 @@ export default function RecallList({
                     overdue ? 'text-red-700' : 'text-clinic-teal'
                   }`}
                 >
-                  {fmt(r.next_due)}
+                  {fmtDate(r.next_due)}
                 </p>
-                <p className="text-xs text-clinic-ink/40">Last: {fmt(r.last_done)}</p>
+                <p className="text-xs text-clinic-ink/40">Last: {fmtDate(r.last_done)}</p>
               </div>
             </div>
 

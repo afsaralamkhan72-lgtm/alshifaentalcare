@@ -10,6 +10,7 @@ import { accentOf, DEFAULT_LAYOUT, type PrintLayout } from '@/lib/printLayout'
 import LetterheadFrame from '@/components/print/LetterheadFrame'
 import SoftHeader from '@/components/print/SoftHeader'
 import ShareQr from '@/components/print/ShareQr'
+import VerifyQr from '@/components/print/VerifyQr'
 
 export interface InvItem { id: string; name: string; tooth: string | null; qty: number; unit_price: number; line_total: number }
 export interface InvData {
@@ -32,6 +33,7 @@ export interface InvData {
   notes: string | null
   patientId?: string
   age?: number | null
+  id?: string
 }
 
 const BLUE = '#0b5fa5'
@@ -179,7 +181,7 @@ function Blue({ d, logo, logoUrl }: { d: InvData; logo: PrintLogo; logoUrl: stri
       <div style={{ padding: '14px 24px 0', display: 'flex', justifyContent: 'flex-end', breakInside: 'avoid', pageBreakInside: 'avoid' }}>
         <div style={{ width: 'min(100%, 300px)', background: BLUE_L, borderRadius: 8, padding: '6px 0' }}>
           {row('Subtotal', money(d.subtotal))}
-          {d.discountAmount > 0 && row(`Riyayat (${d.discountPercent}%)`, `− ${money(d.discountAmount)}`)}
+          {d.discountAmount > 0 && row(`Discount (${d.discountPercent}%)`, `− ${money(d.discountAmount)}`)}
           {row('Kul raqam', money(d.total), true)}
           {row('Mila', money(d.paid), false, '#047857')}
           <div style={{ background: BLUE, color: '#fff', borderRadius: 6, margin: '4px 6px 2px' }}>{row('Baqaya', money(d.balance), true, '#fff')}</div>
@@ -259,7 +261,7 @@ function Soft({ d, logo, logoUrl, layout }: { d: InvData; logo: PrintLogo; logoU
             </div>
             <div style={{ width: 'min(100%, 320px)', background: 'rgb(var(--c-mint))', borderRadius: 10, padding: '6px 0' }}>
               {row('Subtotal', money(d.subtotal))}
-              {d.discountAmount > 0 && row(`Riyayat (${d.discountPercent}%)`, `− ${money(d.discountAmount)}`)}
+              {d.discountAmount > 0 && row(`Discount (${d.discountPercent}%)`, `− ${money(d.discountAmount)}`)}
               {row('Kul raqam', money(d.total), true)}
               {row('Mila', money(d.paid), false, '#047857')}
               <div style={{ background: acc, color: '#fff', borderRadius: 8, margin: '4px 6px 2px' }}>{row('Baqaya', money(d.balance), true)}</div>
@@ -407,6 +409,11 @@ export default function InvoiceSheets({ d, logo, logoUrl, defaultTpl, layout = D
         </select>
       </label>
       {tpl === 'soft' ? <Soft d={d} logo={logo} logoUrl={logoUrl} layout={layout} /> : tpl === 'green' ? <Green d={d} logo={logo} logoUrl={logoUrl} layout={layout} /> : tpl === 'blue' ? <Blue d={d} logo={logo} logoUrl={logoUrl} /> : <Classic d={d} logo={logo} logoUrl={logoUrl} />}
+      {d.id && !d.voided && (
+        <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-end' }}>
+          <VerifyQr table="invoices" id={d.id} />
+        </div>
+      )}
     </div>
   )
 }

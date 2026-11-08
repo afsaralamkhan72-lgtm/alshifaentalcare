@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { requireOwner } from '@/lib/auth'
+import { requireOwner, getStaffProfile } from '@/lib/auth'
+import StaffTabs from '@/components/admin/StaffTabs'
 import { todayKarachi } from '@/lib/karachi'
 import { type DayRow, type LeaveType, type ReqRow, type Rules, nextPayDay } from '@/lib/attendanceUi'
 import AttendanceToday from '@/components/admin/AttendanceToday'
@@ -62,8 +63,8 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
 
   return (
     <div>
-      <Link href="/admin/payroll" className="mb-2 inline-block text-sm text-clinic-ink/50 hover:text-clinic-teal">← Salary</Link>
-      <h1 className="font-display text-2xl font-semibold text-clinic-ink">Staff ki hazri</h1>
+      <StaffTabs isAdmin={(await getStaffProfile()).role === 'admin'} />
+      <h1 className="font-display text-2xl font-semibold text-clinic-ink">Staff: hazri</h1>
       <p className="mt-1 text-sm text-clinic-ink/60">Aane / jaane ka waqt, mohlat, late, overtime, band din, aur salary minute ke hisab se.</p>
 
       {showPay && pay && (

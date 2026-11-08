@@ -21,7 +21,7 @@ const SECTIONS = [
   { k: 'dental', l: 'Dental dawaiyan' },
   { k: 'homeopathic', l: 'Homeopathic dawaiyan' },
   { k: 'prices', l: 'Treatment prices' },
-  { k: 'discounts', l: 'Riyayat ki had', owner: true },
+  { k: 'discounts', l: 'Discount ki had', owner: true },
   { k: 'lists', l: 'Takleef / Diagnosis list' },
   { k: 'visit', l: 'Visit page par kya dikhana hai', owner: true },
   { k: 'messages', l: 'Messages (WhatsApp)' },

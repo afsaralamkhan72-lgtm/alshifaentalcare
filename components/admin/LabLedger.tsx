@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { friendlyError } from '@/lib/errors'
-import { fmtDate } from '@/lib/karachi'
+import { fmtDate, money } from '@/lib/karachi'
 
 export interface LabGroup {
   name: string
@@ -14,7 +14,6 @@ export interface LabGroup {
   paid: number
   open: { id: string; case_number: string | null; work_type: string | null; patient: string | null; date: string; owed: number }[]
 }
-const rs = (n: number) => `Rs. ${Number(n).toLocaleString('en-US')}`
 
 export default function LabLedger({ groups }: { groups: LabGroup[] }) {
   const router = useRouter()
@@ -34,7 +33,7 @@ export default function LabLedger({ groups }: { groups: LabGroup[] }) {
     const { error } = await createClient().rpc('pay_lab_total', { p_lab_name: g.name, p_amount: Number(amt), p_method: method, p_key: key })
     setBusy(false)
     if (error) return setErr(friendlyError(error.message))
-    setMsg(`${g.name} ko ${rs(Number(amt))} di gayi (kharche mein bhi likh di)`)
+    setMsg(`${g.name} ko ${money(Number(amt))} di gayi (kharche mein bhi likh di)`)
     setPayFor('')
     setAmt('')
     router.refresh()
@@ -45,7 +44,7 @@ export default function LabLedger({ groups }: { groups: LabGroup[] }) {
   return (
     <div className="mt-4 grid gap-3">
       <p className="rounded-xl bg-red-50 px-4 py-3 text-sm">
-        Sab labs ko kul dena: <strong className="text-red-700">{rs(totalOwed)}</strong>
+        Sab labs ko kul dena: <strong className="text-red-700">{money(totalOwed)}</strong>
       </p>
       {err && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">{err}</p>}
       {msg && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">{msg}</p>}
@@ -56,11 +55,11 @@ export default function LabLedger({ groups }: { groups: LabGroup[] }) {
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
                 <h2 className="font-semibold text-clinic-ink">{g.name}</h2>
-                <p className="text-xs text-clinic-ink/55">{g.cases} case · kul kaam {rs(g.cost)} · di gayi {rs(g.paid)}</p>
+                <p className="text-xs text-clinic-ink/55">{g.cases} case · kul kaam {money(g.cost)} · di gayi {money(g.paid)}</p>
               </div>
               <div className="text-right">
                 <p className="text-xs text-clinic-ink/60">Dena baqi</p>
-                <p className={`font-display text-xl font-semibold ${owed > 0 ? 'text-red-700' : 'text-emerald-700'}`}>{owed > 0 ? rs(owed) : 'saaf'}</p>
+                <p className={`font-display text-xl font-semibold ${owed > 0 ? 'text-red-700' : 'text-emerald-700'}`}>{owed > 0 ? money(owed) : 'saaf'}</p>
               </div>
             </div>
             {owed > 0 && (
@@ -70,7 +69,7 @@ export default function LabLedger({ groups }: { groups: LabGroup[] }) {
                     <li key={o.id} className="flex flex-wrap items-center gap-2">
                       <Link href={`/admin/lab/${o.id}`} className="text-clinic-teal hover:underline">{o.case_number ?? 'case'}</Link>
                       <span className="text-xs text-clinic-ink/55">{fmtDate(o.date)} · {o.work_type ?? 'kaam'}{o.patient ? ` · ${o.patient}` : ''}</span>
-                      <span className="ml-auto font-medium">{rs(o.owed)}</span>
+                      <span className="ml-auto font-medium">{money(o.owed)}</span>
                     </li>
                   ))}
                 </ul>

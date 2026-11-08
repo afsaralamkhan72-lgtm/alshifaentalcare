@@ -4,13 +4,12 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { friendlyError } from '@/lib/errors'
-import { fmtDate, todayKarachi } from '@/lib/karachi'
+import { fmtDate, money, todayKarachi } from '@/lib/karachi'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
 
 export interface PlanItem { id: string; no: number; due_date: string; amount: number }
 export interface Plan { id: string; patient_treatment_id: string; base_paid: number; planned_amount: number; items: PlanItem[] }
 
-const rs = (n: number) => `Rs. ${Number(n).toLocaleString('en-US')}`
 
 function addMonths(d: string, m: number): string {
   const [y, mo, da] = d.split('-').map(Number)
@@ -83,7 +82,7 @@ export default function PaymentPlan({
       phone
         ? buildWhatsAppLink({
             phoneOverride: phone,
-            customMessage: `Assalam o Alaikum ${patientName},\n\nAap ki qist ${rs(i.left)} ${fmtDate(i.due_date)} ko due hai. Meharbani kar ke ada kar dein.\n\nShukriya.`,
+            customMessage: `Assalam o Alaikum ${patientName},\n\nAap ki qist ${money(i.left)} ${fmtDate(i.due_date)} ko due hai. Meharbani kar ke ada kar dein.\n\nShukriya.`,
           })
         : null
     const CHIP: Record<string, string> = {
@@ -112,8 +111,8 @@ export default function PaymentPlan({
               <li key={i.id} className="flex flex-wrap items-center gap-2 text-sm">
                 <span className="w-5 text-xs text-clinic-ink/50">{i.no}.</span>
                 <span>{fmtDate(i.due_date)}</span>
-                <span className="font-medium">{rs(i.amount)}</span>
-                {i.state !== 'paid' && i.left < i.amount && <span className="text-[11px] text-clinic-ink/60">(baqi {rs(i.left)})</span>}
+                <span className="font-medium">{money(i.amount)}</span>
+                {i.state !== 'paid' && i.left < i.amount && <span className="text-[11px] text-clinic-ink/60">(baqi {money(i.left)})</span>}
                 <span className={`rounded-full px-2 py-0.5 text-[11px] ${CHIP[i.state]}`}>{LBL[i.state]}</span>
                 {link && (i.state === 'late' || i.state === 'today') && (
                   <a href={link} target="_blank" rel="noopener noreferrer" className="ml-auto text-[11px] font-semibold text-emerald-700 underline">
@@ -145,7 +144,7 @@ export default function PaymentPlan({
         </button>
       ) : (
         <div className="rounded-lg bg-sky-50 p-2">
-          <p className="text-xs font-semibold text-sky-900">Baqaya {rs(balance)} ko qiston mein baantein</p>
+          <p className="text-xs font-semibold text-sky-900">Baqaya {money(balance)} ko qiston mein baantein</p>
           <div className="mt-1 flex flex-wrap items-end gap-2 text-xs">
             <label className="grid gap-0.5">
               Kitni qistein
@@ -169,8 +168,8 @@ export default function PaymentPlan({
             ))}
           </ul>
           <p className={`mt-1 text-xs ${sum > balance ? 'text-red-600' : 'text-clinic-ink/60'}`}>
-            Jama {rs(sum)} / baqaya {rs(balance)}
-            {sum < balance ? ` (${rs(balance - sum)} plan se bahar rahega)` : ''}
+            Jama {money(sum)} / baqaya {money(balance)}
+            {sum < balance ? ` (${money(balance - sum)} plan se bahar rahega)` : ''}
           </p>
           {err && <p className="mt-1 text-xs text-red-700">{err}</p>}
           <div className="mt-2 flex gap-2">

@@ -63,6 +63,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         defaultTpl={printCfg.defaults.bill}
         layout={printCfg.layout}
         d={{
+          id: inv.id,
           patientId: patient?.id ?? inv.patient_id,
           age: patient?.age ?? null,
           number: inv.invoice_number,
@@ -98,6 +99,9 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           patientPhone={patient?.phone ?? ''}
           dueDate={inv.due_date}
           payments={payments}
+          subtotal={Number(inv.subtotal)}
+          discountAmount={Number(inv.discount_amount)}
+          items={items.map((it) => ({ name: it.name, tooth: it.tooth, qty: Number(it.qty), line_total: Number(it.line_total) }))}
         />
       </div>
     </div>

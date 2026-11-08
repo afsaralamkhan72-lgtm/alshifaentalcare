@@ -128,3 +128,41 @@
     padding-bottom: 0.5rem;
   }
 }
+
+/* Phone par jadwal ke chhote button/link ungli se dabane layak (kam az kam 36px) */
+@media (max-width: 640px) {
+  main table button,
+  main table a {
+    min-height: 36px;
+    display: inline-flex;
+    align-items: center;
+  }
+}
+
+/* Touch screens (phone/tablet): chhote buttons aur akele links ko ungli ke layaq bara karein */
+@media (max-width: 1023px) {
+  main button:not([role='tab']),
+  main :is(div, nav, header, section, td, span) > a[href]:not(:has(div, img, a, button, table, input, select)) {
+    min-height: 36px;
+    display: inline-flex;
+    align-items: center;
+    column-gap: 0.25em;
+  }
+  main button:not([role='tab']) { justify-content: center; }
+  /* Tablet par bhi form ke khane ungli ke laiq (phone par upar wala 42px rule pehle se hai) */
+  .admin-shell main input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='hidden']),
+  .admin-shell main select {
+    min-height: 40px;
+  }
+  /* Jumle/list ke andar ke links: dikhawat wahi, dabane ki jagah bari (padding) */
+  .admin-shell main :is(p, li, td, dd) > a[href]:not(:has(div, img, a, button, table, input, select)) {
+    padding-block: 0.8em;
+  }
+  /* Jumlon ke andar ke links ko chhoo na karein; baqi akele links */
+  .admin-shell main :is(label, li, h1, h2, h3, h4, article, aside, summary) > a[href]:not(:has(div, img, a, button, table, input, select)) {
+    min-height: 36px;
+    display: inline-flex;
+    align-items: center;
+    column-gap: 0.25em;
+  }
+}

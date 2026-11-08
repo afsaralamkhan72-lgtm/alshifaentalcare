@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { friendlyError } from '@/lib/errors'
 import { dur, t12 } from '@/lib/attendanceUi'
+import { moneyWhole } from '@/lib/karachi'
 
 export interface CalcRow {
   staff_id: string
@@ -55,7 +56,6 @@ interface MonthDay {
   missing_out: boolean
 }
 
-const rs = (n: number) => `Rs. ${Math.round(Number(n)).toLocaleString('en-US')}`
 const STATUS_UR: Record<string, string> = { present: 'hazir', half: 'aadha din', leave: 'chhutti', absent: 'ghair-hazir' }
 
 export default function AttendanceMonth({ period, today, rows }: { period: string; today: string; rows: CalcRow[] }) {
@@ -134,11 +134,11 @@ export default function AttendanceMonth({ period, today, rows }: { period: strin
                 {r.title && <span className="text-xs text-clinic-ink/55">{r.title}</span>}
                 {!r.track && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-600">hazri nahi lagti</span>}
                 {r.finalized && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] text-emerald-700">tayyar (lock)</span>}
-                <span className="ml-auto font-display text-lg font-semibold text-clinic-ink">{rs(r.net)}</span>
+                <span className="ml-auto font-display text-lg font-semibold text-clinic-ink">{moneyWhole(r.net)}</span>
               </div>
               <p className="mt-1 text-[11px] text-clinic-ink/55">
-                Tankhwah {rs(r.monthly_salary)}
-                {r.eff_min < r.month_min && ` · joining (${r.eff_from}) se ${dur(r.eff_min)} ka hisab: ${rs(r.entitled)}`}
+                Tankhwah {moneyWhole(r.monthly_salary)}
+                {r.eff_min < r.month_min && ` · joining (${r.eff_from}) se ${dur(r.eff_min)} ka hisab: ${moneyWhole(r.entitled)}`}
                 {r.rate_per_min ? ` · aik minute = Rs. ${Number(r.rate_per_min).toFixed(2)}` : ''}
               </p>
 
@@ -158,10 +158,10 @@ export default function AttendanceMonth({ period, today, rows }: { period: strin
               <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
                 {r.cut_total > 0 && (
                   <span className="text-red-700">
-                    Katauti {rs(r.cut_total)} (late {rs(r.cut_late)}, jaldi {rs(r.cut_early)}, ghair-hazri {rs(r.cut_absent)})
+                    Katauti {moneyWhole(r.cut_total)} (late {moneyWhole(r.cut_late)}, jaldi {moneyWhole(r.cut_early)}, ghair-hazri {moneyWhole(r.cut_absent)})
                   </span>
                 )}
-                {r.ot_amount > 0 && <span className="text-violet-700">Overtime {rs(r.ot_amount)}</span>}
+                {r.ot_amount > 0 && <span className="text-violet-700">Overtime {moneyWhole(r.ot_amount)}</span>}
                 {r.missing_out > 0 && <span className="text-amber-700">{r.missing_out} din jaane ka waqt nahi likha (koi katauti nahi)</span>}
               </div>
 

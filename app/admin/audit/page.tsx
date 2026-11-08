@@ -35,10 +35,25 @@ interface AuditRow {
 
 const SKIP = new Set(['updated_at'])
 
+const ACTION_LABEL: Record<string, string> = {
+  INSERT: 'Naya',
+  UPDATE: 'Tabdeeli',
+  DELETE: 'Delete',
+  ARCHIVE: 'Band (archive)',
+  RESTORE_ACTIVE: 'Dobara chalu',
+  MERGE: 'Items merge',
+  STOCK_DAMAGED: 'Stock kharab/toota',
+  STOCK_RETURN: 'Stock supplier ko wapas',
+  DELETE_TO_BIN: 'Recycle bin mein',
+  RESTORE_FROM_BIN: 'Bin se wapas',
+  PURGE: 'Hamesha ke liye delete',
+}
+
 function show(v: unknown) {
   if (v === null || v === undefined || v === '') return '—'
-  if (typeof v === 'object') return JSON.stringify(v)
-  return String(v)
+  const t = typeof v === 'object' ? JSON.stringify(v) : String(v)
+  // Lambi cheez (jaise visit ka draft) poori na dikhayein, page bhari ho jata hai
+  return t.length > 160 ? t.slice(0, 160) + '… (lamba, poora record database mein mehfooz hai)' : t
 }
 
 function summary(r: AuditRow) {
@@ -115,7 +130,7 @@ export default async function AuditPage({
         <button className="rounded-lg bg-clinic-teal px-4 py-2 text-sm font-semibold text-white">
           Dekhein
         </button>
-        <Link href="/admin/audit" className="text-sm text-clinic-ink/60 hover:underline">
+        <Link href="/admin/audit" className="inline-flex min-h-[36px] items-center px-2 text-sm text-clinic-ink/60 hover:underline">
           Reset
         </Link>
       </form>
@@ -138,12 +153,12 @@ export default async function AuditPage({
                     className={`mr-2 rounded-full px-2 py-0.5 text-xs font-semibold ${
                       r.action === 'INSERT'
                         ? 'bg-emerald-50 text-emerald-700'
-                        : r.action === 'DELETE'
+                        : r.action === 'DELETE' || r.action === 'PURGE' || r.action === 'DELETE_TO_BIN'
                           ? 'bg-red-50 text-red-700'
                           : 'bg-amber-50 text-amber-700'
                     }`}
                   >
-                    {r.action === 'INSERT' ? 'Naya' : r.action === 'UPDATE' ? 'Tabdeeli' : 'Delete'}
+                    {ACTION_LABEL[r.action] ?? r.action}
                   </span>
                   {r.table_name} {summary(r) && `· ${summary(r)}`}
                 </p>

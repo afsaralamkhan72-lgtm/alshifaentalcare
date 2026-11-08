@@ -1,0 +1,22 @@
+-- =====================================================================
+-- AL SHIFA HEALTH CARE: FINAL-AL-SHIFA-DATABASE.sql
+-- Complete final database (schema + functions + triggers + RLS + seed)
+--
+-- KAISE CHALAYEIN
+--  * NAYA khali Supabase project: pehle PART A se PART E tak, isi tarteeb se, ek ek karke.
+--    Phir admin-setup.sql (pehla login). Phir app deploy.
+--  * File bari hai (bohat lambi). Supabase SQL Editor mein ek hi baar mein paste na karein.
+--    Isi file ke chhote tukde database-parts/ folder mein alag alag bane hue hain (01, 02, 03 ...).
+--    Wohi tarteeb se chalayein. Ya psql: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f FINAL-AL-SHIFA-DATABASE.sql
+--  * MAUJOODA (FINAL55/56/57/58) project par ye poori file MAT chalayein. Wahan sirf
+--    migrations/ wale chhote parts chalayein (README-DATABASE.md mein tarteeb likhi hai).
+--  * Pehle hamesha backup. Production par sirf apni ijazat se.
+--
+-- PART A  : extensions
+-- PART B  : tables, indexes, foreign keys, constraints, views, functions (RPC), triggers, RLS, grants
+-- PART C  : zaroori seed/configuration (dobara chalane se kuch kharab nahi hota)
+-- PART D  : storage buckets + policies (sirf Supabase par)
+-- PART E  : khatam
+-- Is mein koi patient, staff, salary, inventory ya paisa ka data nahi hai.
+-- =====================================================================
+

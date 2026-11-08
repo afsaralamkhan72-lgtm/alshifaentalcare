@@ -60,6 +60,7 @@ export default function ToothChart({
   canEdit,
   pickOnly = false,
   renderExtra,
+  noPlan,
   onWork,
 }: {
   age: number | null
@@ -72,6 +73,7 @@ export default function ToothChart({
   pickOnly?: boolean
   /** Is daant ke liye masla / kaam likhne ka hissa (visit mein) */
   renderExtra?: (tooth: string) => React.ReactNode
+  noPlan?: boolean
   /** Chart par kaam (filling, RCT ...) lagane/hatane par: bill wali treatment ki qatar bhi ban/hat jaye */
   onWork?: (condition: string, teeth: string[], planned: boolean, on: boolean) => void
 }) {
@@ -85,6 +87,7 @@ export default function ToothChart({
   const canSwitch = true
   const [narrow, setNarrow] = useState(false)
   const [more, setMore] = useState(false)
+  const [sheetMin, setSheetMin] = useState(false)
   const [planLater, setPlanLater] = useState(false)
   const stateFor = (c: string): Mark['state'] => (WORK.includes(c) && !planLater ? 'completed' : planLater && WORK.includes(c) ? 'planned' : 'existing')
 
@@ -245,11 +248,11 @@ export default function ToothChart({
 
       {showCard && onMarks && (
         <>
-        {narrow && <div className="h-[55vh]" aria-hidden="true" />}
+        {narrow && <div className={sheetMin ? 'h-24' : 'h-[46vh]'} aria-hidden="true" />}
         <div
           className={
             narrow
-              ? 'fixed inset-x-0 bottom-0 z-40 grid max-h-[65vh] gap-2 overflow-y-auto rounded-t-2xl border-t border-clinic-teal/20 bg-white p-4 pb-6 shadow-[0_-10px_30px_rgba(20,43,80,0.25)]'
+              ? 'fixed inset-x-0 bottom-0 z-40 grid max-h-[46vh] gap-2 overflow-y-auto rounded-t-2xl border-t border-clinic-teal/20 bg-white p-4 pb-6 shadow-[0_-10px_30px_rgba(20,43,80,0.25)]'
               : 'mt-3 grid gap-2 rounded-xl border border-sky-200 bg-sky-50/60 p-3 lg:sticky lg:top-3 lg:mt-0'
           }
         >
@@ -261,10 +264,18 @@ export default function ToothChart({
                 <p className="text-sm font-semibold text-clinic-ink">{toothLabel(act)}</p>
               </div>
             </div>
-            <button type="button" onClick={() => onSelect([])} className="rounded-full border border-clinic-ink/20 px-3 py-1 text-xs font-semibold text-clinic-ink/70">
-              Band karein ✕
-            </button>
+            <div className="flex items-center gap-2">
+              {narrow && (
+                <button type="button" onClick={() => setSheetMin(!sheetMin)} data-testid="sheet-toggle" className="min-h-[44px] whitespace-nowrap rounded-full border border-clinic-ink/20 px-3 py-1 text-xs font-semibold text-clinic-ink/70">
+                  {sheetMin ? 'Kholein ▴' : 'Chhota ▾'}
+                </button>
+              )}
+              <button type="button" onClick={() => onSelect([])} className="min-h-[44px] whitespace-nowrap rounded-full border border-clinic-ink/20 px-3 py-1 text-xs font-semibold text-clinic-ink/70">
+                Band karein ✕
+              </button>
+            </div>
           </div>
+          {!(narrow && sheetMin) && (<>
           {selected.length > 1 && (
             <div className="flex flex-wrap items-center gap-1.5 text-xs">
               <span className="text-clinic-ink/60">Surface/note kis daant ka:</span>
@@ -284,10 +295,12 @@ export default function ToothChart({
               Sab chune hue daanton par ek saath lagayein
             </label>
           )}
+          {!noPlan && (
           <label className="flex items-center gap-2 text-xs text-clinic-ink/70">
             <input type="checkbox" checked={planLater} onChange={(e) => setPlanLater(e.target.checked)} className="h-4 w-4" />
             Ye kaam aaj nahi, baad mein karna hai (plan mein jayega)
           </label>
+          )}
           {(() => {
             const btn = (c: (typeof CONDITIONS)[number]) => {
               const on = targets.every((t) => marks.some((m) => m.tooth === t && m.condition === c.value && m.state === stateFor(c.value)))
@@ -374,6 +387,7 @@ export default function ToothChart({
               className="rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm text-clinic-ink disabled:bg-clinic-ink/5"
             />
           </label>
+          </>)}
         </div>
         </>
       )}

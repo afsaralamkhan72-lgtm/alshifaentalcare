@@ -4,6 +4,7 @@ import { requireAnyPerm, getStaffProfile, isOwnerRole } from '@/lib/auth'
 import BudgetPanel, { type BudgetRow } from '@/components/admin/BudgetPanel'
 import { todayKarachi, addDays, money } from '@/lib/karachi'
 import ExpenseManager, { type ExpenseRow, type CategoryRow } from '@/components/admin/ExpenseManager'
+import SectionTabs from '@/components/admin/SectionTabs'
 
 export default async function ExpensesPage({
   searchParams,
@@ -66,6 +67,7 @@ export default async function ExpensesPage({
 
   return (
     <div>
+      <SectionTabs which="accounts" />
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <Link href="/admin/accounts" className="mb-2 inline-block text-sm text-clinic-ink/50 hover:text-clinic-teal">← Accounts</Link>

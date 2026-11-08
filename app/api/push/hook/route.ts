@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { timingSafeEqual } from 'node:crypto'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { pushKeys, sendToAll } from '@/lib/push'
+import { numFmt } from '@/lib/karachi'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,6 +20,6 @@ export async function POST(req: Request) {
     const { data } = await sb?.from('patients').select('full_name').eq('id', b.patient_id).maybeSingle() ?? { data: null }
     name = data?.full_name ?? ''
   }
-  const r = await sendToAll(`Rs. ${amount.toLocaleString('en-US')} mile`, name ? `${name} se payment mili` : 'Nayi payment mili', '/admin/dashboard')
+  const r = await sendToAll(`Rs. ${numFmt(amount)} mile`, name ? `${name} se payment mili` : 'Nayi payment mili', '/admin/dashboard')
   return NextResponse.json(r)
 }

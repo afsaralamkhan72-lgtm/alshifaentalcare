@@ -1,11 +1,12 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
 import { CLINIC } from '@/clinic.config'
-import { money } from '@/lib/karachi'
+import { money, fmtDate } from '@/lib/karachi'
+import { buildBillText } from '@/lib/billText'
 import { askReceipt } from '@/lib/receiptEvent'
 import { openFresh } from '@/lib/openFresh'
 
@@ -31,6 +32,9 @@ interface Props {
   patientPhone: string
   dueDate: string | null
   payments: PayRow[]
+  subtotal: number
+  discountAmount: number
+  items: { name: string; tooth: string | null; qty: number; line_total: number }[]
 }
 
 const METHODS = [
@@ -51,6 +55,13 @@ export default function InvoicePanel(p: Props) {
   const [reason, setReason] = useState('')
   const [mode, setMode] = useState<null | 'void' | string>(null) // 'void' ya payment id
   const keyRef = useRef(crypto.randomUUID())
+  const [limit, setLimit] = useState(0)
+  const [disc, setDisc] = useState('')
+  const [dreason, setDreason] = useState('')
+  useEffect(() => {
+    createClient().rpc('my_discount_limit').then(({ data }) => setLimit(Number(data ?? 0)))
+  }, [])
+  const discNum = Math.max(0, Number(disc) || 0)
 
   const active = p.status === 'active'
 
@@ -69,20 +80,40 @@ export default function InvoicePanel(p: Props) {
   }
 
   async function receive() {
+    const amt = Number(amount) || 0
+    if (discNum > 0 && !dreason.trim()) {
+      setErr('Discount ki wajah likhein')
+      return
+    }
+    if (discNum + amt > p.balance) {
+      setErr(`Discount + payment baqaya (${money(p.balance)}) se zyada hai`)
+      return
+    }
     const ok = await run(() =>
-      createClient().rpc('collect_payment', {
-        p_invoice_id: p.invoiceId,
-        p_amount: Number(amount),
-        p_method: method,
-        p_note: note || null,
-        p_key: keyRef.current,
-      })
+      discNum > 0
+        ? createClient().rpc('collect_with_discount', {
+            p_invoice_id: p.invoiceId,
+            p_discount: discNum,
+            p_amount: amt,
+            p_method: method,
+            p_reason: dreason.trim() || note || null,
+            p_key: keyRef.current,
+          })
+        : createClient().rpc('collect_payment', {
+            p_invoice_id: p.invoiceId,
+            p_amount: amt,
+            p_method: method,
+            p_note: note || null,
+            p_key: keyRef.current,
+          })
     )
     if (ok) {
-      askReceipt({ patientId: p.patientId, amount: Number(amount), method })
+      if (amt > 0) askReceipt({ patientId: p.patientId, amount: amt, method })
       keyRef.current = crypto.randomUUID()
       setNote('')
       setAmount('')
+      setDisc('')
+      setDreason('')
     }
   }
 
@@ -101,17 +132,18 @@ export default function InvoicePanel(p: Props) {
 
   const wa = buildWhatsAppLink({
     phoneOverride: p.patientPhone,
-    customMessage: [
-      `Assalam o Alaikum ${p.patientName},`,
-      `${CLINIC.name}, invoice ${p.invoiceNumber}`,
-      '',
-      `Total  : ${money(p.total)}`,
-      `Mile   : ${money(p.paid)}`,
-      `Baqaya : ${money(p.balance)}`,
-      ...(p.balance > 0 && p.dueDate ? [`Aakhri tareekh: ${new Date(p.dueDate).toLocaleDateString('en-GB')}`] : []),
-      '',
-      `${CLINIC.name} · ${CLINIC.phone.display}`,
-    ].join('\n'),
+    customMessage: buildBillText({
+      patientName: p.patientName,
+      invoiceNumber: p.invoiceNumber,
+      items: p.items,
+      subtotal: p.subtotal,
+      discountAmount: p.discountAmount,
+      total: p.total,
+      paid: p.paid,
+      balance: p.balance,
+      dueDate: p.dueDate,
+      voided: p.status === 'void',
+    }),
   })
 
   const inputClass =
@@ -150,7 +182,28 @@ export default function InvoicePanel(p: Props) {
               {METHODS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
             <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note (optional)" className={`${inputClass} min-w-[160px] flex-1`} />
-            <button onClick={receive} disabled={busy || !Number(amount)} className="rounded-full bg-clinic-teal px-5 py-2 text-sm font-semibold text-white disabled:opacity-40">
+            {limit > 0 && (
+              <div className="flex w-full flex-wrap items-center gap-2">
+                <input
+                  type="number"
+                  min={0}
+                  max={p.balance}
+                  value={disc}
+                  data-testid="bill-discount"
+                  onChange={(e) => {
+                    setDisc(e.target.value)
+                    setAmount(String(Math.max(0, p.balance - (Number(e.target.value) || 0))))
+                  }}
+                  placeholder="Discount Rs. (poore bill par)"
+                  className={`${inputClass} w-56`}
+                />
+                {discNum > 0 && (
+                  <input value={dreason} onChange={(e) => setDreason(e.target.value)} placeholder="Discount ki wajah (zaroori)" className={`${inputClass} min-w-[160px] flex-1`} />
+                )}
+                <span className="text-[11px] text-clinic-ink/50">aap ki had {limit}%</span>
+              </div>
+            )}
+            <button onClick={receive} disabled={busy || (!Number(amount) && !discNum)} className="rounded-full bg-clinic-teal px-5 py-2 text-sm font-semibold text-white disabled:opacity-40">
               {busy ? 'Save...' : 'Payment Save'}
             </button>
           </div>
@@ -172,7 +225,7 @@ export default function InvoicePanel(p: Props) {
             <tbody>
               {p.payments.map((x) => (
                 <tr key={x.id} className="border-t border-clinic-teal/10">
-                  <td className="px-4 py-2">{new Date(x.paid_on).toLocaleDateString('en-GB')}</td>
+                  <td className="px-4 py-2">{fmtDate(x.paid_on)}</td>
                   <td className="px-4 py-2">
                     {x.kind === 'payment' ? (x.reversed ? 'Payment (ulti ho chuki)' : 'Payment') : 'Refund'}
                     {x.note ? <span className="ml-1 text-xs text-clinic-ink/50">· {x.note}</span> : null}

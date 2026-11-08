@@ -25,12 +25,58 @@ export async function createStaff(formData: FormData) {
   const password = String(formData.get('password') ?? '')
   const fullName = String(formData.get('full_name') ?? '').trim()
   const phone = String(formData.get('phone') ?? '').trim()
+  const title = String(formData.get('title') ?? '').trim()
+  const salary = Math.max(0, Number(formData.get('monthly_salary') ?? 0) || 0)
+  const joined = String(formData.get('joined_on') ?? '').trim()
+  const withLogin = String(formData.get('with_login') ?? 'yes') === 'yes'
   const role = String(formData.get('role') ?? 'receptionist')
   const perms = permsFrom(formData)
 
+  if (fullName.length < 2) back('/admin/staff', 'err', 'Naam likhein')
+  const supabase = await createClient()
+
+  // Staff ka hazri/salary wala record: pehle se hai to wohi (dobara nahi banega), warna naya
+  async function ensureMember(profileId: string | null) {
+    const { data: found } = await supabase
+      .from('staff_members')
+      .select('id, profile_id')
+      .ilike('full_name', fullName)
+      .eq('is_active', true)
+      .limit(2)
+    const same = (found ?? []).filter((m) => !m.profile_id || m.profile_id === profileId)
+    if (same.length === 1) {
+      if (profileId && !same[0].profile_id) await supabase.from('staff_members').update({ profile_id: profileId }).eq('id', same[0].id)
+      return null
+    }
+    const { error } = await supabase.from('staff_members').insert({
+      full_name: fullName,
+      title: title || null,
+      phone: phone || null,
+      profile_id: profileId,
+      monthly_salary: salary,
+      joined_on: joined || undefined,
+    })
+    return error ? error.message : null
+  }
+
+  // Doctor ho to "Treating doctor" ki list mein bhi wohi naam (dohra nahi likhna parta)
+  async function syncDoctor(isDoc: boolean) {
+    if (!isDoc) return
+    const { data: ex } = await supabase.from('treating_doctors').select('id').ilike('name', fullName).limit(1)
+    if (!ex || ex.length === 0) await supabase.from('treating_doctors').insert({ name: fullName })
+  }
+
+  if (!withLogin) {
+    const err = await ensureMember(null)
+    await syncDoctor(/\bdr\b|doctor/i.test(`${fullName} ${title}`))
+    if (err) back('/admin/staff', 'err', 'Staff save nahi hua: ' + err)
+    revalidatePath('/admin/staff')
+    revalidatePath('/admin/payroll')
+    back('/admin/staff', 'ok', `${fullName} add ho gaya (login ke baghair, sirf hazri aur salary)`)
+  }
+
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) back('/admin/staff', 'err', 'Email theek nahi')
   if (password.length < 8) back('/admin/staff', 'err', 'Password kam az kam 8 haroof ka ho')
-  if (fullName.length < 2) back('/admin/staff', 'err', 'Naam likhein')
   if (role !== 'receptionist' && role !== 'doctor') back('/admin/staff', 'err', 'Role theek nahi')
 
   const admin = createAdminClient()
@@ -58,13 +104,16 @@ export async function createStaff(formData: FormData) {
   }
 
   if (role === 'receptionist') {
-    const supabase = await createClient()
     const { error: sErr } = await supabase.rpc('set_staff_permissions', { p_user: uid, p_codes: perms })
     if (sErr) back('/admin/staff', 'err', 'Account ban gaya, magar permissions nahi lagi: ' + sErr.message)
   }
 
+  const mErr = await ensureMember(uid)
+  await syncDoctor(role === 'doctor')
   revalidatePath('/admin/staff')
-  back('/admin/staff', 'ok', `${fullName} ka account ban gaya`)
+  revalidatePath('/admin/payroll')
+  if (mErr) back('/admin/staff', 'err', `${fullName} ka login ban gaya, magar hazri/salary ka record nahi bana: ${mErr}`)
+  back('/admin/staff', 'ok', `${fullName} ka account aur hazri/salary ka record ban gaya`)
 }
 
 export async function savePermissions(formData: FormData) {
@@ -124,10 +173,11 @@ export async function activateReceptionist(formData: FormData) {
     id: userId, full_name: fullName, role: 'receptionist', phone: phone || null, is_active: true,
   })
   if (error) back('/admin/staff', 'err', error.message)
-  await supabase.rpc('set_staff_permissions', {
+  const { error: permErr } = await supabase.rpc('set_staff_permissions', {
     p_user: userId,
     p_codes: ['patients.view','patients.create','patients.edit','appointments.view','appointments.manage','lab.view','lab.manage','inventory.view'],
   })
+  if (permErr) back('/admin/staff', 'err', 'Account ban gaya magar permissions nahi lagin: ' + permErr.message)
   revalidatePath('/admin/staff')
   back('/admin/staff', 'ok', 'Activate ho gaya')
 }

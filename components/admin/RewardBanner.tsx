@@ -7,9 +7,9 @@ import { friendlyError } from '@/lib/errors'
 import { money } from '@/lib/karachi'
 import type { ReadyReward } from '@/lib/rewards'
 
-const kt = (k: string, v: number | null) => (k === 'percent' ? `${v}% chhoot` : k === 'amount' ? `Rs.${v} chhoot` : 'Muft')
+const kt = (k: string, v: number | null) => (k === 'percent' ? `${v}% discount` : k === 'amount' ? `Rs.${v} discount` : 'Muft')
 
-/** Tayyar inaam. invoice di ho to "Chhoot lagayein" ka button bhi (sirf us bill ki inaam wali treatments par). */
+/** Tayyar inaam. invoice di ho to "Discount lagayein" ka button bhi (sirf us bill ki inaam wali treatments par). */
 export default function RewardBanner({ rewards, invoice }: { rewards: ReadyReward[]; invoice?: { id: string; open: boolean; items: { name: string; line_total: number }[] } }) {
   const router = useRouter()
   const [busy, setBusy] = useState(false)
@@ -31,7 +31,7 @@ export default function RewardBanner({ rewards, invoice }: { rewards: ReadyRewar
     const { error } = await createClient().rpc('apply_reward_discount', { p_invoice: invoice.id, p_source: r.source, p_reward: r.id })
     setBusy(false)
     if (error) return setMsg('❌ ' + friendlyError(error.message))
-    setMsg('✓ Chhoot lag gayi')
+    setMsg('✓ Discount lag gaya')
     router.refresh()
   }
 
@@ -49,10 +49,10 @@ export default function RewardBanner({ rewards, invoice }: { rewards: ReadyRewar
                 {r.treatments.length ? ` (sirf: ${r.treatments.join(', ')})` : ' (us din ke bill par)'}
                 {r.expires_at ? ` · ${r.expires_at.slice(0, 10)} tak` : ''}
                 {p && disc && (p.base > 0 ? <span className="block text-xs text-amber-800">Is bill par {money(p.base)} ka {kt(r.kind, r.value)} = <b>{money(p.d)}</b> kam</span> : <span className="block text-xs text-red-700">Is bill mein inaam wali treatment nahi</span>)}
-                {!disc && <span className="block text-xs text-amber-800">Ye chhoot nahi, haath se dein aur Loyalty page par &quot;Inaam diya&quot; dabayein.</span>}
+                {!disc && <span className="block text-xs text-amber-800">Ye discount nahi, haath se dein aur Loyalty page par &quot;Inaam diya&quot; dabayein.</span>}
               </span>
               {invoice?.open && disc && p && p.base > 0 && (
-                <button disabled={busy} onClick={() => apply(r)} className="rounded-full bg-clinic-teal px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-60">Chhoot lagayein</button>
+                <button disabled={busy} onClick={() => apply(r)} className="rounded-full bg-clinic-teal px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-60">Discount lagayein</button>
               )}
             </li>
           )

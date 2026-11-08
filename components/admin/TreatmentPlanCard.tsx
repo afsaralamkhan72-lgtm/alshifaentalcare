@@ -57,6 +57,7 @@ export default function TreatmentPlanCard({
     remaining: number
   } | null>(null)
   const [method, setMethod] = useState('cash')
+  const [payError, setPayError] = useState('')
 
   const paidTotal =
     Number(plan.advance_paid) + installments.reduce((s, i) => s + Number(i.paid_amount), 0)
@@ -79,46 +80,21 @@ export default function TreatmentPlanCard({
     if (got <= 0) return
     setBusyId(inst.id)
     const supabase = createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
 
-    // Record on the installment...
-    await supabase
-      .from('installments')
-      .update({
-        paid_amount: got,
-        paid_date: today,
-        payment_method: method,
-        recorded_by: user?.id ?? null,
-      })
-      .eq('id', inst.id)
-
-    // ...and mirror it into transactions so it shows up in Billing reports
-    await supabase.from('transactions').insert({
-      type: 'income',
-      category: 'treatment-installment',
-      amount: got,
-      payment_method: method,
-      doctor_id: plan.doctor_id ?? null,
-      description: `${plan.title}, installment #${inst.installment_no} (${patientName})`,
-      transaction_date: today,
-      recorded_by: user?.id ?? null,
+    // Installment, transaction aur visit note ek hi database function se (sab ya kuch nahi)
+    const { error: payErr } = await supabase.rpc('pay_installment', {
+      p_installment_id: inst.id,
+      p_amount: got,
+      p_method: method,
+      p_note: note && note.trim() ? note.trim() : null,
+      p_idempotency_key: inst.id,
     })
-
-    // Us din ka visit bhi record ho jaye, alag se likhna na pade
-    if (note && note.trim()) {
-      const next = new Date(today)
-      next.setMonth(next.getMonth() + 1)
-      await supabase.from('visit_notes').insert({
-        patient_id: patientId,
-        plan_id: plan.id,
-        visit_date: today,
-        procedure: note.trim(),
-        next_visit: next.toISOString().slice(0, 10),
-        doctor_id: user?.id ?? null,
-      })
+    if (payErr) {
+      setBusyId(null)
+      setPayError(payErr.message)
+      return
     }
+    setPayError('')
 
     setJustPaid({
       month: new Date(inst.due_date).toLocaleDateString('en-GB', {
@@ -293,6 +269,11 @@ export default function TreatmentPlanCard({
         </select>
       </div>
 
+      {payError && (
+        <p role="alert" className="mt-3 rounded-lg bg-red-50 p-2 text-sm text-red-700">
+          {payError}
+        </p>
+      )}
       <div className="mt-3 overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-clinic-mint text-left text-clinic-ink/60">

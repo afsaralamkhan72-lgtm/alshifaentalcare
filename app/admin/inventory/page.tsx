@@ -13,8 +13,25 @@ async function getInventory() {
   const { data: hidden } = await supabase.from('inventory').select('id').eq('is_active', false)
   const off = new Set((hidden ?? []).map((h) => h.id))
   const { data: meta } = await supabase.from('inventory_meta').select('inventory_id, company, is_qualitative')
+  const { data: grp } = await supabase.from('inventory').select('id, item_group')
+  const gmap = new Map((grp ?? []).map((g) => [g.id as string, ((g as { item_group?: string | null }).item_group ?? null) as string | null]))
   const m = new Map((meta ?? []).map((x) => [x.inventory_id as string, x]))
-  return (data ?? []).filter((i) => !off.has(i.id)).map((i) => ({ ...i, qualitative: Boolean(m.get(i.id)?.is_qualitative), company: (m.get(i.id)?.company as string | null) ?? null }))
+  // description / deleted_at / merged_into part4 SQL ke baad aate hain; na hon to error ko nazar-andaz karein
+  const { data: desc } = await supabase.from('inventory').select('id, description')
+  const dmap = new Map(((desc ?? []) as { id: string; description: string | null }[]).map((d) => [d.id, d.description]))
+  return (data ?? []).filter((i) => !off.has(i.id)).map((i) => ({ ...i, item_group: gmap.get(i.id) ?? null, description: dmap.get(i.id) ?? null, qualitative: Boolean(m.get(i.id)?.is_qualitative), company: (m.get(i.id)?.company as string | null) ?? null }))
+}
+
+async function getArchivedAndFlags() {
+  const supabase = await createClient()
+  const [arch, flags] = await Promise.all([
+    supabase.from('inventory').select('id, item_name, category, quantity, unit').eq('is_active', false).is('deleted_at', null).is('merged_into', null).order('item_name'),
+    supabase.rpc('inventory_item_flags'),
+  ])
+  const flagsOk = !flags.error
+  const hasHistory: Record<string, boolean> = {}
+  for (const f of (flags.data ?? []) as { inventory_id: string; has_history: boolean }[]) hasHistory[f.inventory_id] = f.has_history
+  return { archived: (arch.error ? [] : (arch.data ?? [])) as { id: string; item_name: string; category: string; quantity: number; unit: string | null }[], hasHistory, flagsOk }
 }
 
 export default async function InventoryPage() {
@@ -22,6 +39,7 @@ export default async function InventoryPage() {
   const profile = await getStaffProfile()
   const canManage = isOwnerRole(profile.role)
   const items = await getInventory()
+  const extra = canManage ? await getArchivedAndFlags() : { archived: [], hasHistory: {} as Record<string, boolean>, flagsOk: false }
   // Pichle 30 din ka istemal dekh kar andaza: stock kitne din chalega
   const forecast: Record<string, number> = {}
   if (canManage) {
@@ -35,6 +53,9 @@ export default async function InventoryPage() {
     }
   }
 
+  const gapRes = canManage ? await (await createClient()).rpc('inventory_reconcile') : { data: [] as unknown[] }
+  const gaps = ((gapRes.data ?? []) as { inventory_id: string; item_name: string; quantity: number; movements_sum: number; opening_gap: number }[])
+
   const lowStock = items.filter((i) => Number(i.reorder_level) > 0 && Number(i.quantity) <= Number(i.reorder_level))
   const expiringSoon = items.filter((i) => {
     if (!i.expiry_date) return false
@@ -47,7 +68,7 @@ export default async function InventoryPage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <Link href="/admin/dashboard" className="mb-2 inline-block text-sm text-clinic-ink/50 hover:text-clinic-teal">← Home</Link>
-          <h1 className="font-display text-2xl font-semibold text-clinic-ink">Inventory &amp; Stock</h1>
+          <h1 className="font-display text-2xl font-semibold text-clinic-ink">Stock</h1>
           <p className="mt-1 text-sm text-clinic-ink/60">
             Dental materials aur homeopathic medicines ka stock.
           </p>
@@ -90,7 +111,17 @@ export default async function InventoryPage() {
       )}
 
       <div className="mt-6">
-        <InventoryManager items={items} canManage={canManage} forecast={forecast} />
+      {gaps.length > 0 && (
+        <details className="mt-3 rounded-xl border border-clinic-teal/15 bg-white p-3 text-sm" data-testid="stock-gap">
+          <summary className="cursor-pointer font-semibold text-clinic-ink/80">{gaps.length} item ka purana (opening) stock movement ke baghair darj hai</summary>
+          <p className="mt-2 text-xs text-clinic-ink/60">Ye purana stock hai jo pehle seedha likha gaya tha. Kuch badla nahi gaya. Agar ginti theek hai to &quot;Stock ginti&quot; karein, taake record saaf ho jaye.</p>
+          <ul className="mt-2 space-y-0.5 text-xs">
+            {gaps.map((g) => (<li key={g.inventory_id}>{g.item_name}: stock {Number(g.quantity)}, movements {Number(g.movements_sum)}, purana stock {Number(g.opening_gap)}</li>))}
+          </ul>
+        </details>
+      )}
+
+        <InventoryManager items={items} canManage={canManage} forecast={forecast} archived={extra.archived} hasHistory={extra.hasHistory} flagsOk={extra.flagsOk} />
       </div>
     </div>
   )

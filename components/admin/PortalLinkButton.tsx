@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { failed } from '@/lib/notifyError'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
@@ -60,10 +61,12 @@ export default function PortalLinkButton({
 
     setBusy(true)
     const supabase = createClient()
-    const { data } = await supabase.rpc('generate_portal_code')
+    const { data, error: genErr } = await supabase.rpc('generate_portal_code')
+    if (genErr) failed(genErr, 'Portal link banana')
 
     if (data) {
-      await supabase.from('patients').update({ portal_code: data }).eq('id', patientId)
+      const { error: upErr } = await supabase.from('patients').update({ portal_code: data }).eq('id', patientId)
+      failed(upErr, 'Portal link save karna')
     }
 
     setBusy(false)

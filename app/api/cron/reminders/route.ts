@@ -3,6 +3,7 @@ import { timingSafeEqual } from 'node:crypto'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { fcmConfigured, sendFcm } from '@/lib/fcm'
 import { CLINIC } from '@/clinic.config'
+import { numFmt } from '@/lib/karachi'
 
 export const dynamic = 'force-dynamic'
 
@@ -66,7 +67,7 @@ export async function GET(req: Request) {
     for (const b of (bal ?? []) as { patient_id: string; balance: number }[]) {
       const { data: p } = await sb.from('patients').select('portal_code').eq('id', b.patient_id).is('deleted_at', null).maybeSingle()
       if (!p) continue
-      await notify(b.patient_id, 'due', String(bucket), 'Hisaab ki yaad-dahani', `${CLINIC.name}: aap ka baqaya Rs. ${Math.round(Number(b.balance)).toLocaleString('en-US')} hai.`, p.portal_code ? `/portal/${p.portal_code}` : '/portal')
+      await notify(b.patient_id, 'due', String(bucket), 'Hisaab ki yaad-dahani', `${CLINIC.name}: aap ka baqaya Rs. ${numFmt(Math.round(Number(b.balance)))} hai.`, p.portal_code ? `/portal/${p.portal_code}` : '/portal')
     }
   }
 

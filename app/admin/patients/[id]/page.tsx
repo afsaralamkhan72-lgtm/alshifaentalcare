@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { toInternationalPKNumber } from '@/lib/phone'
 import { Suspense, cache } from 'react'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
@@ -183,7 +184,7 @@ export default async function PatientDetailPage({ params, searchParams }: Props)
   const alerts = medicalAlerts(history?.medical_history as Record<string, unknown> | undefined)
 
   const dob = patient.date_of_birth ? fmtDate(patient.date_of_birth) : null
-  const wa = digits ? `https://wa.me/92${digits.replace(/^0/, '').replace(/^92/, '')}` : null
+  const wa = digits ? `https://wa.me/${toInternationalPKNumber(patient.phone ?? '')}` : null
   const isDental = patient.department === 'dental'
 
   const readyRewards = await getReadyRewards(supabase, patient.id)
@@ -449,15 +450,14 @@ async function HistorySection({ patient, history, canClinical, canMoney, canRx }
     const label = t ? `${t.name}${t.teeth?.length ? ` (${t.teeth.join(', ')})` : ''}` : n.procedure
     if (label) done.set(n.clinical_visit_id, [...(done.get(n.clinical_visit_id) ?? []), label])
   }
-  const money = new Map<string, { total: number; paid: number }>()
+  const invMoney = new Map<string, { total: number; paid: number }>()
   for (const i of (invRes.data ?? []) as { clinical_visit_id: string; total: number; paid_amount: number }[]) {
-    const m = money.get(i.clinical_visit_id) ?? { total: 0, paid: 0 }
-    money.set(i.clinical_visit_id, { total: m.total + Number(i.total), paid: m.paid + Number(i.paid_amount) })
+    const m = invMoney.get(i.clinical_visit_id) ?? { total: 0, paid: 0 }
+    invMoney.set(i.clinical_visit_id, { total: m.total + Number(i.total), paid: m.paid + Number(i.paid_amount) })
   }
   const rxBy = new Map(((rxRes.data ?? []) as { id: string; clinical_visit_id: string }[]).map((r) => [r.clinical_visit_id, r.id]))
   const photoN = new Map<string, number>()
   for (const f of (phRes.data ?? []) as { clinical_visit_id: string }[]) photoN.set(f.clinical_visit_id, (photoN.get(f.clinical_visit_id) ?? 0) + 1)
-  const rs = (n: number) => `Rs. ${Number(n).toLocaleString('en-US')}`
 
   return (
     <div className="grid gap-3">
@@ -485,10 +485,10 @@ async function HistorySection({ patient, history, canClinical, canMoney, canRx }
                   </p>
                   {(v.diagnoses ?? []).length > 0 && <p className="text-xs text-clinic-teal">Dx: {(v.diagnoses ?? []).map((d) => d.text + (d.teeth?.length ? ` (${d.teeth.join(', ')})` : '')).join(' · ')}</p>}
                   {(done.get(v.id) ?? []).length > 0 && <p className="text-xs text-clinic-ink/80">Kaam: {(done.get(v.id) ?? []).join(' · ')}</p>}
-                  {money.get(v.id) && (
+                  {invMoney.get(v.id) && (
                     <p className="text-xs text-clinic-ink/70">
-                      Bill {rs(money.get(v.id)!.total)} · Mila {rs(money.get(v.id)!.paid)}
-                      {money.get(v.id)!.total - money.get(v.id)!.paid > 0 && <span className="text-red-600"> · Baqaya {rs(money.get(v.id)!.total - money.get(v.id)!.paid)}</span>}
+                      Bill {money(invMoney.get(v.id)!.total)} · Mila {money(invMoney.get(v.id)!.paid)}
+                      {invMoney.get(v.id)!.total - invMoney.get(v.id)!.paid > 0 && <span className="text-red-600"> · Baqaya {money(invMoney.get(v.id)!.total - invMoney.get(v.id)!.paid)}</span>}
                     </p>
                   )}
                   {(photoN.get(v.id) ?? 0) > 0 && <p className="text-xs text-clinic-ink/60">Tasveerein: {photoN.get(v.id)}</p>}
@@ -531,7 +531,7 @@ async function WorkspaceSection({
   const can = (p: string) => perms.includes(p)
   const today = todayKarachi()
   const canMoney = isOwner || can('billing.view')
-  // meri riyayat ki had (SQL chali na ho to purana rule: owner 100%, baqi 0%)
+  // meri discount ki had (SQL chali na ho to purana rule: owner 100%, baqi 0%)
   const dmRes = await supabase.rpc('my_discount_limit')
   const discountMax = dmRes.error || dmRes.data == null ? (isOwner ? 100 : 0) : Number(dmRes.data)
   const [treatments, chartRes, catRes, docRes, matRes, qualRes, cvRes, medRes, billRes, rxRes, photoRes, optRes, cvCnt, vnCnt, vsRes] = await Promise.all([
@@ -649,6 +649,7 @@ async function WorkspaceSection({
         owner: isOwner,
         discountMax,
         rx: can('prescriptions.write'),
+        lab: can('lab.manage'),
       }}
     />
   )

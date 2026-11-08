@@ -1,6 +1,6 @@
 import { CLINIC } from '@/clinic.config'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
-import { fmtDate } from '@/lib/karachi'
+import { fmtDate, numFmt } from '@/lib/karachi'
 import { renderTemplate, salaamLine, adabName, type Tpl } from '@/lib/messageTemplates'
 
 /**
@@ -35,7 +35,7 @@ export const apptReminderLink = (a: Appt, tpl?: Tpl) => link(a.phone, 'appt_remi
 export const apptRescheduleLink = (a: Appt, tpl?: Tpl) => link(a.phone, 'appt_reschedule', vars(a), tpl)
 
 export function paymentReminderLink(p: { full_name: string; phone: string; balance: number; gender?: string | null }, tpl?: Tpl) {
-  return link(p.phone, 'baqaya', { salaam: salaamLine(p.full_name, p.gender), adab: adabName(p.full_name, p.gender), name: p.full_name, balance: Number(p.balance).toLocaleString('en-US') }, tpl)
+  return link(p.phone, 'baqaya', { salaam: salaamLine(p.full_name, p.gender), adab: adabName(p.full_name, p.gender), name: p.full_name, balance: numFmt(Number(p.balance)) }, tpl)
 }
 
 export function messageLink(key: string, p: { full_name: string; phone: string; gender?: string | null }, extra: Record<string, string | number | null | undefined> = {}, tpl?: Tpl) {

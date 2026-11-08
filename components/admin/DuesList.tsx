@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useTemplates } from '@/lib/useTemplates'
 import { messageLink } from '@/lib/messages'
-import { todayKarachi } from '@/lib/karachi'
+import { todayKarachi, fmtDate, numFmt } from '@/lib/karachi'
 import { askReceipt } from '@/lib/receiptEvent'
 
 export interface DueRow {
@@ -28,10 +28,6 @@ export interface DueRow {
     portal_code: string | null
     deleted_at: string | null
   } | null
-}
-
-function fmt(d: string | null) {
-  return d ? new Date(d).toLocaleDateString('en-GB') : '—'
 }
 
 export default function DuesList({
@@ -89,11 +85,11 @@ export default function DuesList({
     const d = row.invoice_id ? Number(disc || 0) : 0
     if (got <= 0 && d <= 0) return
     if (d > 0 && !reason.trim()) {
-      setError('Riyayat ki wajah likhein')
+      setError('Discount ki wajah likhein')
       return
     }
     if (got + d > Number(row.balance_due)) {
-      setError(`Raqam baqaya (Rs. ${Number(row.balance_due).toLocaleString('en-US')}) se zyada hai`)
+      setError(`Raqam baqaya (Rs. ${numFmt(Number(row.balance_due))}) se zyada hai`)
       return
     }
 
@@ -134,37 +130,17 @@ export default function DuesList({
       return
     }
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    const newBalance = Math.max(0, Number(row.balance_due) - got)
-
-    // Purani entry ka baqaya kam karein
-    await supabase
-      .from('transactions')
-      .update({
-        balance_due: newBalance,
-        settled_at: newBalance === 0 ? new Date().toISOString() : null,
-      })
-      .eq('id', row.id)
-
-    // Aur aaj ki payment alag entry ke tor par record karein
-    await supabase.from('transactions').insert({
-      patient_id: row.patients?.id,
-      type: 'income',
-      category: 'treatment',
-      treatment_name: row.treatment_name
-        ? `${row.treatment_name} (baqaya)`
-        : 'Baqaya payment',
-      amount: got,
-      balance_due: 0,
-      payment_method: method,
-      treating_doctor: row.treating_doctor,
-      transaction_date: todayKarachi(),
-      settled_at: new Date().toISOString(),
-      recorded_by: user?.id ?? null,
+    const { error: dueErr } = await supabase.rpc('pay_legacy_due', {
+      p_tx_id: row.id,
+      p_amount: got,
+      p_method: method,
+      p_idempotency_key: payKey || null,
     })
+    if (dueErr) {
+      setBusyId(null)
+      setError(dueErr.message)
+      return
+    }
 
     setBusyId(null)
     setCollecting(null)
@@ -218,7 +194,7 @@ export default function DuesList({
         const link = messageLink(
           'baqaya',
           { full_name: p.full_name, phone: p.phone },
-          { balance: Number(row.balance_due).toLocaleString('en-US') },
+          { balance: numFmt(Number(row.balance_due)) },
           tpl
         ) + (p.portal_code ? encodeURIComponent(`\n\nApna record dekhein:\n${portalUrl}\nCode: ${p.portal_code}`) : '')
 
@@ -236,7 +212,7 @@ export default function DuesList({
                   {p.mr_number} · {p.phone}
                 </p>
                 <p className="mt-1 text-sm text-clinic-ink/80">
-                  {row.treatment_name ?? 'Treatment'} · {fmt(row.transaction_date)}
+                  {row.treatment_name ?? 'Treatment'} · {fmtDate(row.transaction_date)}
                   {row.treating_doctor ? ` · ${row.treating_doctor}` : ''}
                 </p>
                 <p className="mt-0.5 text-xs text-clinic-ink/60">
@@ -256,7 +232,7 @@ export default function DuesList({
                 >
                   Rs. {Number(row.balance_due).toLocaleString()}
                 </p>
-                <p className="text-xs text-clinic-ink/60">Due: {fmt(row.due_date)}</p>
+                <p className="text-xs text-clinic-ink/60">Due: {fmtDate(row.due_date)}</p>
               </div>
             </div>
 
@@ -310,7 +286,7 @@ export default function DuesList({
                     <input
                       type="number"
                       min={0}
-                      placeholder="Riyayat Rs."
+                      placeholder="Discount Rs."
                       value={disc}
                       onChange={(e) => {
                         setDisc(e.target.value)
@@ -322,7 +298,7 @@ export default function DuesList({
                       <input
                         value={reason}
                         onChange={(e) => setReason(e.target.value)}
-                        placeholder="Riyayat ki wajah"
+                        placeholder="Discount ki wajah"
                         className="min-w-0 flex-1 rounded-lg border border-clinic-teal/30 px-3 py-1.5 text-sm"
                       />
                     )}

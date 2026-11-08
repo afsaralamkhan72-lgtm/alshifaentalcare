@@ -38,7 +38,11 @@ export default function LabCaseForm({
   fixedPatient,
   treatments = [],
   defaultTreatmentId,
+  defaultTeeth,
+  defaultWork,
 }: {
+  defaultTeeth?: string[]
+  defaultWork?: string
   /** Treatment card ke "Lab case" button se: form khud khule aur ye treatment chuna ho */
   defaultTreatmentId?: string
   labs: LabOption[]
@@ -49,7 +53,7 @@ export default function LabCaseForm({
   treatments?: { id: string; name: string; teeth: string[] }[]
 }) {
   const router = useRouter()
-  const [open, setOpen] = useState(Boolean(defaultTreatmentId && treatments.some((t) => t.id === defaultTreatmentId)))
+  const [open, setOpen] = useState(Boolean(defaultTreatmentId && treatments.some((t) => t.id === defaultTreatmentId)) || Boolean(fixedPatient && defaultTeeth && defaultTeeth.length > 0))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -82,8 +86,8 @@ export default function LabCaseForm({
   const [saveLab, setSaveLab] = useState(true)
   const LAST_LAB = 'alshifa-last-lab'
 
-  const [workType, setWorkType] = useState(() => WORK_TYPES.find((w) => startT && new RegExp(w.split(' ')[0], 'i').test(startT.name)) ?? '')
-  const [teeth, setTeeth] = useState<string[]>(treatments.find((t) => t.id === defaultTreatmentId)?.teeth ?? [])
+  const [workType, setWorkType] = useState(() => WORK_TYPES.find((w) => { const n = startT?.name ?? defaultWork; return n && new RegExp(w.split(' ')[0], 'i').test(n) }) ?? '')
+  const [teeth, setTeeth] = useState<string[]>(treatments.find((t) => t.id === defaultTreatmentId)?.teeth ?? defaultTeeth ?? [])
   const [showChart, setShowChart] = useState(teeth.length === 0)
   const [shade, setShade] = useState('')
   const [material, setMaterial] = useState('')

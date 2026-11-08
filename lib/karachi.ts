@@ -9,8 +9,21 @@ export function addDays(dateStr: string, days: number): string {
   return d.toISOString().slice(0, 10)
 }
 
+/** Single money formatter: "Rs. 1,234.5" (max 2 decimals, no float noise). */
 export const money = (n: number | string | null | undefined) =>
-  `Rs. ${Number(n ?? 0).toLocaleString('en-US')}`
+  `Rs. ${Number(n ?? 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}`
 
-export const fmtDate = (d: string | null | undefined) =>
-  d ? new Date(`${d.slice(0, 10)}T00:00:00`).toLocaleDateString('en-GB') : '—'
+/** Whole-rupee version (salary slips, payroll) */
+export const moneyWhole = (n: number | string | null | undefined) =>
+  `Rs. ${Math.round(Number(n ?? 0)).toLocaleString('en-US')}`
+
+/** Number only, max 2 decimals (no "Rs.") */
+export const numFmt = (n: number | string | null | undefined) =>
+  Number(n ?? 0).toLocaleString('en-US', { maximumFractionDigits: 2 })
+
+/** dd/mm/yyyy. Date-only strings are kept as-is; timestamps are shown in Karachi time. */
+export const fmtDate = (d: string | null | undefined) => {
+  if (!d) return '—'
+  if (d.length <= 10) return new Date(`${d}T00:00:00`).toLocaleDateString('en-GB')
+  return new Date(d).toLocaleDateString('en-GB', { timeZone: 'Asia/Karachi' })
+}

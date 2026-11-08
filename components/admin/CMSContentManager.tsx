@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { failed } from '@/lib/notifyError'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
@@ -100,16 +101,18 @@ export default function CMSContentManager({
     if (!confirm('Pakka delete karna hai?')) return
     setBusyId(id)
     const supabase = createClient()
-    await supabase.from(table).delete().eq('id', id)
+    const { error } = await supabase.from(table).delete().eq('id', id)
     setBusyId(null)
+    if (failed(error, 'Delete karna')) return
     router.refresh()
   }
 
   async function toggleField(id: string, key: string, current: boolean) {
     setBusyId(id)
     const supabase = createClient()
-    await supabase.from(table).update({ [key]: !current }).eq('id', id)
+    const { error } = await supabase.from(table).update({ [key]: !current }).eq('id', id)
     setBusyId(null)
+    if (failed(error, 'Tabdeeli save karna')) return
     router.refresh()
   }
 

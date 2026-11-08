@@ -9,8 +9,9 @@ type P = { id: string; full_name: string; mr_number: string | null } | null
 type Program = { is_active: boolean; reset_after: number | null; allow_manual: boolean; google_review_url: string | null; facebook_url: string | null; instagram_url: string | null; tiktok_url: string | null }
 type Reward = { id: string; stamps_required: number; title: string; kind: 'percent' | 'amount' | 'free'; value: number | null; treatment_names: string[]; valid_days: number | null; max_per_patient: number | null; is_active: boolean }
 
-const kindText = (k: string, v: number | null) => (k === 'percent' ? `${v}% chhoot` : k === 'amount' ? `Rs.${v} chhoot` : 'Muft')
-const TABS = [['today', 'Aaj ke stamps'], ['members', 'Members'], ['ready', 'Inaam tayyar'], ['signups', 'Naye sign-up'], ['settings', 'Settings']] as const
+const kindText = (k: string, v: number | null) => (k === 'percent' ? `${v}% discount` : k === 'amount' ? `Rs.${v} discount` : 'Muft')
+const TABS = [['today', 'Aaj'], ['patients', 'Patients'], ['settings', 'Settings']] as const
+const SUBS = [['members', 'Members'], ['ready', 'Inaam tayyar'], ['signups', 'Naye sign-up']] as const
 
 export default function LoyaltyManager(props: {
   owner: boolean
@@ -23,6 +24,7 @@ export default function LoyaltyManager(props: {
 }) {
   const router = useRouter()
   const [tab, setTab] = useState<(typeof TABS)[number][0]>('today')
+  const [sub, setSub] = useState<(typeof SUBS)[number][0]>(props.ready.length ? 'ready' : 'members')
   const [msg, setMsg] = useState('')
   const [busy, setBusy] = useState(false)
   const sb = createClient()
@@ -45,13 +47,23 @@ export default function LoyaltyManager(props: {
           <a href="/admin/loyalty/poster" target="_blank" className="rounded-lg border border-clinic-teal px-3 py-2 text-sm font-medium text-clinic-teal">QR poster chhapein</a>
         )}
       </div>
-      {!props.program.is_active && <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">Loyalty abhi band hai{props.owner ? ' — Settings mein shuru karein.' : '.'}</p>}
+      {!props.program.is_active && (
+        <div className="mt-3 rounded-2xl bg-amber-50 p-4 text-amber-900">
+          <p className="text-sm font-semibold">Loyalty abhi band hai.</p>
+          <p className="mt-1 text-sm">Shuru karne par har visit par marez ko stamp milega aur stamp poore hone par Discount ka inaam.</p>
+          {props.owner && (
+            <button disabled={busy} onClick={() => run(() => sb.from('loyalty_program').update({ is_active: true }).eq('id', 1), 'Loyalty shuru ho gayi')} className="mt-3 rounded-full bg-clinic-teal px-6 py-3 text-base font-semibold text-white disabled:opacity-60">
+              Loyalty shuru karein
+            </button>
+          )}
+        </div>
+      )}
       {msg && <p role="status" className="mt-3 rounded-lg bg-clinic-ink/5 p-3 text-sm">{msg}</p>}
 
       <div className="mt-4 flex flex-wrap gap-2" role="tablist">
         {tabs.map(([k, l]) => (
           <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={`rounded-full px-4 py-2 text-sm font-medium ${tab === k ? 'bg-clinic-teal text-white' : 'bg-white text-clinic-ink ring-1 ring-clinic-ink/15'}`}>
-            {l}{k === 'ready' && props.ready.length ? ` (${props.ready.length})` : ''}{k === 'signups' && props.signups.length ? ` (${props.signups.length})` : ''}
+            {l}{k === 'patients' && props.ready.length + props.signups.length ? ` (${props.ready.length + props.signups.length})` : ''}
           </button>
         ))}
       </div>
@@ -79,7 +91,16 @@ export default function LoyaltyManager(props: {
           </div>
         )}
 
-        {tab === 'members' && (
+        {tab === 'patients' && (
+          <div className="mb-3 flex flex-wrap gap-2" role="tablist" aria-label="Patients ki qismen">
+            {SUBS.map(([k, l]) => (
+              <button key={k} role="tab" aria-selected={sub === k} onClick={() => setSub(k)} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${sub === k ? 'bg-clinic-ink text-white' : 'bg-clinic-mint text-clinic-ink'}`}>
+                {l}{k === 'ready' && props.ready.length ? ` (${props.ready.length})` : ''}{k === 'signups' && props.signups.length ? ` (${props.signups.length})` : ''}
+              </button>
+            ))}
+          </div>
+        )}
+        {tab === 'patients' && sub === 'members' && (
           <ul className="divide-y divide-clinic-ink/10">
             {props.members.length === 0 && <li className="py-2 text-sm text-clinic-ink/60">Abhi koi member nahi.</li>}
             {props.members.map((m) => (
@@ -88,7 +109,7 @@ export default function LoyaltyManager(props: {
           </ul>
         )}
 
-        {tab === 'ready' && (
+        {tab === 'patients' && sub === 'ready' && (
           <ul className="divide-y divide-clinic-ink/10">
             {props.ready.length === 0 && <li className="py-2 text-sm text-clinic-ink/60">Koi inaam tayyar nahi.</li>}
             {props.ready.map((u) => (
@@ -97,11 +118,11 @@ export default function LoyaltyManager(props: {
                 <button disabled={busy} onClick={() => run(() => sb.rpc('loyalty_redeem', { p_unlock: u.id, p_note: null }), 'Inaam de diya gaya darj ho gaya')} className="rounded-lg bg-clinic-teal px-3 py-2 text-white disabled:opacity-60">Inaam diya</button>
               </li>
             ))}
-            {props.ready.length > 0 && <li className="pt-3 text-xs text-clinic-ink/50">Chhoot lagane ka asaan tareeqa: marez ka visit mukammal karein, aane wali screen par “Chhoot lagayein” dabayein. Chhoot aur “Inaam diya” khud ho jate hain. Yahan “Inaam diya” sirf tab dabayein jab chhoot ke bajaye koi muft cheez di ho.</li>}
+            {props.ready.length > 0 && <li className="pt-3 text-xs text-clinic-ink/50">Discount lagane ka asaan tareeqa: marez ka visit mukammal karein, aane wali screen par “Discount lagayein” dabayein. Discount aur “Inaam diya” khud ho jate hain. Yahan “Inaam diya” sirf tab dabayein jab discount ke bajaye koi muft cheez di ho.</li>}
           </ul>
         )}
 
-        {tab === 'signups' && (
+        {tab === 'patients' && sub === 'signups' && (
           <ul className="divide-y divide-clinic-ink/10">
             {props.signups.length === 0 && <li className="py-2 text-sm text-clinic-ink/60">Koi naya sign-up nahi.</li>}
             {props.signups.map((g) => (
@@ -177,14 +198,19 @@ function Settings({ program, rewards, run, busy }: { program: Program; rewards: 
   return (
     <div className="space-y-6">
       <section className="space-y-3">
-        <label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" checked={p.is_active} onChange={(e) => set('is_active', e.target.checked)} /> Loyalty shuru hai</label>
-        <label className="block text-sm">Har kitne stamp ke baad card dobara shuru (khali = kabhi nahi)
+        <label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" checked={p.is_active} onChange={(e) => set('is_active', e.target.checked)} /> Loyalty shuru hai (band karne par stamp aur inaam ruk jate hain)</label>
+        <label className="block text-sm">Kitne stamp ke baad card dobara shuru ho (khali = kabhi nahi)
           <input type="number" min={2} max={50} className={inp} value={p.reset_after ?? ''} onChange={(e) => set('reset_after', e.target.value ? Number(e.target.value) : null)} /></label>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={p.allow_manual} onChange={(e) => set('allow_manual', e.target.checked)} /> Doctor haath se stamp laga sakay</label>
+        <details className="rounded-xl border border-clinic-ink/10 p-3">
+          <summary className="cursor-pointer text-sm font-semibold text-clinic-teal">Review aur social links (inaam milne par marez ko dikhte hain)</summary>
+          <div className="mt-3 space-y-3">
         {(['google_review_url', 'facebook_url', 'instagram_url', 'tiktok_url'] as const).map((k) => (
           <label key={k} className="block text-sm">{k === 'google_review_url' ? 'Google Business (review link)' : k.replace('_url', '')} link
             <input className={inp} placeholder="https://…" value={p[k] ?? ''} onChange={(e) => set(k, e.target.value)} /></label>
         ))}
+          </div>
+        </details>
         <button disabled={busy} onClick={() => {
           if (p.reset_after != null && (p.reset_after < 2 || p.reset_after > 50)) return alert('Reset 2 se 50 ke darmiyan hona chahiye')
           for (const k of ['google_review_url', 'facebook_url', 'instagram_url', 'tiktok_url'] as const) { const u = cleanUrl(p[k]); if (u && !/^https?:\/\//i.test(u)) return alert('Link https:// se shuru hona chahiye')}
@@ -205,9 +231,9 @@ function Settings({ program, rewards, run, busy }: { program: Program; rewards: 
         </ul>
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           <input aria-label="Stamp ginti" type="number" min={1} max={50} className={inp} placeholder="Kitne stamp par" value={r.stamps} onChange={(e) => setR({ ...r, stamps: e.target.value })} />
-          <input aria-label="Inaam ka naam" className={inp} placeholder="Inaam (jaise: Scaling 20% chhoot)" value={r.title} onChange={(e) => setR({ ...r, title: e.target.value })} />
+          <input aria-label="Inaam ka naam" className={inp} placeholder="Inaam (jaise: Scaling 20% discount)" value={r.title} onChange={(e) => setR({ ...r, title: e.target.value })} />
           <select aria-label="Qisam" className={inp} value={r.kind} onChange={(e) => setR({ ...r, kind: e.target.value as Reward['kind'] })}>
-            <option value="percent">Fee % chhoot</option><option value="amount">Rs. chhoot</option><option value="free">Muft</option>
+            <option value="percent">Fee % discount</option><option value="amount">Rs. discount</option><option value="free">Muft</option>
           </select>
           {r.kind !== 'free' && <input aria-label="Qeemat" type="number" min={1} className={inp} placeholder={r.kind === 'percent' ? '% (1-100)' : 'Rs.'} value={r.value} onChange={(e) => setR({ ...r, value: e.target.value })} />}
           <input aria-label="Kis treatment par" className={inp} placeholder="Kis treatment par (koma se, khali = koi bhi)" value={r.treatments} onChange={(e) => setR({ ...r, treatments: e.target.value })} />
@@ -218,7 +244,7 @@ function Settings({ program, rewards, run, busy }: { program: Program; rewards: 
           const n = Number(r.stamps)
           if (!Number.isInteger(n) || n < 1 || n > 50) return alert('Stamp ginti 1 se 50 ke darmiyan likhein')
           if (!r.title.trim()) return alert('Inaam ka naam likhein')
-          if (r.kind !== 'free' && !(Number(r.value) > 0)) return alert('Chhoot ki qeemat likhein')
+          if (r.kind !== 'free' && !(Number(r.value) > 0)) return alert('Discount ki qeemat likhein')
           if (r.kind === 'percent' && Number(r.value) > 100) return alert('Percent 100 se zyada nahi ho sakta')
           run(async () => {
             const res = await sb.from('loyalty_rewards').insert({ stamps_required: n, title: r.title.trim(), kind: r.kind, value: r.kind === 'free' ? null : Number(r.value), treatment_names: r.treatments.split(',').map((x) => x.trim()).filter(Boolean), valid_days: r.days ? Number(r.days) : null, max_per_patient: r.max ? Number(r.max) : null })

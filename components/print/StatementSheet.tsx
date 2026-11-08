@@ -101,7 +101,7 @@ export default function StatementSheet({ d, logo, logoUrl, layout }: { d: Statem
           <p style={h2}>Kis cheez ka kitna aaya, kitna diya</p>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead style={{ display: 'table-header-group' }}>
-              <tr><th style={th}>Bill</th><th style={th}>Cheez</th><th style={{ ...th, ...r }}>Aaya</th><th style={{ ...th, ...r }}>Riyayat</th><th style={{ ...th, ...r }}>Diya</th><th style={{ ...th, ...r }}>Raha</th></tr>
+              <tr><th style={th}>Bill</th><th style={th}>Cheez</th><th style={{ ...th, ...r }}>Aaya</th><th style={{ ...th, ...r }}>Discount</th><th style={{ ...th, ...r }}>Diya</th><th style={{ ...th, ...r }}>Raha</th></tr>
             </thead>
             <tbody>
               {d.bills.length === 0 && <tr><td colSpan={6} style={{ ...td, textAlign: 'center', opacity: 0.6 }}>Koi bill nahi.</td></tr>}

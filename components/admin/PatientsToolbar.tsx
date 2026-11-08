@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { failed } from '@/lib/notifyError'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import PatientExtraFields, { EXTRA_EMPTY, ageFrom, extraToDb, type Extra } from './PatientExtraFields'
@@ -137,9 +138,10 @@ export default function PatientsToolbar({
         .ilike('phone', `%${tail}%`)
         .limit(1)
       if (ex && ex.length > 0) {
-        await supabase.from('appointments').update({ patient_id: created.id, status: 'arrived', arrived_at: new Date().toISOString() }).eq('id', (ex[0] as { id: string }).id)
+        const { error: apErr } = await supabase.from('appointments').update({ patient_id: created.id, status: 'arrived', arrived_at: new Date().toISOString() }).eq('id', (ex[0] as { id: string }).id)
+        failed(apErr, 'Patient ban gaya, magar aaj ki list mein daalna')
       } else {
-        await supabase.from('appointments').insert({
+        const { error: apErr2 } = await supabase.from('appointments').insert({
           patient_name: form.full_name,
           phone: form.phone,
           department: form.department,
@@ -149,6 +151,7 @@ export default function PatientsToolbar({
           arrived_at: new Date().toISOString(),
           source: 'walk-in',
         })
+        failed(apErr2, 'Patient ban gaya, magar aaj ki list mein daalna')
       }
     }
     setAllergy('')

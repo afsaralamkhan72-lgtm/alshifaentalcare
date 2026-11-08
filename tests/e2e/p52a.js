@@ -1,0 +1,26 @@
+const L=require('./lib2.js');
+(async()=>{const r=await L.open(1280);const p=r.p||r.page||r;
+const pid=await L.newPatient(p,'Card Test '+Date.now().toString().slice(-4),'0302'+String(Date.now()).slice(-7));
+await p.goto('http://localhost:3055/admin/patients/'+pid,{waitUntil:'domcontentloaded'});await p.waitForTimeout(1800);
+const st=p.getByRole('button',{name:/Naya visit shuru/});if(await st.count()){await st.click();await p.waitForTimeout(800)}
+await p.getByRole('button',{name:'Agla →'}).click();await p.waitForTimeout(900);
+await p.locator('[aria-label^="Upper Right Central Incisor"]').first().click();await p.waitForTimeout(300);
+await p.locator('[aria-label^="Upper Left Central Incisor"]').first().click();await p.waitForTimeout(500);
+console.log('cards',await p.locator('[data-testid=tooth-card]').count());
+const c=p.locator('[data-testid=tooth-card]');
+await c.nth(0).getByRole('button',{name:/Dental caries/}).click();
+await c.nth(0).getByRole('button',{name:/\+ Composite Filling/}).first().click();
+await c.nth(1).getByRole('button',{name:/Pulp necrosis/}).click();
+console.log((await c.nth(1).innerText()).replace(/\n+/g,' | ').slice(0,700));await c.nth(1).getByRole('button',{name:/Root Canal/}).first().click();await p.waitForTimeout(500);
+console.log('--- cards text ---');console.log((await c.nth(0).innerText()).replace(/\n+/g,' | ').slice(0,500));console.log((await c.nth(1).innerText()).replace(/\n+/g,' | ').slice(0,500));
+await p.screenshot({path:'/tmp/prst/p52a.png',fullPage:false});
+await p.getByRole('button',{name:'Agla →'}).click();await p.waitForTimeout(600);
+await p.getByRole('button',{name:'Agla →'}).click();await p.waitForTimeout(800);
+console.log('--- bill ---');const t=await p.locator('main').innerText();console.log(t.slice(t.indexOf('Bill'),t.indexOf('Bill')+500).replace(/\n+/g,' | '));
+await p.getByRole('button',{name:/Poora mil gaya/}).click();
+await p.getByRole('button',{name:/Visit khatam karein/}).click();await p.waitForTimeout(3500);
+console.log('done',await p.evaluate(()=>document.body.innerText.includes('Aaj ka visit mukammal ho gaya')));
+console.log(L.q(`select name,teeth,price,status from patient_treatments where patient_id='${pid}' order by created_at`));
+console.log(L.q(`select total,paid_amount,balance from invoices where patient_id='${pid}'`));
+console.log(L.q(`select diagnoses::text, findings::text from clinical_visits where patient_id='${pid}' order by created_at desc limit 1`));
+process.exit(0)})().catch(e=>{console.log('FAIL',e.message.slice(0,400));process.exit(1)});

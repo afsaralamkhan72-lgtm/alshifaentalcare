@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { toInternationalPKNumber } from '@/lib/phone'
 
 export interface ReminderRow {
   key: string
@@ -12,7 +13,7 @@ export interface ReminderRow {
 }
 
 function digits(p: string) {
-  return p.replace(/\D/g, '').replace(/^0/, '92')
+  return toInternationalPKNumber(p)
 }
 
 export default function ReminderList({ rows, empty }: { rows: ReminderRow[]; empty: string }) {

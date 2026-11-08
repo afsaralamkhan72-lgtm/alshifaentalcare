@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { failed } from '@/lib/notifyError'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { compressImage } from '@/lib/image-compress'
@@ -116,8 +117,10 @@ export default function PatientPhotoGallery({
   async function remove(photo: PatientPhoto) {
     if (!confirm('Ye photo delete karein?')) return
     const supabase = createClient()
-    await supabase.storage.from(BUCKET).remove([photo.storage_path])
-    await supabase.from('patient_photos').delete().eq('id', photo.id)
+    const { error: stErr } = await supabase.storage.from(BUCKET).remove([photo.storage_path])
+    if (failed(stErr, 'Photo file hatana')) return
+    const { error: dbErr } = await supabase.from('patient_photos').delete().eq('id', photo.id)
+    if (failed(dbErr, 'Photo ka record hatana')) return
     router.refresh()
   }
 

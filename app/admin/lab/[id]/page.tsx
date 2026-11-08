@@ -5,13 +5,15 @@ import LabOrderActions from '@/components/admin/LabOrderActions'
 import LabMoney from '@/components/admin/LabMoney'
 import LabReports from '@/components/admin/LabReports'
 import type { MediaItem } from '@/components/admin/MediaStrip'
-import { getPermissions, requirePerm } from '@/lib/auth'
+import { getPermissions, requirePerm, getStaffProfile, isOwnerRole } from '@/lib/auth'
+import LabCaseDelete from '@/components/admin/LabCaseDelete'
 import ClinicLogo from '@/components/ClinicLogo'
 import { toothTitle as toothLabel } from '@/lib/teeth'
 import { CLINIC } from '@/clinic.config'
 import LabPatientNotify from '@/components/admin/LabPatientNotify'
 import { messageLink } from '@/lib/messages'
 import { mapTemplates } from '@/lib/messageTemplates'
+import { fmtDate, numFmt } from '@/lib/karachi'
 
 interface LabCase {
   id: string
@@ -32,10 +34,6 @@ interface LabCase {
   cost: number | null
   lab_paid: number | null
   patients: { full_name: string; mr_number: string | null; age: number | null; gender: string | null } | null
-}
-
-function fmt(d: string | null) {
-  return d ? new Date(d).toLocaleDateString('en-GB') : '—'
 }
 
 export default async function LabOrderPage({ params }: { params: Promise<{ id: string }> }) {
@@ -65,6 +63,7 @@ export default async function LabOrderPage({ params }: { params: Promise<{ id: s
 
   const clinic = (clinicRow?.value ?? {}) as Record<string, string>
   const perms = await getPermissions()
+  const isOwner = isOwnerRole((await getStaffProfile()).role)
   const [{ data: files }, { data: tr }] = await Promise.all([
     supabase.from('patient_photos').select('id, storage_path, caption, category').eq('lab_case_id', c.id).order('created_at'),
     c.treatment_id ? supabase.from('patient_treatments').select('name, price').eq('id', c.treatment_id).maybeSingle() : Promise.resolve({ data: null }),
@@ -91,6 +90,11 @@ export default async function LabOrderPage({ params }: { params: Promise<{ id: s
             Patient profile →
           </Link>
         )}
+        {isOwner && (
+          <span className="ml-auto">
+            <LabCaseDelete id={c.id} caseNumber={c.case_number ?? 'Ye case'} paid={Number(c.lab_paid ?? 0)} goTo="/admin/lab" small />
+          </span>
+        )}
       </div>
 
       <div className="mt-3">
@@ -100,8 +104,8 @@ export default async function LabOrderPage({ params }: { params: Promise<{ id: s
         )}
         {tr && Number((tr as { price?: number }).price ?? 0) > 0 && perms.includes('billing.view') && (
           <p className="mb-4 rounded-xl border border-clinic-teal/10 bg-white p-3 text-sm text-clinic-ink/80 print:hidden">
-            Is treatment ({(tr as { name: string }).name}) ki qeemat Rs. {Number((tr as { price: number }).price).toLocaleString('en-US')} · lab ka kharcha Rs. {Number(c.cost ?? 0).toLocaleString('en-US')} ·{' '}
-            <b>bachat Rs. {(Number((tr as { price: number }).price) - Number(c.cost ?? 0)).toLocaleString('en-US')}</b>
+            Is treatment ({(tr as { name: string }).name}) ki qeemat Rs. {numFmt(Number((tr as { price: number }).price))} · lab ka kharcha Rs. {numFmt(Number(c.cost ?? 0))} ·{' '}
+            <b>bachat Rs. {numFmt((Number((tr as { price: number }).price) - Number(c.cost ?? 0)))}</b>
           </p>
         )}
         <LabMoney caseId={c.id} status={c.status} cost={Number(c.cost ?? 0)} labPaid={Number(c.lab_paid ?? 0)} />
@@ -157,7 +161,7 @@ export default async function LabOrderPage({ params }: { params: Promise<{ id: s
           <div>
             <p className="text-xs text-clinic-ink/50">Patient</p>
             <p className="font-medium text-clinic-ink">
-              {patient?.full_name} {patient?.mr_number ? `(${patient.mr_number})` : ''}
+              {patient?.full_name ?? 'Patient ka naam nahi'} {patient?.mr_number ? `(${patient.mr_number})` : ''}
             </p>
           </div>
           <div>
@@ -172,11 +176,11 @@ export default async function LabOrderPage({ params }: { params: Promise<{ id: s
           </div>
           <div>
             <p className="text-xs text-clinic-ink/50">Impression Date</p>
-            <p className="font-medium text-clinic-ink">{fmt(c.impression_date)}</p>
+            <p className="font-medium text-clinic-ink">{fmtDate(c.impression_date)}</p>
           </div>
           <div>
             <p className="text-xs text-clinic-ink/50">Due Date</p>
-            <p className="font-medium text-clinic-ink">{fmt(c.due_date)}</p>
+            <p className="font-medium text-clinic-ink">{fmtDate(c.due_date)}</p>
           </div>
         </div>
 

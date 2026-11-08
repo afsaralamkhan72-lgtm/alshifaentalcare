@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requireAnyPerm } from '@/lib/auth'
 import { fmtDate, money, todayKarachi } from '@/lib/karachi'
+import SectionTabs from '@/components/admin/SectionTabs'
 
 export default async function InvoicesPage({
   searchParams,
@@ -71,6 +72,7 @@ export default async function InvoicesPage({
 
   return (
     <div>
+      <SectionTabs which="accounts" />
       <h1 className="font-display text-2xl font-semibold text-clinic-ink">Invoices</h1>
       <p className="mt-1 text-sm text-clinic-ink/60">
         Naye invoice. Naya invoice patient ke page par "Complete + Charge" se banta hai.

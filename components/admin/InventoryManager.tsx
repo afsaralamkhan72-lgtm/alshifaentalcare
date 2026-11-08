@@ -16,6 +16,8 @@ export interface InventoryItem {
   supplier: string | null
   qualitative?: boolean
   company?: string | null
+  item_group?: string | null
+  description?: string | null
 }
 
 interface Movement {
@@ -34,6 +36,10 @@ const KIND_LABEL: Record<string, string> = {
   purchase: 'Kharid',
   usage: 'Istemal',
   count_correction: 'Ginti ki durusti',
+  merge_in: 'Merge (doosre item se aaya)',
+  merge_out: 'Merge (is item mein mil gaya)',
+  return_supplier: 'Supplier ko wapas',
+  damaged: 'Kharab / toota',
 }
 
 const INITIAL = {
@@ -46,7 +52,7 @@ const INITIAL = {
   supplier: '',
 }
 
-type Panel = { id: string; mode: 'use' | 'buy' | 'history' } | null
+type Panel = { id: string; mode: 'use' | 'buy' | 'history' | 'ret' } | null
 
 /**
  * Stock ab seedha +/- nahi hota. Har tabdeeli ek record (movement) banati hai:
@@ -56,8 +62,14 @@ export default function InventoryManager({
   items,
   canManage,
   forecast = {},
+  archived = [],
+  hasHistory = {},
+  flagsOk = false,
 }: {
   items: InventoryItem[]
+  archived?: { id: string; item_name: string; category: string; quantity: number; unit: string | null }[]
+  hasHistory?: Record<string, boolean>
+  flagsOk?: boolean
   canManage: boolean
   /** item id -> kitne din ka stock bacha (pichle 30 din ke istemal ke hisaab se) */
   forecast?: Record<string, number>
@@ -78,6 +90,9 @@ export default function InventoryManager({
   const [expiry, setExpiry] = useState('')
   const [billPath, setBillPath] = useState<string | null>(null)
   const [rowMsg, setRowMsg] = useState('')
+  const [retKind, setRetKind] = useState<'damaged' | 'return_supplier'>('damaged')
+  const [retNote, setRetNote] = useState('')
+  const [retKey, setRetKey] = useState('')
   const [moves, setMoves] = useState<Record<string, Movement[]>>({})
 
   function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
@@ -86,8 +101,13 @@ export default function InventoryManager({
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault()
-    setSaving(true)
     setError('')
+    const nm = form.item_name.trim().toLowerCase()
+    if (items.some((i) => i.category === form.category && i.item_name.trim().toLowerCase() === nm)) {
+      setError('Ye item is category mein pehle se maujood hai. Dohra na banayein: list mein usi item par "Kharid" ya "Badlein" karein.')
+      return
+    }
+    setSaving(true)
 
     const supabase = createClient()
     const { data: created, error: insertError } = await supabase
@@ -132,8 +152,9 @@ export default function InventoryManager({
     router.refresh()
   }
 
-  function openPanel(id: string, mode: 'use' | 'buy' | 'history', item?: InventoryItem) {
+  function openPanel(id: string, mode: 'use' | 'buy' | 'history' | 'ret', item?: InventoryItem) {
     setRowMsg('')
+    setRetKind('damaged'); setRetNote(''); setRetKey(crypto.randomUUID())
     setQty('')
     setCost('')
     setSupplier(item?.supplier ?? '')
@@ -170,6 +191,29 @@ export default function InventoryManager({
     router.refresh()
   }
 
+  async function submitReturn(item: InventoryItem) {
+    const n = Number(qty)
+    if (!n || n <= 0) return setRowMsg('Qty likhein.')
+    if (n > Number(item.quantity)) return setRowMsg(`Itna stock maujood nahi (${item.quantity}).`)
+    if (retKind === 'damaged' && !retNote.trim()) return setRowMsg('Kharabi ki wajah likhein.')
+    if (retKind === 'return_supplier' && Number(cost || 0) < 0) return setRowMsg('Raqam ghalat hai.')
+    setSaving(true)
+    setRowMsg('')
+    const { error: err } = await createClient().rpc('stock_return_or_damage', {
+      p_inventory_id: item.id,
+      p_qty: n,
+      p_kind: retKind,
+      p_refund: retKind === 'return_supplier' ? Number(cost || 0) : 0,
+      p_method: method,
+      p_note: retNote.trim() || null,
+      p_key: retKey || null,
+    })
+    setSaving(false)
+    if (err) return setRowMsg(err.message)
+    setPanel(null)
+    router.refresh()
+  }
+
   async function submitBuy(item: InventoryItem) {
     const n = Number(qty)
     const u = Number(upp || 1)
@@ -198,11 +242,36 @@ export default function InventoryManager({
     router.refresh()
   }
 
-  async function deactivate(item: InventoryItem) {
-    if (!window.confirm(`"${item.item_name}" ko list se hata dein? Record rehta hai.`)) return
-    const supabase = createClient()
-    await supabase.from('inventory').update({ is_active: false }).eq('id', item.id)
+  const [edit, setEdit] = useState<null | { id: string; item_name: string; category: InventoryItem['category']; unit: string; reorder_level: string; supplier: string; item_group: string; description: string }>(null)
+  const [mergeFor, setMergeFor] = useState<string | null>(null)
+  const [mergeKeep, setMergeKeep] = useState('')
+  const [itemMsg, setItemMsg] = useState('')
+
+  async function saveEdit() {
+    if (!edit) return
+    setSaving(true)
+    setItemMsg('')
+    const { error: err } = await createClient().rpc('update_inventory_item', {
+      p_id: edit.id, p_name: edit.item_name, p_category: edit.category, p_unit: edit.unit,
+      p_reorder: Number(edit.reorder_level || 0), p_supplier: edit.supplier, p_group: edit.item_group, p_description: edit.description,
+    })
+    setSaving(false)
+    if (err) return setItemMsg(err.message)
+    setEdit(null)
     router.refresh()
+  }
+
+  async function itemRpc(fn: string, args: Record<string, unknown>, confirmText: string) {
+    if (!window.confirm(confirmText)) return
+    setItemMsg('')
+    const { error: err } = await createClient().rpc(fn, args)
+    if (err) return setItemMsg(err.message)
+    setMergeFor(null)
+    router.refresh()
+  }
+
+  async function deactivate(item: InventoryItem) {
+    await itemRpc('set_inventory_active', { p_id: item.id, p_active: false }, `"${item.item_name}" ko band (archive) karein? Stock aur purana record mehfooz rehta hai, sirf list se hat jata hai. Archived list se wapas la sakte hain.`)
   }
 
   const inputClass =
@@ -280,7 +349,7 @@ export default function InventoryManager({
               return (
                 <Fragment key={item.id}>
                   <tr className="border-t border-clinic-teal/10">
-                    <td className="px-4 py-3 font-medium text-clinic-ink">{item.item_name}</td>
+                    <td className="px-4 py-3 font-medium text-clinic-ink">{item.item_name}{item.item_group && <span className="block text-[11px] font-normal text-clinic-ink/50">{item.item_group}</span>}</td>
                     <td className="px-4 py-3 capitalize text-clinic-ink/60">{item.category}</td>
                     <td className="px-4 py-3">
                       <span className={low ? 'font-semibold text-red-600' : 'text-clinic-ink'}>
@@ -308,6 +377,7 @@ export default function InventoryManager({
                       <div className="flex justify-end gap-3 text-xs font-semibold text-clinic-teal">
                         {canManage && <button onClick={() => openPanel(item.id, 'use')}>Istemal</button>}
                         {canManage && <button onClick={() => openPanel(item.id, 'buy', item)}>Kharid</button>}
+                        {canManage && <button onClick={() => openPanel(item.id, 'ret')} data-testid="item-return">Wapas / Kharab</button>}
                         {canManage && <button onClick={() => openPanel(item.id, 'history')}>History</button>}
                         {canManage && (
                           <button
@@ -321,10 +391,74 @@ export default function InventoryManager({
                             {item.qualitative ? 'Visit mein doctor chunta ✓' : 'Visit mein doctor chune'}
                           </button>
                         )}
+                        {canManage && (
+                          <button
+                            onClick={() => setEdit({ id: item.id, item_name: item.item_name, category: item.category, unit: item.unit ?? '', reorder_level: String(item.reorder_level ?? 0), supplier: item.supplier ?? '', item_group: item.item_group ?? '', description: item.description ?? '' })}
+                            data-testid="item-edit"
+                          >
+                            Badlein
+                          </button>
+                        )}
+                        {canManage && flagsOk && <button onClick={() => { setMergeFor(mergeFor === item.id ? null : item.id); setMergeKeep(''); setItemMsg('') }} data-testid="item-merge" className="text-clinic-ink/60">Milayein</button>}
                         {canManage && <button onClick={() => deactivate(item)} className="text-clinic-ink/40">Band</button>}
+                        {canManage && flagsOk && !hasHistory[item.id] && (
+                          <button onClick={() => itemRpc('delete_inventory_item', { p_id: item.id }, `"${item.item_name}" delete karein? Is par koi record nahi, ye Recycle Bin mein chala jayega.`)} data-testid="item-delete" className="text-red-600">Delete</button>
+                        )}
                       </div>
                     </td>
                   </tr>
+
+                  {edit?.id === item.id && (
+                    <tr className="bg-clinic-sand/60">
+                      <td colSpan={6} className="px-4 py-3" data-testid="item-edit-form">
+                        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                          <input value={edit.item_name} onChange={(e) => setEdit({ ...edit, item_name: e.target.value })} placeholder="Item ka naam" aria-label="Item ka naam" className={smallInput} />
+                          <select value={edit.category} onChange={(e) => setEdit({ ...edit, category: e.target.value as InventoryItem['category'] })} aria-label="Category" className={smallInput}>
+                            <option value="dental">Dental</option>
+                            <option value="homeopathic">Homeopathic</option>
+                            <option value="general">General</option>
+                          </select>
+                          <input value={edit.unit} onChange={(e) => setEdit({ ...edit, unit: e.target.value })} placeholder="Unit (pcs, box...)" aria-label="Unit" className={smallInput} />
+                          <input type="number" step="0.01" min={0} value={edit.reorder_level} onChange={(e) => setEdit({ ...edit, reorder_level: e.target.value })} placeholder="Alert at" aria-label="Alert at" className={smallInput} />
+                          <input value={edit.supplier} onChange={(e) => setEdit({ ...edit, supplier: e.target.value })} placeholder="Supplier" aria-label="Supplier" className={smallInput} />
+                          <input value={edit.item_group} onChange={(e) => setEdit({ ...edit, item_group: e.target.value })} placeholder="Group" aria-label="Group" className={smallInput} />
+                          <input value={edit.description} onChange={(e) => setEdit({ ...edit, description: e.target.value })} placeholder="Tafseel (optional)" aria-label="Tafseel" className={`${smallInput} sm:col-span-2`} />
+                        </div>
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <button onClick={saveEdit} disabled={saving || !edit.item_name.trim()} className="rounded-full bg-clinic-teal px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-50">Save</button>
+                          <button onClick={() => { setEdit(null); setItemMsg('') }} className="text-xs text-clinic-ink/50">Cancel</button>
+                          {itemMsg && <span className="text-xs text-red-600">{itemMsg}</span>}
+                        </div>
+                        <p className="mt-1 text-[11px] text-clinic-ink/50">Naam ya tafseel badalne se purane kharid, istemal aur stock ke record nahi badlte; wo isi item se jude rehte hain. Stock yahan se nahi badalta (kharid / istemal / ginti se badalta hai).</p>
+                      </td>
+                    </tr>
+                  )}
+
+                  {mergeFor === item.id && (
+                    <tr className="bg-clinic-sand/60">
+                      <td colSpan={6} className="px-4 py-3" data-testid="item-merge-form">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-xs text-clinic-ink/70">&quot;{item.item_name}&quot; dohra hai. Ise is item mein milayein:</span>
+                          <select value={mergeKeep} onChange={(e) => setMergeKeep(e.target.value)} aria-label="Asli item" className={smallInput}>
+                            <option value="">Asli item chunein</option>
+                            {items.filter((o) => o.id !== item.id && o.category === item.category && (o.unit ?? '') === (item.unit ?? '')).map((o) => (
+                              <option key={o.id} value={o.id}>{o.item_name} ({Number(o.quantity)} {o.unit})</option>
+                            ))}
+                          </select>
+                          <button
+                            disabled={!mergeKeep}
+                            onClick={() => itemRpc('merge_inventory_items', { p_keep: mergeKeep, p_remove: item.id }, `"${item.item_name}" ka ${Number(item.quantity)} ${item.unit ?? ''} stock chune hue asli item mein jur jayega. "${item.item_name}" band ho jayega, lekin uski kharid/istemal ki puri history mehfooz rahegi. Merge karein?`)}
+                            className="rounded-full bg-clinic-teal px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-40"
+                          >
+                            Milayein
+                          </button>
+                          <button onClick={() => setMergeFor(null)} className="text-xs text-clinic-ink/50">Cancel</button>
+                          {itemMsg && <span className="text-xs text-red-600">{itemMsg}</span>}
+                        </div>
+                        <p className="mt-1 text-[11px] text-clinic-ink/50">Sirf wohi items dikhte hain jin ki category aur unit aik jaisi hai.</p>
+                      </td>
+                    </tr>
+                  )}
 
                   {p?.mode === 'use' && (
                     <tr className="bg-clinic-sand/60">
@@ -336,6 +470,36 @@ export default function InventoryManager({
                           <button onClick={() => setPanel(null)} className="text-xs text-clinic-ink/50">Cancel</button>
                           {rowMsg && <span className="text-xs text-red-600">{rowMsg}</span>}
                         </div>
+                      </td>
+                    </tr>
+                  )}
+
+                  {p?.mode === 'ret' && (
+                    <tr className="bg-clinic-sand/60">
+                      <td colSpan={6} className="px-4 py-3" data-testid="item-return-form">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <select value={retKind} onChange={(e) => setRetKind(e.target.value as 'damaged' | 'return_supplier')} aria-label="Qism" className={smallInput}>
+                            <option value="damaged">Kharab / toota / expire</option>
+                            <option value="return_supplier">Supplier ko wapas kiya</option>
+                          </select>
+                          <input autoFocus type="number" step="0.01" min={0} value={qty} onChange={(e) => setQty(e.target.value)} placeholder={`Kitna (${item.unit})`} aria-label="Kitna" className={`${smallInput} w-28`} />
+                          {retKind === 'return_supplier' && (
+                            <>
+                              <input type="number" min={0} value={cost} onChange={(e) => setCost(e.target.value)} placeholder="Wapas mili raqam Rs." aria-label="Wapas mili raqam" className={`${smallInput} w-40`} />
+                              <select value={method} onChange={(e) => setMethod(e.target.value)} className={smallInput}>
+                                <option value="cash">Cash</option>
+                                <option value="bank">Bank</option>
+                                <option value="easypaisa">EasyPaisa</option>
+                                <option value="jazzcash">JazzCash</option>
+                              </select>
+                            </>
+                          )}
+                          <input value={retNote} onChange={(e) => setRetNote(e.target.value)} placeholder={retKind === 'damaged' ? 'Wajah (zaroori)' : 'Wajah / bill (optional)'} aria-label="Wajah" className={`${smallInput} w-56`} />
+                          <button onClick={() => submitReturn(item)} disabled={saving} className="rounded-full bg-clinic-teal px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-50">Save</button>
+                          <button onClick={() => setPanel(null)} className="text-xs text-clinic-ink/50">Cancel</button>
+                          {rowMsg && <span className="w-full text-xs text-red-600">{rowMsg}</span>}
+                        </div>
+                        <p className="mt-1 text-[11px] text-clinic-ink/50">Stock kam hota hai aur History mein likha jata hai. Supplier se paise wapas mile to wo Income (Supplier Refund) mein likhe jate hain (sirf owner). Kharab maal par naya kharcha nahi banta kyunki kharid ka kharcha pehle likha ja chuka hai.</p>
                       </td>
                     </tr>
                   )}
@@ -397,6 +561,20 @@ export default function InventoryManager({
           </tbody>
         </table>
       </div>
+      {canManage && archived.length > 0 && (
+        <details className="mt-4 rounded-2xl border border-clinic-teal/10 bg-white p-4" data-testid="archived-items">
+          <summary className="cursor-pointer text-sm font-semibold text-clinic-ink/70">Band (archived) items: {archived.length}</summary>
+          <ul className="mt-2 space-y-1 text-sm">
+            {archived.map((a) => (
+              <li key={a.id} className="flex flex-wrap items-center justify-between gap-2">
+                <span>{a.item_name} <span className="text-xs text-clinic-ink/50">({Number(a.quantity)} {a.unit})</span></span>
+                <button onClick={() => itemRpc('set_inventory_active', { p_id: a.id, p_active: true }, `"${a.item_name}" dobara chalu karein?`)} className="text-xs font-semibold text-clinic-teal">Dobara chalu karein</button>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+      {itemMsg && !edit && !mergeFor && <p className="mt-2 text-sm text-red-600">{itemMsg}</p>}
     </>
   )
 }

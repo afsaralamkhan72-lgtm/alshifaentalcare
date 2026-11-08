@@ -2,12 +2,8 @@ import Link from 'next/link'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
 import { CLINIC } from '@/clinic.config'
-import { todayKarachi } from '@/lib/karachi'
+import { todayKarachi, fmtDate, numFmt, money } from '@/lib/karachi'
 import { toothTitle as toothLabel } from '@/lib/teeth'
-
-function fmt(d: string | null) {
-  return d ? new Date(d).toLocaleDateString('en-GB') : '—'
-}
 
 export interface PortalPatient { id: string; full_name: string; mr_number: string | null; phone: string; department: string }
 
@@ -116,7 +112,7 @@ export default async function PortalView({ patient, supabase, rxHref }: { patien
       if (v.procedure) (procByVisit.get(v.clinical_visit_id) ?? procByVisit.set(v.clinical_visit_id, []).get(v.clinical_visit_id)!).push(v.procedure)
     }
   }
-  const rsx = (n: number) => `Rs. ${Number(n).toLocaleString('en-US')}`
+  const rsx = money
 
   // Stamp aur inaam (loyalty). Jo na ho ya error aaye to ye hissa chhup jata hai, baqi page chalta rahta hai.
   const [lcRes, scRes] = await Promise.all([
@@ -152,12 +148,12 @@ export default async function PortalView({ patient, supabase, rxHref }: { patien
           <p className="text-xs text-white/60">Next Appointment</p>
           <p className="mt-1 font-display text-lg font-semibold">
             {upcoming
-              ? `${fmt(upcoming.preferred_date)}${upcoming.preferred_time ? ` · ${upcoming.preferred_time}` : ''}`
+              ? `${fmtDate(upcoming.preferred_date)}${upcoming.preferred_time ? ` · ${upcoming.preferred_time}` : ''}`
               : 'Not booked'}
           </p>
           {lastVisit?.next_visit && (
             <p className="mt-2 text-xs text-white/60">
-              Suggested next visit: {fmt(lastVisit.next_visit)}
+              Suggested next visit: {fmtDate(lastVisit.next_visit)}
             </p>
           )}
         </div>
@@ -170,7 +166,7 @@ export default async function PortalView({ patient, supabase, rxHref }: { patien
           {nextDue && (
             <p className="mt-2 text-xs text-clinic-ink/50">
               Next instalment Rs. {Number(nextDue.amount).toLocaleString()} due{' '}
-              {fmt(nextDue.due_date)}
+              {fmtDate(nextDue.due_date)}
             </p>
           )}
         </div>
@@ -229,7 +225,7 @@ export default async function PortalView({ patient, supabase, rxHref }: { patien
                   const isPaid = Number(i.paid_amount) > 0
                   return (
                     <tr key={n} className="border-t border-clinic-teal/10">
-                      <td className="px-4 py-2">{fmt(i.due_date)}</td>
+                      <td className="px-4 py-2">{fmtDate(i.due_date)}</td>
                       <td className="px-4 py-2">Rs. {Number(i.amount).toLocaleString()}</td>
                       <td className="px-4 py-2">
                         <span
@@ -241,7 +237,7 @@ export default async function PortalView({ patient, supabase, rxHref }: { patien
                                 : 'bg-clinic-mint text-clinic-ink/50'
                           }`}
                         >
-                          {isPaid ? `Paid ${fmt(i.paid_date)}` : i.due_date < today ? 'Overdue' : 'Pending'}
+                          {isPaid ? `Paid ${fmtDate(i.paid_date)}` : i.due_date < today ? 'Overdue' : 'Pending'}
                         </span>
                       </td>
                     </tr>
@@ -276,7 +272,7 @@ export default async function PortalView({ patient, supabase, rxHref }: { patien
                     {(t.teeth ?? []).length > 0 && <span className="text-xs text-clinic-ink/60"> ({(t.teeth ?? []).map(toothLabel).join(', ')})</span>}
                   </p>
                   <p className="text-xs text-clinic-ink/50">
-                    {fmt(t.started_on)} · {t.status === 'completed' ? 'mukammal' : t.status === 'planned' ? 'plan' : 'jaari'}
+                    {fmtDate(t.started_on)} · {t.status === 'completed' ? 'mukammal' : t.status === 'planned' ? 'plan' : 'jaari'}
                   </p>
                   {b && (
                     <p className="mt-1 text-sm text-clinic-ink/80">
@@ -289,7 +285,7 @@ export default async function PortalView({ patient, supabase, rxHref }: { patien
                       <li className="text-xs font-semibold text-clinic-ink/60">Qistein</li>
                       {items.map((it) => (
                         <li key={it.no} className="flex flex-wrap items-center gap-2">
-                          <span>{fmt(it.due_date)}</span>
+                          <span>{fmtDate(it.due_date)}</span>
                           <span className="font-medium">{rsx(it.amount)}</span>
                           <span className={`rounded-full px-2 py-0.5 text-[11px] ${it.state === 'paid' ? 'bg-emerald-50 text-emerald-700' : it.state === 'late' ? 'bg-red-50 text-red-700' : 'bg-white text-clinic-ink/50'}`}>
                             {it.state === 'paid' ? 'ada' : it.state === 'late' ? 'der ho gayi' : 'baqi'}
@@ -330,7 +326,7 @@ export default async function PortalView({ patient, supabase, rxHref }: { patien
                 {lc.ready.map((r) => (
                   <div key={r.id} className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
                     Aap ka inaam tayyar: <span className="font-semibold">{r.title}</span>
-                    {r.expires_at ? <span className="text-xs text-emerald-800/70"> (mudat: {fmt(r.expires_at)})</span> : null}
+                    {r.expires_at ? <span className="text-xs text-emerald-800/70"> (mudat: {fmtDate(r.expires_at)})</span> : null}
                   </div>
                 ))}
               </div>
@@ -340,7 +336,7 @@ export default async function PortalView({ patient, supabase, rxHref }: { patien
                 {scr.map((c) => (
                   <div key={c.id} className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">
                     Scratch card ka inaam: <span className="font-semibold">{c.title}</span>
-                    {c.expires_at ? <span className="text-xs text-amber-800/70"> (mudat: {fmt(c.expires_at)})</span> : null}
+                    {c.expires_at ? <span className="text-xs text-amber-800/70"> (mudat: {fmtDate(c.expires_at)})</span> : null}
                   </div>
                 ))}
               </div>
@@ -357,7 +353,7 @@ export default async function PortalView({ patient, supabase, rxHref }: { patien
             {pays.map((p) => (
               <div key={p.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
                 <span className="text-clinic-ink/70">
-                  {fmt(p.paid_on)}
+                  {fmtDate(p.paid_on)}
                   {p.method ? ` · ${p.method}` : ''}
                 </span>
                 <span className={p.kind === 'refund' ? 'font-semibold text-red-700' : 'font-semibold text-emerald-700'}>
@@ -377,7 +373,7 @@ export default async function PortalView({ patient, supabase, rxHref }: { patien
             {cvs.map((v) => (
               <div key={v.id} className="px-4 py-2.5 text-sm">
                 <p className="text-clinic-ink">
-                  {fmt(v.visit_date)}
+                  {fmtDate(v.visit_date)}
                   {v.doctor ? <span className="text-xs text-clinic-ink/50"> · {v.doctor}</span> : null}
                 </p>
                 {(procByVisit.get(v.id) ?? []).length > 0 && <p className="text-xs text-clinic-ink/60">{(procByVisit.get(v.id) ?? []).join(', ')}</p>}
@@ -396,7 +392,7 @@ export default async function PortalView({ patient, supabase, rxHref }: { patien
               <div key={n} className="flex items-center justify-between px-4 py-3">
                 <div>
                   <p className="text-sm text-clinic-ink">{a.treatment_name ?? 'Consultation'}</p>
-                  <p className="text-xs text-clinic-ink/50">{fmt(a.preferred_date)}</p>
+                  <p className="text-xs text-clinic-ink/50">{fmtDate(a.preferred_date)}</p>
                 </div>
                 <span className="rounded-full bg-clinic-mint px-3 py-1 text-xs font-semibold capitalize text-clinic-ink/60">
                   {a.status}
@@ -433,7 +429,7 @@ export default async function PortalView({ patient, supabase, rxHref }: { patien
             {rxList.map((r, i) => (
               <div key={i} className="rounded-2xl border border-clinic-teal/10 bg-white p-4">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs text-clinic-ink/50">{fmt(r.prescribed_date)}</p>
+                  <p className="text-xs text-clinic-ink/50">{fmtDate(r.prescribed_date)}</p>
                   <Link href={rxHref(r.id)} className="text-xs font-semibold text-clinic-teal hover:underline">
                     Print / PDF
                   </Link>

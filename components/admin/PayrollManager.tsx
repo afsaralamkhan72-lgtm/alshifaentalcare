@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { failed } from '@/lib/notifyError'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { money, fmtDate } from '@/lib/karachi'
+import { money, fmtDate, numFmt } from '@/lib/karachi'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
 import { CLINIC } from '@/clinic.config'
 import { issueStaffPortal, revokeStaffPortal } from '@/app/admin/payroll/actions'
@@ -88,7 +89,16 @@ export default function PayrollManager({
 
   async function generate() {
     const supabase = createClient()
-    if (!confirm(`${lastMonth} ka mahina sab staff ke liye tayyar karein? Salary, hazri ki katauti aur overtime khate mein likh di jayegi, aur is mahine ki hazri lock ho jayegi.`)) return
+    const { data: calc } = await supabase.rpc('payroll_calc', { p_period: lastMonth })
+    const rowsC = (Array.isArray(calc) ? calc : []) as { full_name: string; absent: number; unmarked: number }[]
+    const absents = rowsC.filter((r) => Number(r.absent) > 0)
+    const unm = rowsC.filter((r) => Number(r.unmarked) > 0)
+    const warn = unm.length
+      ? `\n\nPehle confirm karein: in ki hazri mark nahi hui: ${unm.map((r) => `${r.full_name} (${r.unmarked} din)`).join(', ')}. Hazri mein jaa kar Present, Chhutti ya Ghair-hazir chunein.\n\n`
+      : absents.length
+      ? `\n\nDhyan: in ke ghair-hazir din salary se kategi: ${absents.map((r) => `${r.full_name} (${r.absent} din)`).join(', ')}. Agar koi din paid chhutti hona chahiye to pehle Hazri mein theek karein.\n\n`
+      : '\n\n'
+    if (!confirm(`${lastMonth} ka mahina sab staff ke liye tayyar karein?${warn} Salary, hazri ki katauti aur overtime khate mein likh di jayegi, aur is mahine ki hazri lock ho jayegi.`)) return
     const { data, error } = await supabase.rpc('payroll_finalize_all', { p_period: lastMonth })
     if (error) return setMsg({ ok: false, text: error.message })
     setMsg({ ok: true, text: `${lastMonth}: ${data} staff ka mahina tayyar ho gaya (salary, katauti, overtime khate mein likh di). Jin ka pehle ho chuka tha unhe dobara nahi banaya.` })
@@ -131,19 +141,9 @@ export default function PayrollManager({
         )}
       </div>
 
-      <form onSubmit={addStaff} className="rounded-2xl border border-clinic-teal/10 bg-white p-4">
-        <p className="font-display font-semibold text-clinic-ink">Naya staff member</p>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <input required placeholder="Naam" value={nf.full_name} onChange={(e) => setNf({ ...nf, full_name: e.target.value })} className={input} />
-          <input placeholder="Kaam (jaise Assistant)" value={nf.title} onChange={(e) => setNf({ ...nf, title: e.target.value })} className={input} />
-          <input placeholder="Phone (WhatsApp)" value={nf.phone} onChange={(e) => setNf({ ...nf, phone: e.target.value })} className={input} />
-          <input type="number" min="0" placeholder="Mahana salary" value={nf.monthly_salary} onChange={(e) => setNf({ ...nf, monthly_salary: e.target.value })} className={input} />
-          <label className="grid gap-0.5 text-xs text-clinic-ink/60">Joining ki tareekh (tankhwah isi din se)
-            <input type="date" required value={nf.joined_on} onChange={(e) => setNf({ ...nf, joined_on: e.target.value })} className={input} />
-          </label>
-        </div>
-        <button className="mt-3 rounded-full border border-clinic-teal px-5 py-2 text-sm font-semibold text-clinic-teal">Add</button>
-      </form>
+      <p className="rounded-2xl border border-dashed border-clinic-teal/30 p-4 text-sm text-clinic-ink/70">
+        Naya staff yahan nahi, <a href="/admin/staff" className="font-semibold text-clinic-teal underline">&quot;Log aur Permissions&quot;</a> mein aik hi form se banta hai.
+      </p>
     </div>
   )
 }
@@ -173,6 +173,7 @@ function StaffCard({
   const [busy, setBusy] = useState(false)
   const [key, setKey] = useState(() => crypto.randomUUID())
   const [issued, setIssued] = useState<{ token: string; pin: string } | null>(null)
+  const [lastMsg, setLastMsg] = useState<string | null>(null)
   const [pending, start] = useTransition()
 
   const balance = Number(bal?.balance ?? 0)
@@ -202,6 +203,12 @@ function StaffCard({
     })
     setBusy(false)
     if (error) return setErr(error.message)
+    const amt = Number(amount)
+    const word = kind === 'advance' ? 'advance (peshgi)' : kind === 'payout' ? 'tankhwah ada' : kind === 'deduction' ? 'katauti' : 'bonus'
+    const after = kind === 'bonus' ? balance + amt : balance - amt
+    setLastMsg(
+      `Assalam o Alaikum ${s.full_name},\n${date} ko aap ko Rs. ${numFmt(amt)} ${word} ${kind === 'deduction' ? 'lagayi gayi' : kind === 'bonus' ? 'di gayi' : 'di gayi'}${needsMethod ? ` (${method})` : ''}.${note ? `\nWajah/note: ${note}` : ''}\nAb aap ka baqaya: Rs. ${numFmt(after)}.\n\n${CLINIC.name}`,
+    )
     setAmount('')
     setNote('')
     setKey(crypto.randomUUID())
@@ -229,7 +236,8 @@ function StaffCard({
 
   async function toggleActive() {
     const supabase = createClient()
-    await supabase.from('staff_members').update({ is_active: !s.is_active }).eq('id', s.id)
+    const { error } = await supabase.from('staff_members').update({ is_active: !s.is_active }).eq('id', s.id)
+    if (failed(error, 'Staff ka status badalna')) return
     if (s.is_active) await revokeStaffPortal(s.id)
     router.refresh()
   }
@@ -238,7 +246,8 @@ function StaffCard({
     const v = window.prompt(`${s.full_name} ki nayi mahana salary (abhi ${s.monthly_salary}). Purani banayi hui salary nahi badlegi:`)
     if (v === null || v.trim() === '' || Number.isNaN(Number(v)) || Number(v) < 0) return
     const supabase = createClient()
-    await supabase.from('staff_members').update({ monthly_salary: Number(v) }).eq('id', s.id)
+    const { error } = await supabase.from('staff_members').update({ monthly_salary: Number(v) }).eq('id', s.id)
+    if (failed(error, 'Salary badalna')) return
     router.refresh()
   }
 
@@ -303,6 +312,14 @@ function StaffCard({
             {busy ? '...' : 'Likhein'}
           </button>
         </form>
+      )}
+      {lastMsg && (
+        <div role="status" className="mb-2 flex flex-wrap items-center gap-2 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-900">
+          <span>Entry likh di gayi. Staff ko message bhejein?</span>
+          <a href={wa(lastMsg)} target="_blank" rel="noopener noreferrer" className="min-h-[36px] rounded-full bg-whatsapp px-4 py-2 font-semibold text-white">WhatsApp par bhejein</a>
+          <a href={`/admin/payroll/slip?staff=${s.id}&m=${period}`} target="_blank" rel="noopener noreferrer" className="min-h-[36px] rounded-full border border-clinic-teal px-4 py-2 font-semibold text-clinic-teal">Slip / PDF</a>
+          <button type="button" onClick={() => setLastMsg(null)} className="min-h-[36px] px-2 underline">Band</button>
+        </div>
       )}
       {err && <p className="mt-2 text-sm text-red-600">{err}</p>}
 

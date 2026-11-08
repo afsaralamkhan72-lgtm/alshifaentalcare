@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { openFresh } from '@/lib/openFresh'
+import { numFmt } from '@/lib/karachi'
 
 /** Payment save hote hi: patient ko rasid (kitna mila, kitna baqi) WhatsApp par bhejne ka mauqa. */
 export default function ReceiptPrompt({
@@ -34,7 +35,7 @@ export default function ReceiptPrompt({
 
   return (
     <div className="rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-4">
-      <p className="font-semibold text-emerald-800">✓ Payment save ho gayi: Rs. {amount.toLocaleString('en-US')}</p>
+      <p className="font-semibold text-emerald-800">✓ Payment save ho gayi: Rs. {numFmt(amount)}</p>
       <p className="mt-1 text-sm text-emerald-900/80">Patient ko rasid bhej dein, taake usay mila hua aur baqi dono nazar aayein.</p>
       <div className="mt-3 flex flex-wrap gap-2">
         <button type="button" disabled={busy} onClick={send} className="rounded-full bg-whatsapp px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">

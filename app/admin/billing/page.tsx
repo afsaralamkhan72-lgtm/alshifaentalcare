@@ -5,6 +5,7 @@ import TransactionForm from '@/components/admin/TransactionForm'
 import EditTransactionButton from '@/components/admin/EditTransactionButton'
 import DeleteTransactionButton from '@/components/admin/DeleteTransactionButton'
 import { todayKarachi } from '@/lib/karachi'
+import SectionTabs from '@/components/admin/SectionTabs'
 
 interface SearchParams {
   from?: string
@@ -76,9 +77,10 @@ export default async function BillingPage({
 
   return (
     <div>
+      <SectionTabs which="accounts" />
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="font-display text-2xl font-semibold text-clinic-ink">Billing &amp; Accounts</h1>
+          <h1 className="font-display text-2xl font-semibold text-clinic-ink">Billing (bill aur payments)</h1>
           <p className="mt-1 text-sm text-clinic-ink/60">
             {from} se {to} tak ka record
           </p>

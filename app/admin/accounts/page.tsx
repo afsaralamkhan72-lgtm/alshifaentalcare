@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getPermissions, getStaffProfile, isOwnerRole } from '@/lib/auth'
 import { money, todayKarachi } from '@/lib/karachi'
+import SectionTabs from '@/components/admin/SectionTabs'
 
 /** Accounts: paise ki saari cheezein aik page par. Har number database ki asli entries se. */
 export default async function AccountsPage() {
@@ -47,6 +48,7 @@ export default async function AccountsPage() {
 
   return (
     <div>
+      <SectionTabs which="accounts" />
       <h1 className="font-display text-2xl font-semibold text-clinic-ink">Accounts</h1>
       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {tiles.map((t) => (

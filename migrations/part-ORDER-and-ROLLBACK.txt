@@ -1,0 +1,29 @@
+FINAL58: DATABASE MIGRATION (7 chhote parts, ek ek karke, pehle TEST project par)
+
+Pehle: Supabase backup lein, ya app mein "Backup" button se JSON copy rakh lein.
+SQL Editor mein is tarteeb se chalayein. Har part ke baad "Success" aana chahiye:
+
+ 1. part1-discount-wording.sql   : error messages mein "Discount" lafz. Koi data nahi badalta.
+ 2. part2-reconcile.sql          : naya sirf-padhne wala invoice_reconcile().
+ 3. part3-stock-check.sql        : naya sirf-padhne wala inventory_reconcile().
+ 4. part4a-inventory-columns.sql : inventory mein naye columns (description, deleted_at, merged_into) + naye audit/movement naam.
+ 5. part4b-inventory-edit.sql    : item ka naam/category/unit/description edit, archive.
+ 6. part4c-inventory-merge.sql   : duplicate items ka safe merge (sirf owner).
+ 7. part4d-inventory-delete.sql  : delete / recycle bin / restore / purge.
+
+Part 4a se pehle 4b, 4c, 4d na chalayein. Part 1-3 ke baghair bhi app chalegi.
+Sab parts add-only hain: dobara chalane se kuch kharab nahi hota.
+
+ROLLBACK:
+  part1: purane lafz chahiye to FINAL55 ki phase SQL dobara chalayein (data nahi badla).
+  part2/3: drop function public.invoice_reconcile(); drop function public.inventory_reconcile();
+  part4b/4c/4d: drop function public.update_inventory_item, set_inventory_active, merge_inventory_items,
+                delete_inventory_item, restore_inventory_item, purge_inventory_item, inventory_item_flags;
+  part4a: naye columns khali rehne dein (nuqsan nahi). Audit constraint tab tak wapas nahi ho sakta jab tak
+          naye audit rows (MERGE/ARCHIVE/...) maujood hon; unhe rehne dein.
+Patient, invoice, payment, stock ya salary ka koi purana record kisi part se nahi badalta.
+
+RESTORE (agar kabhi poora data wapas lana pare):
+  Kabhi live database par nahi. Naya khali Supabase project banayein, SQL schema chalayein,
+  phir tests/tools/restore-from-backup.sql chalayein (backup JSON ke saath). Staff login users (Auth) alag se
+  dobara banane honge: backup mein Auth users shamil nahi.

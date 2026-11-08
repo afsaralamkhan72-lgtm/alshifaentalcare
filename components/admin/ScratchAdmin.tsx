@@ -9,7 +9,7 @@ import { friendlyError } from '@/lib/errors'
 type Prize = { id: string; title: string; kind: 'percent' | 'amount' | 'free' | 'none'; value: number | null; treatment_names: string[]; weight: number; is_active: boolean }
 type Card = { id: string; title: string; kind: string; value: number | null; treatment_names: string[]; card_date: string; expires_at: string | null; patient: { id: string; full_name: string } | null }
 
-const kt = (k: string, v: number | null) => (k === 'percent' ? `${v}% chhoot` : k === 'amount' ? `Rs.${v} chhoot` : k === 'free' ? 'Muft' : 'Koi inaam nahi')
+const kt = (k: string, v: number | null) => (k === 'percent' ? `${v}% discount` : k === 'amount' ? `Rs.${v} discount` : k === 'free' ? 'Muft' : 'Koi inaam nahi')
 
 export default function ScratchAdmin({ owner, enabled, days, prizes, cards }: { owner: boolean; enabled: boolean; days: number; prizes: Prize[]; cards: Card[] }) {
   const router = useRouter()
@@ -34,7 +34,7 @@ export default function ScratchAdmin({ owner, enabled, days, prizes, cards }: { 
   return (
     <section className="mt-8 rounded-2xl border border-clinic-teal/10 bg-white p-5">
       <h2 className="font-display text-lg font-semibold text-clinic-ink">Scratch Card</h2>
-      <p className="mt-1 text-sm text-clinic-ink/60">Jis din marez ka stamp lagta hai (QR scan), wo ek card khurch kar inaam jeet sakta hai. Inaam kaun sa niklega, ye in ke &quot;wazan&quot; se tay hota hai.</p>
+      <p className="mt-1 text-sm text-clinic-ink/60">Jis din marez ka stamp lagta hai (QR scan), wo ek card khurch kar inaam jeet sakta hai. Inaam kaun sa niklega, ye in ke &quot;kitni baar nikle&quot; se tay hota hai.</p>
       {msg && <p className="mt-2 text-sm">{msg}</p>}
 
       {cards.length > 0 && (
@@ -48,7 +48,7 @@ export default function ScratchAdmin({ owner, enabled, days, prizes, cards }: { 
               </li>
             ))}
           </ul>
-          <p className="mt-1 text-xs text-clinic-ink/50">Chhoot bill mein khud nahi lagti: bill banate waqt haath se kam karein, phir &quot;Inaam diya&quot; dabayein.</p>
+          <p className="mt-1 text-xs text-clinic-ink/50">Discount bill mein khud nahi lagti: bill banate waqt haath se kam karein, phir &quot;Inaam diya&quot; dabayein.</p>
         </div>
       )}
 
@@ -67,7 +67,7 @@ export default function ScratchAdmin({ owner, enabled, days, prizes, cards }: { 
             <ul className="divide-y divide-clinic-ink/10">
               {prizes.map((p) => (
                 <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
-                  <span className={p.is_active ? '' : 'opacity-50'}><strong>{p.title}</strong> · {kt(p.kind, p.value)}{p.treatment_names.length ? ` (${p.treatment_names.join('/')})` : ''} · wazan {p.weight}{p.is_active && total > 0 ? ` (taqreeban ${Math.round((p.weight / total) * 100)}%)` : ''}</span>
+                  <span className={p.is_active ? '' : 'opacity-50'}><strong>{p.title}</strong> · {kt(p.kind, p.value)}{p.treatment_names.length ? ` (${p.treatment_names.join('/')})` : ''} · kitni baar nikle {p.weight}{p.is_active && total > 0 ? ` (taqreeban ${Math.round((p.weight / total) * 100)}%)` : ''}</span>
                   <button disabled={busy} onClick={() => run(() => sb.from('scratch_prizes').update({ is_active: !p.is_active }).eq('id', p.id), p.is_active ? 'Band kiya' : 'Chalu kiya')} className="text-xs text-clinic-teal underline">{p.is_active ? 'band' : 'chalu'}</button>
                 </li>
               ))}
@@ -79,13 +79,13 @@ export default function ScratchAdmin({ owner, enabled, days, prizes, cards }: { 
             run(() => sb.from('scratch_prizes').insert({ title: f.title.trim(), kind: f.kind, value: f.kind === 'free' || f.kind === 'none' ? null : Number(f.value), treatment_names: f.treatments.split(',').map((x) => x.trim()).filter(Boolean), weight: Math.max(1, Math.min(10000, Number(f.weight) || 1)) }), 'Inaam add ho gaya')
             setF({ title: '', kind: 'percent', value: '', treatments: '', weight: '1' })
           }}>
-            <input required minLength={2} placeholder="Naam (jaise 10% chhoot)" value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} className={`${input} sm:col-span-2`} />
+            <input required minLength={2} placeholder="Naam (jaise 10% discount)" value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} className={`${input} sm:col-span-2`} />
             <select value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value as Prize['kind'] })} className={input}>
-              <option value="percent">% chhoot</option><option value="amount">Rs. chhoot</option><option value="free">Muft</option><option value="none">Koi inaam nahi</option>
+              <option value="percent">% discount</option><option value="amount">Rs. discount</option><option value="free">Muft</option><option value="none">Koi inaam nahi</option>
             </select>
             <input type="number" min={0} placeholder="Miqdar" disabled={f.kind === 'free' || f.kind === 'none'} required={f.kind === 'percent' || f.kind === 'amount'} value={f.value} onChange={(e) => setF({ ...f, value: e.target.value })} className={input} />
             <input placeholder="Treatment (optional, comma se)" value={f.treatments} onChange={(e) => setF({ ...f, treatments: e.target.value })} className={input} />
-            <input type="number" min={1} max={10000} title="Wazan: zyada = zyada baar niklega" value={f.weight} onChange={(e) => setF({ ...f, weight: e.target.value })} className={input} />
+            <input type="number" min={1} max={10000} title="Kitni baar nikle: zyada = zyada baar" value={f.weight} onChange={(e) => setF({ ...f, weight: e.target.value })} className={input} />
             <button disabled={busy} className="rounded-lg bg-clinic-teal px-3 py-2 text-sm font-semibold text-white disabled:opacity-60 sm:col-span-6">Inaam add karein</button>
           </form>
         </div>

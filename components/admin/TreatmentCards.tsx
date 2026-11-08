@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { friendlyError } from '@/lib/errors'
 import { toothTitle as toothLabel } from '@/lib/teeth'
-import { fmtDate } from '@/lib/karachi'
+import { fmtDate, money } from '@/lib/karachi'
 import type { TItem } from './visit/types'
 import PaymentPlan, { type Plan } from './PaymentPlan'
 
@@ -34,7 +34,6 @@ const TEMPLATES: { re: RegExp; stages: string[] }[] = [
 
 const STATUS: Record<string, string> = { planned: 'sirf plan', active: 'chal rahi', completed: 'mukammal', cancelled: 'cancel' }
 const LAB: Record<string, string> = { pending: 'lab ko bhejna hai', sent: 'lab ko bheja', in_progress: 'lab mein ban raha', received: 'lab se aa gaya', fitted: 'fit ho gaya' }
-const rs = (n: number) => `Rs. ${Number(n).toLocaleString('en-US')}`
 
 /** Har treatment ka aik card: kitni visits, kharcha / mila / baqaya, tasveerein, lab ki halat, aur lambi treatment ke marhale */
 export default function TreatmentCards({
@@ -102,9 +101,18 @@ export default function TreatmentCards({
               </p>
               {canMoney && (
                 <p className="mt-1 text-sm text-clinic-ink/80">
-                  Kharcha {rs(t.charged)} · Mila {rs(t.paid)}
-                  {t.balance > 0 ? <span className="font-semibold text-red-600"> · Baqaya {rs(t.balance)}</span> : <span className="text-emerald-700"> · hisaab saaf</span>}
+                  Kharcha {money(t.charged)} · Mila {money(t.paid)}
+                  {t.balance > 0 ? <span className="font-semibold text-red-600"> · Baqaya {money(t.balance)}</span> : <span className="text-emerald-700"> · hisaab saaf</span>}
                 </p>
+              )}
+              {canEdit && t.status === 'active' && t.visits.length > 0 && (
+                <Link
+                  href={`/admin/patients/${patientId}?continue=${t.id}`}
+                  data-testid="next-visit"
+                  className="mt-2 inline-flex min-h-[44px] items-center rounded-full bg-clinic-teal px-5 py-2 text-sm font-semibold text-white"
+                >
+                  Visit {t.visits.length + 1} shuru karein →
+                </Link>
               )}
               {canEdit && canMoney && t.status === 'active' && t.visits.length > 0 && t.balance <= 0 && (
                 <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">

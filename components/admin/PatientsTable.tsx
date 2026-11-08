@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
 import { CLINIC } from '@/clinic.config'
-import { todayKarachi } from '@/lib/karachi'
+import { todayKarachi, fmtDate } from '@/lib/karachi'
 
 export interface PatientRow {
   id: string
@@ -39,10 +39,6 @@ interface Summary {
     paidMonths: number
     nextDue: { id: string; installment_no: number; amount: number; due_date: string } | null
   } | null
-}
-
-function fmt(d: string | null) {
-  return d ? new Date(d).toLocaleDateString('en-GB') : '—'
 }
 
 export default function PatientsTable({
@@ -186,38 +182,22 @@ export default function PatientsTable({
 
     setSaving(true)
     const supabase = createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    const today = todayKarachi()
     const s = summaries[patient.id]
 
     if (target.startsWith('inst:')) {
       // Plan ka mahina
       const instId = target.slice(5)
-      await supabase
-        .from('installments')
-        .update({
-          paid_amount: got,
-          paid_date: today,
-          payment_method: method,
-          recorded_by: user?.id ?? null,
-        })
-        .eq('id', instId)
-
-      await supabase.from('transactions').insert({
-        patient_id: patient.id,
-        type: 'income',
-        category: 'treatment',
-        treatment_name: `${s?.plan?.title ?? 'Treatment'} (month ${s?.plan?.nextDue?.installment_no})`,
-        amount: got,
-        balance_due: 0,
-        payment_method: method,
-        treating_doctor: patient.primary_doctor,
-        transaction_date: today,
-        settled_at: new Date().toISOString(),
-        recorded_by: user?.id ?? null,
+      const { error: instErr } = await supabase.rpc('pay_installment', {
+        p_installment_id: instId,
+        p_amount: got,
+        p_method: method,
+        p_idempotency_key: instId,
       })
+      if (instErr) {
+        setSaving(false)
+        setPayErr(instErr.message)
+        return
+      }
     } else {
       // Purana baqaya
       const due = s?.dues.find((d) => d.id === target)
@@ -234,28 +214,16 @@ export default function PatientsTable({
           return
         }
       } else if (due) {
-        const newBal = Math.max(0, due.balance_due - got)
-        await supabase
-          .from('transactions')
-          .update({
-            balance_due: newBal,
-            settled_at: newBal === 0 ? new Date().toISOString() : null,
-          })
-          .eq('id', due.id)
-
-        await supabase.from('transactions').insert({
-          patient_id: patient.id,
-          type: 'income',
-          category: 'treatment',
-          treatment_name: `${due.treatment_name ?? 'Treatment'} (baqaya)`,
-          amount: got,
-          balance_due: 0,
-          payment_method: method,
-          treating_doctor: patient.primary_doctor,
-          transaction_date: today,
-          settled_at: new Date().toISOString(),
-          recorded_by: user?.id ?? null,
+        const { error: dueErr } = await supabase.rpc('pay_legacy_due', {
+          p_tx_id: due.id,
+          p_amount: got,
+          p_method: method,
         })
+        if (dueErr) {
+          setSaving(false)
+          setPayErr(dueErr.message)
+          return
+        }
       }
     }
 
@@ -448,7 +416,7 @@ function PatientPanel({
             {summary.plan.nextDue && (
               <p className="mt-1 text-xs font-medium text-clinic-teal">
                 Agla month: #{summary.plan.nextDue.installment_no} · Rs.{' '}
-                {summary.plan.nextDue.amount.toLocaleString()} · {fmt(summary.plan.nextDue.due_date)}
+                {summary.plan.nextDue.amount.toLocaleString()} · {fmtDate(summary.plan.nextDue.due_date)}
               </p>
             )}
           </div>
@@ -489,7 +457,7 @@ function PatientPanel({
                     </p>
                   </div>
                   <p className="mt-0.5 text-xs text-clinic-ink/60">
-                    Due: {fmt(d.due_date)}
+                    Due: {fmtDate(d.due_date)}
                     {overdue && ' · overdue'}
                   </p>
                 </div>

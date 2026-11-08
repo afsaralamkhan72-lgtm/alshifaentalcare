@@ -1,7 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { requireAnyPerm } from '@/lib/auth'
-import { todayKarachi } from '@/lib/karachi'
+import { todayKarachi, numFmt } from '@/lib/karachi'
 import ClosingPanel, { type Summary, type ClosingRow } from '@/components/admin/ClosingPanel'
+import SectionTabs from '@/components/admin/SectionTabs'
 
 export default async function ClosingPage({ searchParams }: { searchParams: Promise<{ date?: string }> }) {
   await requireAnyPerm('billing.collect', 'reports.view')
@@ -41,9 +42,10 @@ export default async function ClosingPage({ searchParams }: { searchParams: Prom
 
   return (
     <div>
+      <SectionTabs which="accounts" />
       {late.n > 0 && (
         <p className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm font-semibold text-amber-900">
-          Dhyan dein: is din ki closing ke baad {late.n} payment aayi (kul Rs. {late.total.toLocaleString('en-US')}, us mein cash Rs. {late.cash.toLocaleString('en-US')}). Closing ka hisaab in ke bina bana tha, is liye drawer ki ginti mein itna farq ho sakta hai.
+          Dhyan dein: is din ki closing ke baad {late.n} payment aayi (kul Rs. {numFmt(late.total)}, us mein cash Rs. {numFmt(late.cash)}). Closing ka hisaab in ke bina bana tha, is liye drawer ki ginti mein itna farq ho sakta hai.
         </p>
       )}
       <h1 className="font-display text-2xl font-semibold text-clinic-ink">Din ki Closing</h1>

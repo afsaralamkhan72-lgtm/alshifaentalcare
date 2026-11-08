@@ -3,6 +3,7 @@ import { requireOwner } from '@/lib/auth'
 import { addDays, fmtDate, money, todayKarachi } from '@/lib/karachi'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
 import { CLINIC } from '@/clinic.config'
+import SectionTabs from '@/components/admin/SectionTabs'
 
 export const dynamic = 'force-dynamic'
 
@@ -111,6 +112,7 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
 
   return (
     <div className="grid gap-5">
+      <SectionTabs which="reports" />
       <div>
         <h1 className="font-display text-2xl font-semibold text-clinic-ink">Business Insights</h1>
         <p className="text-sm text-clinic-ink/60">Sirf doctor/admin ke liye. Ye sab maujooda records se hisaab lagata hai.</p>
@@ -144,9 +146,9 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
         )}
       </Card>
 
-      <Card title="Treatment par bachat" hint="Pichle 12 mahine. Bachat = treatment ki qeemat − lab ka kharcha. Riyayat alag dikhayi hai. Dawa/samaan ka kharcha is mein shamil nahi.">
+      <Card title="Treatment par bachat" hint="Pichle 12 mahine. Bachat = treatment ki qeemat − lab ka kharcha. Discount alag dikhayi hai. Dawa/samaan ka kharcha is mein shamil nahi.">
         <div className="overflow-x-auto"><table className="w-full min-w-[520px] text-sm">
-          <thead className="text-left text-xs text-clinic-ink/50"><tr><th className="py-1">Treatment</th><th>Tadaad</th><th className="text-right">Qeemat</th><th className="text-right">Lab</th><th className="text-right">Riyayat</th><th className="text-right">Bachat</th></tr></thead>
+          <thead className="text-left text-xs text-clinic-ink/50"><tr><th className="py-1">Treatment</th><th>Tadaad</th><th className="text-right">Qeemat</th><th className="text-right">Lab</th><th className="text-right">Discount</th><th className="text-right">Bachat</th></tr></thead>
           <tbody>{trRows.map((r) => (
             <tr key={r.name} className="border-t border-clinic-teal/10"><td className="py-1.5">{r.name}</td><td>{r.n}</td><td className="text-right">{money(r.revenue)}</td><td className="text-right">{money(r.lab)}</td><td className="text-right">{money(r.disc)}</td><td className="text-right font-semibold">{money(r.net)}</td></tr>
           ))}</tbody>

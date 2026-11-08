@@ -6,7 +6,7 @@ type Res = { status: string; title?: string; kind?: string; value?: number | nul
 
 const text = (r: Res) =>
   r.kind === 'none' ? 'Is baar koi inaam nahi, agli visit par dobara koshish karein!' :
-  r.kind === 'percent' ? `${r.value}% chhoot` : r.kind === 'amount' ? `Rs. ${r.value} chhoot` : 'Muft'
+  r.kind === 'percent' ? `${r.value}% discount` : r.kind === 'amount' ? `Rs. ${r.value} discount` : 'Muft'
 
 export default function ScratchCard() {
   const [state, setState] = useState<'idle' | 'loading' | 'card'>('idle')

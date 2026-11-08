@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { numFmt } from '@/lib/karachi'
 
 interface Props {
   patientId: string
@@ -88,7 +89,7 @@ export default function DeletePatientButton({ patientId, patientName, mrNumber }
 
             {owing > 0 && (
               <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm font-semibold text-amber-900">
-                Dhyan dein: is patient ka Rs. {owing.toLocaleString('en-US')} baqaya hai. Recycle bin mein jane se wo Dues list mein nahi dikhega. Pehle baqaya wasool karein ya soch samajh kar hatayein.
+                Dhyan dein: is patient ka Rs. {numFmt(owing)} baqaya hai. Recycle bin mein jane se wo Dues list mein nahi dikhega. Pehle baqaya wasool karein ya soch samajh kar hatayein.
               </p>
             )}
             <label className="mt-4 block text-sm text-clinic-ink">

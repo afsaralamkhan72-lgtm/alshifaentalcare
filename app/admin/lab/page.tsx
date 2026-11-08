@@ -1,14 +1,14 @@
 import { requirePerm, getStaffProfile, isOwnerRole } from '@/lib/auth'
 import Link from 'next/link'
-import { toothTitle as toothLabel } from '@/lib/teeth'
+import LabCaseDelete from '@/components/admin/LabCaseDelete'
 import { createClient } from '@/lib/supabase/server'
 import LabCaseForm, { type LabOption, type PatientOption } from '@/components/admin/LabCaseForm'
-import { todayKarachi } from '@/lib/karachi'
+import { todayKarachi, numFmt } from '@/lib/karachi'
 
 export default async function LabPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; patient?: string; treatment?: string }>
+  searchParams: Promise<{ q?: string; patient?: string; treatment?: string; teeth?: string; work?: string }>
 }) {
   await requirePerm('lab.view')
   const isOwner = isOwnerRole((await getStaffProfile()).role)
@@ -78,7 +78,7 @@ export default async function LabPage({
     <div>
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="font-display text-2xl font-semibold text-clinic-ink">Lab Work</h1>
+          <h1 className="font-display text-2xl font-semibold text-clinic-ink">Lab</h1>
           <p className="mt-1 text-sm text-clinic-ink/60">
             Work order banayein, lab ko WhatsApp par bhejein, report aaye to case mein upload karein.
           </p>
@@ -93,6 +93,8 @@ export default async function LabPage({
           patients={(patientsRes.data ?? []) as PatientOption[]}
           fixedPatient={fixed}
           treatments={patTreatments}
+          defaultTeeth={params.teeth ? params.teeth.split(',').filter((t) => /^[1-8][1-8]$/.test(t)) : undefined}
+          defaultWork={params.work}
           defaultTreatmentId={fixed && params.treatment && uuid.test(params.treatment) ? params.treatment : undefined}
         />
       </div>
@@ -112,56 +114,47 @@ export default async function LabPage({
             const patient = c.patients as unknown as { full_name: string; mr_number: string } | null
             const nReports = reports.get(c.id) ?? 0
             const overdue = c.due_date && c.due_date < today && nReports === 0
+            const teethTxt = ((c.tooth_numbers ?? []) as string[]).join(', ') || '—'
+            const baqaya = Number(c.cost ?? 0) - Number(c.lab_paid ?? 0)
 
             return (
-              <Link
+              <div
                 key={c.id}
-                href={`/admin/lab/${c.id}`}
-                className={`block rounded-2xl border bg-white p-4 transition-colors hover:border-clinic-teal ${
+                className={`relative rounded-2xl border bg-white transition-colors hover:border-clinic-teal ${
                   overdue ? 'border-red-200' : 'border-clinic-teal/10'
                 }`}
               >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-clinic-teal">
-                      {c.case_number}
-                    </p>
-                    <p className="mt-0.5 font-medium text-clinic-ink">
-                      {patient?.full_name ?? 'Unknown patient'}
-                      <span className="ml-2 text-xs text-clinic-ink/40">{patient?.mr_number}</span>
-                    </p>
-                    <p className="mt-1 text-sm text-clinic-ink/60">
-                      {c.work_type ?? 'Lab work'} · Tooth{' '}
-                      {((c.tooth_numbers ?? []) as string[]).map(toothLabel).join(', ') || '—'} · {c.lab_name}
-                    </p>
-                  </div>
-
-                  <div className="text-right">
-                    <span
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                        nReports > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-clinic-mint text-clinic-ink/60'
-                      }`}
-                    >
-                      {nReports > 0 ? `Report: ${nReports} file` : 'Report abhi nahi'}
+                <Link href={`/admin/lab/${c.id}`} className="block p-4 pr-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-clinic-teal">{c.case_number}</p>
+                  <p className="mt-0.5 font-medium text-clinic-ink">
+                    {patient?.full_name ?? 'Patient ka naam nahi'}
+                    <span className="ml-2 text-xs text-clinic-ink/40">{patient?.mr_number}</span>
+                  </p>
+                  <p className="mt-1 text-sm text-clinic-ink/70">
+                    {c.work_type ?? 'Lab work'} · Daant: <b>{teethTxt}</b>
+                  </p>
+                  <p className="text-xs text-clinic-ink/50">Lab: {c.lab_name}</p>
+                  <div className="mt-2 flex flex-wrap gap-1.5 text-xs font-semibold">
+                    <span className={`rounded-full px-2.5 py-1 ${nReports > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                      {nReports > 0 ? `Report aa gayi (${nReports})` : 'Report abhi nahi'}
                     </span>
-                    {Number(c.cost ?? 0) - Number(c.lab_paid ?? 0) > 0 && (
-                      <p className="mt-1 text-xs font-semibold text-red-600">
-                        Lab ka baqaya Rs. {(Number(c.cost) - Number(c.lab_paid)).toLocaleString()}
-                      </p>
-                    )}
                     {c.due_date && (
-                      <p
-                        className={`mt-1 text-xs ${
-                          overdue ? 'font-semibold text-red-600' : 'text-clinic-ink/50'
-                        }`}
-                      >
+                      <span className={`rounded-full px-2.5 py-1 ${overdue ? 'bg-red-50 text-red-600' : 'bg-clinic-mint text-clinic-ink/60'}`}>
                         Due {new Date(c.due_date).toLocaleDateString('en-GB')}
-                        {overdue ? ', der ho gayi' : ''}
-                      </p>
+                        {overdue ? ' · der ho gayi' : ''}
+                      </span>
+                    )}
+                    {baqaya > 0 && (
+                      <span className="rounded-full bg-red-50 px-2.5 py-1 text-red-600">Lab ka baqaya Rs. {numFmt(baqaya)}</span>
                     )}
                   </div>
-                </div>
-              </Link>
+                </Link>
+                {isOwner && (
+                  <div className="absolute right-3 top-3">
+                    <LabCaseDelete id={c.id} caseNumber={c.case_number ?? 'Ye case'} paid={Number(c.lab_paid ?? 0)} small />
+                  </div>
+                )}
+              </div>
             )
           })
         )}

@@ -8,8 +8,8 @@ import RewardBanner from '@/components/admin/RewardBanner'
 /**
  * Visit page par loyalty inaam ka asaan raasta.
  * - Visit shuru/chalte waqt (visitId nahi): sirf yaad-dahani ke inaam tayyar hai, aur kya karna hai.
- * - Visit mukammal hone ke baad (visitId): us visit ke bill par "Chhoot lagayein" ka button
- *   (wohi tested apply_reward_discount, jo chhoot, discount log aur "inaam diya" aik sath karta hai).
+ * - Visit mukammal hone ke baad (visitId): us visit ke bill par "Discount lagayein" ka button
+ *   (wohi tested apply_reward_discount, jo discount, discount log aur "inaam diya" aik sath karta hai).
  * Inaam na ho to kuch nahi dikhta.
  */
 export default function VisitRewards({ patientId, visitId }: { patientId: string; visitId?: string }) {
@@ -48,13 +48,13 @@ export default function VisitRewards({ patientId, visitId }: { patientId: string
           {rewards.map((r) => (
             <li key={r.source + r.id}>
               {r.title}
-              {r.kind === 'percent' ? ` (${r.value}% chhoot)` : r.kind === 'amount' ? ` (Rs.${r.value} chhoot)` : ' (muft)'}
+              {r.kind === 'percent' ? ` (${r.value}% discount)` : r.kind === 'amount' ? ` (Rs.${r.value} discount)` : ' (muft)'}
             </li>
           ))}
         </ul>
         <p className="mt-1 text-xs">
-          Chhoot lagane ka tareeqa: neeche &quot;kitne paise mile&quot; mein abhi kuch na likhein, visit mukammal karein, phir aane wali screen par
-          &quot;Chhoot lagayein&quot; dabayein. Uske baad baqi paise lein.
+          Discount lagane ka tareeqa: neeche &quot;kitne paise mile&quot; mein abhi kuch na likhein, visit mukammal karein, phir aane wali screen par
+          &quot;Discount lagayein&quot; dabayein. Uske baad baqi paise lein.
         </p>
       </div>
     )
@@ -64,7 +64,7 @@ export default function VisitRewards({ patientId, visitId }: { patientId: string
     <div onClickCapture={() => setTimeout(() => void load(), 1200)}>
       <RewardBanner rewards={rewards} invoice={inv} />
       {inv && !inv.open && (
-        <p className="mt-1 text-xs text-amber-800">Is bill ka baqaya 0 hai, is liye chhoot nahi lag sakti. Agli visit par lagayein.</p>
+        <p className="mt-1 text-xs text-amber-800">Is bill ka baqaya 0 hai, is liye discount nahi lag sakti. Agli visit par lagayein.</p>
       )}
     </div>
   )
