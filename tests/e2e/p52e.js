@@ -6,12 +6,7 @@ await p.goto('http://localhost:3055/admin/patients/'+pid,{waitUntil:'domcontentl
 const st=p.getByRole('button',{name:/Naya visit shuru/});if(await st.count()){await st.click();await p.waitForTimeout(800)}
 await p.getByRole('button',{name:'Agla →'}).click();await p.waitForTimeout(900);
 await p.locator('[aria-label^="Upper Right Central Incisor"]').first().click();await p.waitForTimeout(400);
-await p.locator('button[aria-pressed]:has-text("Filling")').first().click();await p.waitForTimeout(500);
-const card=p.locator('[data-testid=tooth-card]').first();
-console.log('card has filling row:', (await card.innerText()).includes('Composite Filling'));
-// remove via chart toggle
-await p.locator('button[aria-pressed]:has-text("Filling")').first().click();await p.waitForTimeout(400);
-console.log('after unmark cards left:', await p.locator('[data-testid=tooth-card]').count());
+console.log('side panel has Missing chip (should be false):',await p.getByRole('button',{name:'Missing'}).count()>0,' gums shown:',await p.getByText('Masoorhe / gums').count()>0);
 // 2) homeopathic visit
 await p.goto('http://localhost:3055/admin/patients',{waitUntil:'networkidle'});
 await p.getByRole('button',{name:'+ Naya Patient'}).click();await p.waitForTimeout(400);

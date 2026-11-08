@@ -18,15 +18,15 @@ async function fin(p){
   const r=await L.open(w);const p=r.p;
   console.log('== width',w);
   const pid=await go(p,'Nk ');
-  console.log(' empty hint:',await p.getByTestId('entry-empty').count());
+  console.log(' panel hidden before any tooth chosen:',await p.getByTestId('entry-add').count()===0);
   // 1) single tooth: 36 diagnosis + Crown
   await tap(p,36);
-  console.log(' chosen:',(await p.getByTestId('entry-teeth').innerText()).replace(/\n/g,' '));
+  console.log(' panel shows after tooth chosen:',await p.getByTestId('entry-add').count()===1);
   await p.getByTestId('entry-dx').fill('Caries');
   await p.getByTestId('quick-tx').filter({hasText:/Crown/}).first().click();
   console.log(' bill preview:',await p.getByTestId('entry-bill').innerText().catch(()=>'-'));
   await p.getByTestId('entry-add').click();await p.waitForTimeout(400);
-  console.log(' cards after 1:',await p.getByTestId('tooth-card').count(),' chosen cleared:',await p.getByTestId('entry-empty').count());
+  console.log(' cards after 1:',await p.getByTestId('tooth-card').count(),' panel closed after card:',await p.getByTestId('entry-add').count()===0);
   // 2) two teeth, extraction, 37+38: two separate cards
   await tap(p,37);await tap(p,38);
   await p.getByTestId('quick-tx').filter({hasText:/Extraction/}).first().click();
@@ -52,10 +52,8 @@ async function fin(p){
   await p.getByTestId('entry-add').click();await p.waitForTimeout(500);
   console.log(' group cards after denture:',await p.getByTestId('group-card').count());
   // 6) complete denture without teeth
-  await p.getByTestId('grp-denture').click();await p.getByTestId('dkind-complete').click();
-  const ct=await p.getByTestId('grp-type').locator('option').allInnerTexts();console.log(' complete types:',ct.join(' | '));
-  console.log(' add enabled w/o teeth:',await p.getByTestId('entry-add').isEnabled());
-  await p.getByTestId('entry-add').click();await p.waitForTimeout(500);
+  console.log(' complete types:',(await p.getByTestId('complete-denture').allInnerTexts()).join(' | '));
+  await p.getByTestId('complete-denture').first().click();await p.waitForTimeout(500);
   console.log(' denture cards:',await p.getByTestId('denture-card').count());
   console.log(' overflow:',await p.evaluate(()=>document.documentElement.scrollWidth>document.documentElement.clientWidth));
   const cols=await p.evaluate(()=>{const o={};document.querySelectorAll('span.absolute.inset-0').forEach(e=>{const f=e.style.backgroundColor;if(f)o[f]=(o[f]||0)+1});return o});

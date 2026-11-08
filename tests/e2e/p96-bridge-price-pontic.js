@@ -43,7 +43,7 @@ async function fin(p){
    console.log(' catalog PFM:',L.q("select price from treatment_catalog where name='PFM Bridge'"));
    // complete denture Both
    const pid3=await go(p2,'Dn ');
-   await p2.getByTestId('grp-denture').click();await p2.getByTestId('dkind-complete').click();console.log(' complete types:',(await p2.getByTestId('grp-type').locator('option').allInnerTexts()).join(' | '));
+   console.log(' complete types:',(await p2.getByTestId('complete-denture').allInnerTexts()).join(' | '));
   }
   await r.b.close?.();
  }

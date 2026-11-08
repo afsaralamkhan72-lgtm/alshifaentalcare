@@ -1079,7 +1079,7 @@ export default function VisitWorkspace(p: Props) {
           {/* 6. DENTAL CHART */}
           {!homeo && (
             <Section title="Dental Chart">
-              <ToothChart age={p.patient.age} selected={sel} onSelect={pickTeeth} marks={marks} onMarks={setMarks} old={p.chartRecords} canEdit={canEdit} noPlan onWork={onChartWork} bridges={rows.filter((r) => r.group && /bridge/i.test(r.name)).map((r) => r.teeth)} />
+              <ToothChart age={p.patient.age} selected={sel} onSelect={pickTeeth} marks={marks} onMarks={setMarks} old={p.chartRecords} canEdit={canEdit} noPlan hideDentalMarks renderExtra={() => entryPanel} onWork={onChartWork} bridges={rows.filter((r) => r.group && /bridge/i.test(r.name)).map((r) => r.teeth)} />
             </Section>
           )}
 
@@ -1341,17 +1341,9 @@ export default function VisitWorkspace(p: Props) {
       </details>
     </div>
   )
-  const blk_work = !homeo ? (
-    <Section title="Daant aur kaam" hint="Chart par daant chunein, masla likhein, kaam chunein. Har daant ka chhota card bante hai, bill khud.">
-      {canEdit && (
-        <div className="grid gap-3 rounded-2xl border-2 border-clinic-teal/25 bg-clinic-mint/30 p-3" data-testid="entry-panel">
-          {selTeeth.length === 0 && !isComplete ? (
-            <p className="text-sm text-clinic-ink/60" data-testid="entry-empty">Upar chart par daant par tap karein (ek ya kai). Phir yahan masla aur kaam chunein.</p>
-          ) : (
-            <p className="text-sm font-semibold text-clinic-ink" data-testid="entry-teeth">
-              Chune daant: <span className="text-clinic-teal">{selTeeth.length ? selTeeth.map(toothLabel).join(', ') : '—'}</span>
-            </p>
-          )}
+  const entryPanel = canEdit ? (
+
+        <div className="grid gap-3 rounded-2xl border border-clinic-teal/25 bg-clinic-mint/30 p-2.5" data-testid="entry-panel">
           <div className="grid gap-1.5">
             <label className="text-xs font-bold text-clinic-ink" htmlFor="entry-dx">Masla (Diagnosis) <span className="font-normal text-clinic-ink/50">likhein ya list se chunein</span></label>
             <div className="flex flex-wrap gap-1.5">
@@ -1386,15 +1378,6 @@ export default function VisitWorkspace(p: Props) {
           </div>
           {isGrp && (
             <div className="grid gap-2 rounded-xl border border-violet-200 bg-white p-2.5" data-testid="group-work">
-              {entTx === 'GRP:denture' && (
-                <div className="flex flex-wrap gap-1.5" role="group" aria-label="Denture ki qism">
-                  {([['partial', 'Kuch daanton ki'], ['complete', 'Poori jabde ki']] as const).map(([k, l]) => (
-                    <button key={k} type="button" data-testid={'dkind-' + k} aria-pressed={entDKind === k} onClick={() => { setEntDKind(k); setEntType('') }} className={`rounded-full px-3 py-1 text-xs font-semibold ${entDKind === k ? 'bg-violet-700 text-white' : 'border border-violet-300 bg-white text-violet-900'}`}>
-                      {entDKind === k ? '✓ ' : ''}{l}
-                    </button>
-                  ))}
-                </div>
-              )}
               <select aria-label="Qism" data-testid="grp-type" value={entType || grpNames[0] || ''} onChange={(e) => setEntType(e.target.value)} className="rounded-lg border border-violet-300 bg-white px-3 py-2 text-sm">
                 {(grpNames.length ? grpNames : [entTx === 'GRP:bridge' ? 'Bridge' : isComplete ? 'Complete Denture' : 'Partial Denture']).map((n) => <option key={n} value={n}>{n}</option>)}
               </select>
@@ -1433,8 +1416,20 @@ export default function VisitWorkspace(p: Props) {
             </button>
           </div>
         </div>
+  ) : null
+  const blk_work = !homeo ? (
+    <Section title="Daant aur kaam" hint="Upar chart par daant chunein, masla aur kaam wahin chunein. Yahan sirf un ke cards aate hain, bill khud.">
+      {canEdit && completeNames.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 text-xs" data-testid="complete-denture-row">
+          <span className="text-clinic-ink/60">Poori jabde ki Denture (daant chunna zaroori nahi):</span>
+          {completeNames.map((n) => (
+            <button key={n} type="button" data-testid="complete-denture" onClick={() => addCompleteDenture(n)} className="rounded-full border border-violet-300 bg-white px-3 py-1.5 font-semibold text-violet-900">
+              + {n}
+            </button>
+          ))}
+        </div>
       )}
-
+      
       <div className="grid gap-3 sm:grid-cols-2" data-testid="cards">
         {rows.filter((r) => r.group).map((r) => {
           const dxs = [...new Set(r.teeth.flatMap(dxOfTooth))]

@@ -28,8 +28,8 @@ exports.addCard=async(p,o)=>{for(const n of o.teeth)await exports.tap(p,n);
  if(o.pick)await p.getByTestId('entry-tx-select').selectOption(o.pick);
  await p.getByTestId('entry-add').click();await p.waitForTimeout(400)};
 exports.addGroup=async(p,o)=>{for(const n of o.teeth||[])await exports.tap(p,n);
+ if(o.kind==='denture'&&o.complete){await p.getByTestId('complete-denture').first().click();await p.waitForTimeout(500);return}
  await p.getByTestId(o.kind==='bridge'?'grp-bridge':'grp-denture').click();
- if(o.kind==='denture'&&o.complete)await p.getByTestId('dkind-complete').click();
  if(o.type)await p.getByTestId('grp-type').selectOption(o.type);
  if(o.mode)await p.getByTestId('gmode-'+o.mode).click();
  await p.getByTestId('entry-add').click();await p.waitForTimeout(500)};

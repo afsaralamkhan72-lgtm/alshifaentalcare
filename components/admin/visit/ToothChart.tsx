@@ -64,6 +64,7 @@ export default function ToothChart({
   renderExtra,
   noPlan,
   onWork,
+  hideDentalMarks = false,
   bridges = [],
 }: {
   age: number | null
@@ -77,6 +78,8 @@ export default function ToothChart({
   /** Is daant ke liye masla / kaam likhne ka hissa (visit mein) */
   renderExtra?: (tooth: string) => React.ReactNode
   noPlan?: boolean
+  /** Visit mein: daant ke kaam/masle yahan nahi chunne (neeche card mein chunte hain). Sirf masoorhe ke nishan baqi */
+  hideDentalMarks?: boolean
   /** Chart par kaam (filling, RCT ...) lagane/hatane par: bill wali treatment ki qatar bhi ban/hat jaye */
   onWork?: (condition: string, teeth: string[], planned: boolean, on: boolean) => void
   /** Bridge ke daant (har bridge ke daanton ki list): sahaare ek rang, beech wale (pontic) doosra. Sirf dikhane ke liye */
@@ -313,8 +316,9 @@ export default function ToothChart({
               ))}
             </div>
           )}
+          {hideDentalMarks && renderExtra?.(act)}
           <p className="text-xs font-semibold text-clinic-ink/70">
-            Nishan / kaam — {targets.length > 1 ? 'sab chune hue daanton par lagega' : <>sirf <span className="text-clinic-teal">{toothLabel(act)}</span> par lagega</>}
+            {hideDentalMarks ? 'Masoorhe ka nishan (agar ho)' : 'Nishan / kaam'} — {targets.length > 1 ? 'sab chune hue daanton par lagega' : <>sirf <span className="text-clinic-teal">{toothLabel(act)}</span> par lagega</>}
           </p>
           {selected.length > 1 && (
             <label className="flex items-center gap-2 text-xs text-clinic-ink/70">
@@ -347,11 +351,13 @@ export default function ToothChart({
             const rest = CONDITIONS.filter((c) => c.value !== 'healthy' && !COMMON.includes(c.value) && !GUM.includes(c.value) && !PEDO.includes(c.value))
             return (
               <>
+                {!hideDentalMarks && (
                 <div>
                   <p className="mb-1 text-[11px] font-semibold text-clinic-ink/55">Daant</p>
                   <div className="flex flex-wrap gap-1.5">{CONDITIONS.filter((c) => COMMON.includes(c.value)).map(btn)}</div>
                 </div>
-                {selected.some(isPrimary) && (
+                )}
+                {!hideDentalMarks && selected.some(isPrimary) && (
                   <div>
                     <p className="mb-1 text-[11px] font-semibold text-clinic-ink/55">Bachon ke daant ka kaam</p>
                     <div className="flex flex-wrap gap-1.5">{CONDITIONS.filter((c) => PEDO.includes(c.value)).map(btn)}</div>
@@ -362,15 +368,15 @@ export default function ToothChart({
                   <div className="flex flex-wrap gap-1.5">{CONDITIONS.filter((c) => GUM.includes(c.value)).map(btn)}</div>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
-                  {more && rest.map(btn)}
+                  {!hideDentalMarks && more && rest.map(btn)}
                   {targets.some((t) => marksOf(t).length > 0) && (
                     <button type="button" onClick={() => onMarks(marks.filter((m) => !targets.includes(m.tooth)))} className="rounded-full px-3 py-1.5 text-xs font-semibold text-red-600 underline">
                       Sab nishan hatao
                     </button>
                   )}
-                  <button type="button" onClick={() => setMore(!more)} className="rounded-full px-3 py-1.5 text-xs font-semibold text-clinic-teal underline">
+                  {!hideDentalMarks && <button type="button" onClick={() => setMore(!more)} className="rounded-full px-3 py-1.5 text-xs font-semibold text-clinic-teal underline">
                     {more ? 'Kam dikhayen' : 'Aur nishan'}
-                  </button>
+                  </button>}
                 </div>
                 {selected.map((t) => {
                   const o = marksOf(t).length === 0 ? oldOf(t) : undefined
@@ -387,7 +393,7 @@ export default function ToothChart({
               </>
             )
           })()}
-          {marksOf(act).some((m) => SURFACE_CONDS.includes(m.condition)) && (
+          {!hideDentalMarks && marksOf(act).some((m) => SURFACE_CONDS.includes(m.condition)) && (
             <div className="flex flex-wrap items-center gap-1.5 text-xs">
               <span className="text-clinic-ink/60">Daant ka kaun sa hissa?</span>
               {SURFACES.map((s) => {
@@ -402,7 +408,7 @@ export default function ToothChart({
               })}
             </div>
           )}
-          {renderExtra?.(act)}
+          {!hideDentalMarks && renderExtra?.(act)}
           <label className="grid gap-1 text-xs text-clinic-ink/60">
             Note ({toothLabel(act)})
             <textarea

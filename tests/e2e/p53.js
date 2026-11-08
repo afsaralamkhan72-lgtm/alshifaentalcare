@@ -7,8 +7,8 @@ await p.goto('http://localhost:3055/admin/patients/'+pid,{waitUntil:'domcontentl
 const st=p.getByRole('button',{name:/Naya visit shuru/});if(await st.count()){await st.click();await p.waitForTimeout(800)}
 await p.getByRole('button',{name:'Agla →'}).click();await p.waitForTimeout(900);
 await p.locator('[aria-label^="Upper Right Central Incisor"]').first().click();await p.waitForTimeout(400);
-const crown=p.getByRole('button',{name:/^Crown/}).first();console.log('crown btn',await crown.count());
-if(await crown.count()){await crown.click();await p.waitForTimeout(600)}
+const crown=p.getByTestId('quick-tx').filter({hasText:/Crown/}).first();console.log('crown btn',await crown.count());
+if(await crown.count()){await crown.click();await p.getByTestId('entry-add').click();await p.waitForTimeout(600)}
 const ls=p.locator('[data-testid=lab-send]');console.log('lab-send',await ls.count());
 const href=await ls.first().getAttribute('href').catch(()=>null);console.log('href',href);
 if(href){await p.goto('http://localhost:3055'+href,{waitUntil:'networkidle'});await p.waitForTimeout(1200);
