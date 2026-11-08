@@ -64,6 +64,35 @@ export default function RecycleBinList({
   const [err, setErr] = useState('')
   const router = useRouter()
   const [busyId, setBusyId] = useState<string | null>(null)
+  // Demo / test patient ko hamesha ke liye hatana (sirf doctor/admin; database bhi dobara check karta hai)
+  const [purge, setPurge] = useState<BinPatient | null>(null)
+  const [purgeInfo, setPurgeInfo] = useState<{ visits: number; invoices: number; payments: number; paid: number } | null>(null)
+  const [typed, setTyped] = useState('')
+  const [backedUp, setBackedUp] = useState(false)
+  const [purging, setPurging] = useState(false)
+
+  async function openPurge(p: BinPatient) {
+    setPurge(p); setPurgeInfo(null); setTyped(''); setBackedUp(false); setErr('')
+    const sb = createClient()
+    const [v, i, y] = await Promise.all([
+      sb.from('clinical_visits').select('id', { count: 'exact', head: true }).eq('patient_id', p.id),
+      sb.from('invoices').select('id', { count: 'exact', head: true }).eq('patient_id', p.id),
+      sb.from('payments').select('amount').eq('patient_id', p.id),
+    ])
+    const rows = (y.data ?? []) as { amount: number }[]
+    setPurgeInfo({ visits: v.count ?? 0, invoices: i.count ?? 0, payments: rows.length, paid: rows.reduce((a, r) => a + Number(r.amount), 0) })
+  }
+  async function doPurge() {
+    if (!purge) return
+    setPurging(true); setErr('')
+    const sb = createClient()
+    const { data, error } = await sb.rpc('purge_patient', { p_id: purge.id, p_confirm: typed })
+    if (error) { setPurging(false); setErr(error.message); return }
+    const paths = ((data as { photo_paths?: string[] } | null)?.photo_paths ?? []).filter(Boolean)
+    if (paths.length) await sb.storage.from('patient-media').remove(paths)
+    setPurging(false); setPurge(null)
+    router.refresh()
+  }
 
   async function restore(table: 'patients' | 'appointments' | 'lab_cases', id: string) {
     setBusyId(id)
@@ -184,11 +213,60 @@ export default function RecycleBinList({
                   >
                     Restore
                   </button>
+                  <button
+                    onClick={() => openPurge(p)}
+                    disabled={busyId === p.id}
+                    data-testid="purge-patient"
+                    className="rounded-full border border-red-200 px-4 py-2 text-xs font-semibold text-red-600 disabled:opacity-40"
+                  >
+                    Hamesha ke liye hatao
+                  </button>
                 </div>
               </div>
             ))}
           </div>
         </section>
+      )}
+      {purge && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true">
+          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5">
+            <p className="font-display text-lg font-semibold text-red-700">Hamesha ke liye hatayein?</p>
+            <p className="mt-1 text-sm font-semibold text-clinic-ink">{purge.full_name} {purge.mr_number ? `(${purge.mr_number})` : ''}</p>
+            <div className="mt-3 rounded-xl bg-red-50 p-3 text-sm text-red-800">
+              <p className="font-semibold">Ye wapas nahi aayega. Is mareez ka ye sab hat jayega:</p>
+              {purgeInfo ? (
+                <ul className="mt-1 list-disc pl-5">
+                  <li>{purgeInfo.visits} visit, chart, nuskhe, tasveerein, lab ke case</li>
+                  <li>{purgeInfo.invoices} invoice, {purgeInfo.payments} payment (kul Rs. {numFmt(purgeInfo.paid)})</li>
+                </ul>
+              ) : <p className="mt-1">Gintee ho rahi hai...</p>}
+              <p className="mt-2 text-xs">Is mareez ki payments aap ki income / hisaab se bhi hat jayengi, is liye Munafa ke total kam honge. Stock ki miqdar nahi badlegi. Audit Log mein sirf ye likha rahega ke kisne kya hataya.</p>
+            </div>
+            <a href="/api/backup" target="_blank" rel="noopener noreferrer" className="mt-3 inline-block rounded-full border border-clinic-teal/30 px-4 py-2 text-xs font-semibold text-clinic-teal">
+              Pehle backup download karein
+            </a>
+            <label className="mt-3 flex items-start gap-2 text-sm">
+              <input type="checkbox" checked={backedUp} onChange={(e) => setBackedUp(e.target.checked)} className="mt-1" />
+              <span>Maine backup le liya hai</span>
+            </label>
+            <label className="mt-3 block text-sm">
+              Tasdeeq ke liye <b>DELETE</b> likhein
+              <input value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" data-testid="purge-confirm" className="mt-1 w-full rounded-lg border border-red-200 px-3 py-2 text-sm" />
+            </label>
+            {err && <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{err}</p>}
+            <div className="mt-4 flex justify-end gap-2">
+              <button onClick={() => setPurge(null)} disabled={purging} className="rounded-full px-4 py-2 text-sm font-semibold text-clinic-ink/70">Wapas</button>
+              <button
+                onClick={doPurge}
+                disabled={purging || !backedUp || typed.trim().toUpperCase() !== 'DELETE' || !purgeInfo}
+                data-testid="purge-go"
+                className="rounded-full bg-red-600 px-5 py-2 text-sm font-semibold text-white disabled:opacity-40"
+              >
+                {purging ? 'Hat raha hai...' : 'Hamesha ke liye hatao'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {appointments.length > 0 && (

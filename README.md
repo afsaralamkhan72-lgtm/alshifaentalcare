@@ -29,8 +29,8 @@ Stack: Next.js 16 (App Router) + React 19 + Supabase (PostgreSQL, Auth, Storage)
 
 1. Pehle backup: Supabase > Database > Backups, aur app mein Settings se "Backup" JSON download.
 2. SQL Editor mein is tarteeb se (har ek add-only hai, dobara chalane se kuch kharab nahi hota):
-   `part1-discount-wording.sql`, `part2-reconcile.sql`, `part3-stock-check.sql`, `part4a-inventory-columns.sql`, `part4b-inventory-edit.sql`, `part4c-inventory-merge.sql`, `part4d-inventory-delete.sql`, `part5-installment-payment.sql`, `part6-stock-return-damage.sql` (folder `migrations/`).
-   Agar aap FINAL58 ke parts pehle chala chuke hain to sirf `part5` aur `part6`.
+   `part1-discount-wording.sql`, `part2-reconcile.sql`, `part3-stock-check.sql`, `part4a-inventory-columns.sql`, `part4b-inventory-edit.sql`, `part4c-inventory-merge.sql`, `part4d-inventory-delete.sql`, `part5-installment-payment.sql`, `part6-stock-return-damage.sql`, `part7-purge-patient.sql` (folder `migrations/`).
+   Agar aap FINAL58 ke parts pehle chala chuke hain to sirf `part5`, `part6` aur `part7`. `part7` demo/test patient ko Recycle Bin se hamesha ke liye hatane ka function hai (sirf doctor/admin).
 3. Wapas lana ho to `migrations/ROLLBACK-part5-part6.sql` (aur purane parts ka rollback `migrations/part-ORDER-and-ROLLBACK.txt` mein).
 
 ## C. Backup aur Restore

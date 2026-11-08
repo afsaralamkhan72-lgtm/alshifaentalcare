@@ -134,22 +134,22 @@ function Blue({ d, logo, logoUrl }: { d: InvData; logo: PrintLogo; logoUrl: stri
           {(logo.data || logoUrl) && <LogoMark logo={logo} fallbackUrl={logoUrl} badge />}
           <div>
             <p style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.15 }}>{CLINIC.name}</p>
-            <p style={{ fontSize: 12, opacity: 0.85 }}>{CLINIC.doctor.name}</p>
+            <p style={{ fontSize: 12, opacity: 0.85, fontStyle: 'italic' }}>{CLINIC.tagline}</p>
           </div>
         </div>
-        <p style={{ fontSize: 26, fontWeight: 800, letterSpacing: 2 }}>BILL</p>
+        <p style={{ fontSize: 26, fontWeight: 800, letterSpacing: 2 }}>INVOICE</p>
       </div>
       <div style={{ height: 6, background: BLUE_D }} />
 
       <div style={{ padding: '18px 24px 0', display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 12, fontSize: 13 }}>
         <div>
-          <p><b>Marez:</b> {d.patientName}</p>
-          <p><b>MR:</b> {d.mr ?? '—'} · {d.phone}</p>
+          <p><b>Patient Name:</b> {d.patientName}</p>
+          <p><b>Patient ID:</b> {d.mr ?? '—'} · {d.phone}</p>
           {d.doctor && <p><b>Dr:</b> {d.doctor}</p>}
         </div>
         <div style={{ textAlign: 'right' }}>
-          <p><b>Bill No:</b> {d.number}</p>
-          <p><b>Tareekh:</b> {fmtDate(d.date)}</p>
+          <p><b>Invoice No:</b> {d.number}</p>
+          <p><b>Date:</b> {fmtDate(d.date)}</p>
         </div>
       </div>
 
@@ -157,18 +157,18 @@ function Blue({ d, logo, logoUrl }: { d: InvData; logo: PrintLogo; logoUrl: stri
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead style={{ display: 'table-header-group' }}>
             <tr>
-              <th style={th}>Tafseel</th>
-              <th style={th}>Daant</th>
-              <th style={{ ...th, textAlign: 'right' }}>Qeemat</th>
-              <th style={{ ...th, textAlign: 'right' }}>Qty</th>
-              <th style={{ ...th, textAlign: 'right' }}>Total</th>
+              <th style={th}>Sr. No.</th>
+              <th style={th}>Description</th>
+              <th style={{ ...th, textAlign: 'right' }}>Rate</th>
+              <th style={{ ...th, textAlign: 'right' }}>Quantity</th>
+              <th style={{ ...th, textAlign: 'right' }}>Amount (PKR)</th>
             </tr>
           </thead>
           <tbody>
-            {d.items.map((it) => (
+            {d.items.map((it, i) => (
               <tr key={it.id} style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
-                <td style={td}>{it.name}</td>
-                <td style={td}>{it.tooth ?? '—'}</td>
+                <td style={td}>{i + 1}</td>
+                <td style={td}>{it.name}{it.tooth ? ` (${it.tooth})` : ''}</td>
                 <td style={{ ...td, textAlign: 'right', whiteSpace: 'nowrap' }}>{money(it.unit_price)}</td>
                 <td style={{ ...td, textAlign: 'right' }}>{it.qty}</td>
                 <td style={{ ...td, textAlign: 'right', whiteSpace: 'nowrap' }}>{money(it.line_total)}</td>
@@ -180,19 +180,31 @@ function Blue({ d, logo, logoUrl }: { d: InvData; logo: PrintLogo; logoUrl: stri
 
       <div style={{ padding: '14px 24px 0', display: 'flex', justifyContent: 'flex-end', breakInside: 'avoid', pageBreakInside: 'avoid' }}>
         <div style={{ width: 'min(100%, 300px)', background: BLUE_L, borderRadius: 8, padding: '6px 0' }}>
-          {row('Subtotal', money(d.subtotal))}
+          {row('Sub Total', money(d.subtotal))}
           {d.discountAmount > 0 && row(`Discount (${d.discountPercent}%)`, `− ${money(d.discountAmount)}`)}
-          {row('Kul raqam', money(d.total), true)}
-          {row('Mila', money(d.paid), false, '#047857')}
-          <div style={{ background: BLUE, color: '#fff', borderRadius: 6, margin: '4px 6px 2px' }}>{row('Baqaya', money(d.balance), true, '#fff')}</div>
+          {row('Net Payable', money(d.total), true)}
+          {row('Paid', money(d.paid), false, '#047857')}
+          <div style={{ background: BLUE, color: '#fff', borderRadius: 6, margin: '4px 6px 2px' }}>{row('Balance Due', money(d.balance), true, '#fff')}</div>
           {d.balance > 0 && d.dueDate && <p style={{ textAlign: 'right', fontSize: 11, padding: '2px 10px' }}>Aakhri tareekh: {fmtDate(d.dueDate)}</p>}
         </div>
       </div>
 
       {d.voided && d.voidReason && <p style={{ padding: '10px 24px 0', fontSize: 12, color: '#b91c1c' }}>Cancel ki wajah: {d.voidReason}</p>}
-      {d.notes && <p style={{ padding: '10px 24px 0', fontSize: 12 }}>Note: {d.notes}</p>}
+      {d.notes && <p style={{ padding: '10px 24px 0', fontSize: 12 }}><b>Notes:</b> {d.notes}</p>}
 
-      <div style={{ marginTop: 'auto', padding: '24px 24px 0', breakInside: 'avoid', pageBreakInside: 'avoid' }}>
+      <div style={{ marginTop: 'auto', padding: '24px 24px 0', display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, breakInside: 'avoid', pageBreakInside: 'avoid' }}>
+        <div>
+          <p style={{ fontFamily: 'cursive', fontStyle: 'italic', fontSize: 26, color: BLUE, lineHeight: 1.1 }}>Thank you!</p>
+          <p style={{ fontStyle: 'italic', fontSize: 12 }}>for choosing {CLINIC.name}</p>
+        </div>
+        <div style={{ width: 84, height: 84, borderRadius: '50%', border: `3px double ${BLUE}`, color: BLUE, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', fontSize: 9, fontWeight: 700, padding: 8, lineHeight: 1.2, transform: 'rotate(-6deg)' }}>
+          {CLINIC.name}<br />{CLINIC.address.city}
+        </div>
+        <div style={{ minWidth: 150, textAlign: 'center', fontSize: 11, fontWeight: 700 }}>
+          <div style={{ borderTop: `1px solid ${BLUE}`, paddingTop: 4 }}>Authorized Signature</div>
+        </div>
+      </div>
+      <div style={{ padding: '14px 24px 0', breakInside: 'avoid', pageBreakInside: 'avoid' }}>
         <div style={{ borderTop: `1px dashed ${BLUE}`, paddingTop: 10, fontSize: 11, lineHeight: 1.6 }}>
           <p style={{ fontWeight: 700 }}>Shartein</p>
           <p>Ada shuda raqam wapas nahi hoti. Baqaya raqam muqarrar tareekh tak ada karein. Bill sambhal kar rakhein.</p>

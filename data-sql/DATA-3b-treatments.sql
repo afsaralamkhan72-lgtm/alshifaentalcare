@@ -1,0 +1,37 @@
+insert into public.treatment_catalog (name, department, category, applies_to, price, price_note)
+select v.n, v.d, v.c, v.a, v.p, v.x
+from (values
+  ('PFM Crown', 'dental', 'Crown & Bridge', 'tooth', 3500::numeric, 'Rs. 3,500-5,000'),
+  ('Zirconia Crown', 'dental', 'Crown & Bridge', 'tooth', 15000::numeric, null),
+  ('Fixed Bridge', 'dental', 'Crown & Bridge', 'tooth', 3000::numeric, 'Rs. 3,000-3,500 per unit'),
+  ('Temporary Crown', 'dental', 'Crown & Bridge', 'tooth', 500::numeric, 'Rs. 500-1,000'),
+  ('Crown Removal', 'dental', 'Crown & Bridge', 'tooth', 500::numeric, 'Rs. 500-800'),
+  ('Crown Cementation', 'dental', 'Crown & Bridge', 'tooth', 500::numeric, 'Rs. 500-1,000'),
+  ('Complete Denture - Upper', 'dental', 'Denture', 'jaw', 18000::numeric, null),
+  ('Complete Denture - Lower', 'dental', 'Denture', 'jaw', 18000::numeric, null),
+  ('Upper + Lower Denture', 'dental', 'Denture', 'once', 55000::numeric, null),
+  ('Partial Denture', 'dental', 'Denture', 'tooth', 15000::numeric, 'Rs. 15,000-20,000'),
+  ('Single Artificial Tooth', 'dental', 'Denture', 'tooth', 2000::numeric, null),
+  ('Denture Adjustment', 'dental', 'Denture', 'once', 0::numeric, null),
+  ('Denture Repair', 'dental', 'Denture', 'once', 500::numeric, 'Rs. 500-1,500'),
+  ('Denture Relining', 'dental', 'Denture', 'jaw', 5000::numeric, null),
+  ('Orthodontic Examination', 'dental', 'Braces', 'once', 0::numeric, null),
+  ('Metal Braces - Upper', 'dental', 'Braces', 'jaw', 35000::numeric, null),
+  ('Metal Braces - Lower', 'dental', 'Braces', 'jaw', 35000::numeric, null),
+  ('Upper + Lower Braces', 'dental', 'Braces', 'once', 60000::numeric, null),
+  ('Braces Advance Payment', 'dental', 'Braces', 'once', 5000::numeric, null),
+  ('Monthly Adjustment', 'dental', 'Braces', 'once', 2000::numeric, null),
+  ('Wire Change', 'dental', 'Braces', 'once', 0::numeric, null),
+  ('Bracket Replacement', 'dental', 'Braces', 'once', 500::numeric, 'Rs. 500-800'),
+  ('Braces Repair', 'dental', 'Braces', 'once', 500::numeric, 'Rs. 500-1,000'),
+  ('Braces Removal', 'dental', 'Braces', 'jaw', 0::numeric, null),
+  ('Retainer', 'dental', 'Braces', 'jaw', 5000::numeric, 'Rs. 5,000-8,000'),
+  ('Gingivitis Treatment', 'dental', 'Gum', 'mouth', 1000::numeric, 'Rs. 1,000-2,000'),
+  ('Gum Infection Treatment', 'dental', 'Gum', 'mouth', 0::numeric, null),
+  ('Gum Cleaning', 'dental', 'Gum', 'mouth', 1500::numeric, 'Rs. 1,500-2,500'),
+  ('Periodontal Examination', 'dental', 'Gum', 'once', 0::numeric, null),
+  ('Periodontal Follow-up', 'dental', 'Gum', 'once', 0::numeric, null),
+  ('Dental X-Ray', 'dental', 'Other', 'once', 800::numeric, 'Rs. 800-1,000'),
+  ('Night Guard', 'dental', 'Other', 'once', 25000::numeric, null)
+) as v(n, d, c, a, p, x)
+where not exists (select 1 from public.treatment_catalog t where lower(btrim(t.name)) = lower(btrim(v.n)));

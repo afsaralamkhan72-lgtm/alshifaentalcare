@@ -348,6 +348,7 @@ export default async function PatientDetailPage({ params, searchParams }: Props)
         </Suspense>
       )}
 
+      <div className="profile-extra grid gap-4">
       {canClinical && (
         <Suspense fallback={null}>
           <TreatmentCardsSlot patientId={patient.id} patientName={patient.full_name} phone={patient.phone ?? null} canMoney={canMoney} canBill={can('billing.create')} canEdit={can('clinical.edit')} canLab={can('lab.view')} />
@@ -364,6 +365,7 @@ export default async function PatientDetailPage({ params, searchParams }: Props)
       <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-clinic-teal/10 pt-4">
         <PortalLinkButton patientId={patient.id} patientName={patient.full_name} patientPhone={patient.phone} portalCode={patient.portal_code ?? null} />
         {isOwner && <DeletePatientButton patientId={patient.id} patientName={patient.full_name} mrNumber={patient.mr_number} />}
+      </div>
       </div>
     </div>
   )

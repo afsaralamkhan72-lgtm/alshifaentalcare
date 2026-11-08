@@ -166,3 +166,6 @@
     column-gap: 0.25em;
   }
 }
+
+/* Visit ka form khula ho to purani history chhup jaye */
+html[data-visit-mode='1'] .profile-extra { display: none; }

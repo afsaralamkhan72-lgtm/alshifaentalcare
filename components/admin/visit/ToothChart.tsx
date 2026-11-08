@@ -50,6 +50,8 @@ type Mode = 'adult' | 'milk' | 'both'
  * Phone par 16 daant aik line mein bohat chhote hote hain, isliye wahan aik hissa (quadrant) aik waqt mein bade size mein.
  * pickOnly = sirf daant chunna (lab form), nishan ya surface nahi.
  */
+const PONTIC_FILL = '#FCD34D'
+
 export default function ToothChart({
   age,
   selected,
@@ -62,6 +64,7 @@ export default function ToothChart({
   renderExtra,
   noPlan,
   onWork,
+  bridges = [],
 }: {
   age: number | null
   selected: string[]
@@ -76,6 +79,8 @@ export default function ToothChart({
   noPlan?: boolean
   /** Chart par kaam (filling, RCT ...) lagane/hatane par: bill wali treatment ki qatar bhi ban/hat jaye */
   onWork?: (condition: string, teeth: string[], planned: boolean, on: boolean) => void
+  /** Bridge ke daant (har bridge ke daanton ki list): sahaare ek rang, beech wale (pontic) doosra. Sirf dikhane ke liye */
+  bridges?: string[][]
 }) {
   const [mode, setMode] = useState<Mode>(() => {
     if (selected.some(isPrimary) && selected.some((t) => !isPrimary(t))) return 'both'
@@ -151,6 +156,22 @@ export default function ToothChart({
   const showAdult = mode !== 'milk'
   const showMilk = mode !== 'adult'
 
+  // Bridge: arch mein tarteeb se pehla aur aakhri daant sahaara, beech wale pontic
+  const bridgeRole: Record<string, 'abut' | 'pontic'> = {}
+  for (const grp of bridges) {
+    const pos = (t: string) => {
+      const q = Number(t[0]), n = Number(t.slice(1))
+      if (!Number.isFinite(q) || !Number.isFinite(n)) return NaN
+      const top = q === 1 || q === 4 || q === 5 || q === 8
+      const width = q >= 5 ? 5 : 8
+      return top ? width - n : width + n - 1
+    }
+    const arch = (t: string) => (['1', '2', '5', '6'].includes(t[0]) ? 'U' : 'L')
+    for (const a of ['U', 'L']) {
+      const ts = grp.filter((t) => arch(t) === a && Number.isFinite(pos(t))).sort((x, y) => pos(x) - pos(y))
+      ts.forEach((t, i) => { bridgeRole[t] = i === 0 || i === ts.length - 1 ? 'abut' : 'pontic' })
+    }
+  }
   const infoOf = (t: string): ToothInfo => {
     const ms = marksOf(t)
     const m = ms[0]
@@ -158,7 +179,7 @@ export default function ToothChart({
     const cond = m?.condition ?? o?.condition
     return {
       sel: selected.includes(t),
-      fill: cond && cond !== 'healthy' ? TOOTH_FILL[cond] : undefined,
+      fill: cond && cond !== 'healthy' ? TOOTH_FILL[cond] : bridgeRole[t] === 'pontic' ? PONTIC_FILL : bridgeRole[t] === 'abut' ? TOOTH_FILL.bridge : undefined,
       ghost: Boolean(o),
       cond,
       badge: ms.some((x) => x.state === 'planned') ? '⏳' : ms.some((x) => x.state === 'completed') ? '✓' : undefined,
@@ -229,7 +250,7 @@ export default function ToothChart({
         )}
       </p>
 
-      {!pickOnly && (usedConds.length > 0 || hasGhost) && (
+      {!pickOnly && (usedConds.length > 0 || hasGhost || Object.keys(bridgeRole).length > 0) && (
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-clinic-ink/65">
           {usedConds.map((c) => {
             const cd = CONDITIONS.find((x) => x.value === c)
@@ -240,6 +261,12 @@ export default function ToothChart({
               </span>
             )
           })}
+          {Object.keys(bridgeRole).length > 0 && (
+            <>
+              <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-sm border border-clinic-ink/20" style={{ background: TOOTH_FILL.bridge }} />Bridge ke sahaare</span>
+              <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-sm border border-clinic-ink/20" style={{ background: PONTIC_FILL }} />Pontic (beech wale)</span>
+            </>
+          )}
           {hasGhost && <span className="italic">halka rang = pichli visit ka</span>}
         </div>
       )}

@@ -1,0 +1,18 @@
+const L=require('./lib2.js');
+(async()=>{const r=await L.open(1280);const p=r.p;
+const name='Purge Demo '+Date.now().toString().slice(-4);
+const pid=await L.newPatient(p,name,'0311'+String(Date.now()).slice(-7));
+L.q(`update patients set deleted_at=now() where id='${pid}'`);
+const before=L.q("select (select count(*) from patients where deleted_at is null),(select coalesce(sum(total),0) from invoices where status<>'void')");
+await p.goto('http://localhost:3055/admin/recycle-bin',{waitUntil:'networkidle'});await p.waitForTimeout(800);
+const card=p.locator('div',{hasText:name}).filter({has:p.getByTestId('purge-patient')}).last();
+await card.getByTestId('purge-patient').click();await p.waitForTimeout(1200);
+const go=p.getByTestId('purge-go');
+console.log('disabled at start:',await go.isDisabled());
+await p.getByTestId('purge-confirm').fill('DELETE');console.log('disabled (typed only):',await go.isDisabled());
+await p.getByLabel('Maine backup le liya hai').check();console.log('disabled (all ok):',await go.isDisabled());
+await go.click();await p.waitForTimeout(2500);
+console.log('patient row left:',L.q(`select count(*) from patients where id='${pid}'`),'dialog open:',await p.getByTestId('purge-go').count());
+console.log('same totals:',before===L.q("select (select count(*) from patients where deleted_at is null),(select coalesce(sum(total),0) from invoices where status<>'void')"));
+console.log('ERR:',await p.locator('[role=dialog] .bg-red-50.text-red-700').allInnerTexts());
+process.exit(0)})().catch(e=>{console.log('FAIL',e.message.slice(0,300));process.exit(1)});

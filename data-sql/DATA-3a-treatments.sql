@@ -1,0 +1,37 @@
+insert into public.treatment_catalog (name, department, category, applies_to, price, price_note)
+select v.n, v.d, v.c, v.a, v.p, v.x
+from (values
+  ('Dental Scaling', 'dental', 'Cleaning', 'mouth', 1000::numeric, null),
+  ('Polishing', 'dental', 'Cleaning', 'mouth', 0::numeric, null),
+  ('Scaling & Polishing', 'dental', 'Cleaning', 'mouth', 1500::numeric, 'Rs. 1,500-2,000'),
+  ('Stain Removal', 'dental', 'Cleaning', 'mouth', 500::numeric, 'Rs. 500-1,000'),
+  ('Teeth Whitening', 'dental', 'Whitening', 'mouth', 5000::numeric, 'Rs. 5,000-8,000'),
+  ('Whitening Follow-up', 'dental', 'Whitening', 'once', 0::numeric, null),
+  ('Simple Extraction', 'dental', 'Extraction', 'tooth', 500::numeric, 'Rs. 500-1,000'),
+  ('Difficult Extraction', 'dental', 'Extraction', 'tooth', 1500::numeric, 'Rs. 1,500-2,000'),
+  ('Root Piece Removal', 'dental', 'Extraction', 'tooth', 1000::numeric, 'Rs. 1,000-2,000'),
+  ('Surgical Extraction', 'dental', 'Extraction', 'tooth', 3000::numeric, 'Rs. 3,000-5,000'),
+  ('Wisdom Tooth Extraction', 'dental', 'Extraction', 'tooth', 3000::numeric, 'Rs. 3,000-6,000'),
+  ('Stitching', 'dental', 'Extraction', 'once', 500::numeric, 'Rs. 500-1,000'),
+  ('Suture Removal', 'dental', 'Extraction', 'once', 0::numeric, null),
+  ('Post Extraction Review', 'dental', 'Extraction', 'once', 0::numeric, null),
+  ('Dressing / Wound Check', 'dental', 'Extraction', 'once', 300::numeric, 'Rs. 300-500'),
+  ('Simple Filling (GIC)', 'dental', 'Filling', 'tooth', 500::numeric, 'Rs. 500-800'),
+  ('Composite Filling', 'dental', 'Filling', 'tooth', 1000::numeric, 'Rs. 1,000-1,500'),
+  ('Light Cure Filling', 'dental', 'Filling', 'tooth', 1000::numeric, 'Rs. 1,000-2,000'),
+  ('Temporary Filling', 'dental', 'Filling', 'tooth', 300::numeric, 'Rs. 300-500'),
+  ('Re-Filling', 'dental', 'Filling', 'tooth', 1000::numeric, 'Rs. 1,000-1,500'),
+  ('Deep Cavity Filling', 'dental', 'Filling', 'tooth', 1500::numeric, 'Rs. 1,500-2,000'),
+  ('Filling Polishing', 'dental', 'Filling', 'tooth', 0::numeric, null),
+  ('RCT Examination', 'dental', 'Root Canal', 'once', 0::numeric, null),
+  ('RCT - Front Tooth with cap', 'dental', 'Root Canal', 'tooth', 4000::numeric, null),
+  ('RCT - Premolar with cap', 'dental', 'Root Canal', 'tooth', 5000::numeric, null),
+  ('RCT - Molar with cap', 'dental', 'Root Canal', 'tooth', 5000::numeric, null),
+  ('RCT Re-treatment with cap', 'dental', 'Root Canal', 'tooth', 6000::numeric, null),
+  ('Temporary Dressing', 'dental', 'Root Canal', 'tooth', 300::numeric, 'Rs. 300-500'),
+  ('Post RCT Crown Preparation', 'dental', 'Root Canal', 'tooth', 0::numeric, null),
+  ('Acrylic Crown', 'dental', 'Crown & Bridge', 'tooth', 1500::numeric, 'Rs. 1,500-2,000'),
+  ('Metal Crown', 'dental', 'Crown & Bridge', 'tooth', 2000::numeric, 'Rs. 2,000-2,500'),
+  ('Porcelain Crown', 'dental', 'Crown & Bridge', 'tooth', 2800::numeric, 'Rs. 2,800-3,500')
+) as v(n, d, c, a, p, x)
+where not exists (select 1 from public.treatment_catalog t where lower(btrim(t.name)) = lower(btrim(v.n)));
