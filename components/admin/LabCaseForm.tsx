@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { LAB_WORK_RE } from '@/lib/treatmentStages'
 import ToothPicker from './ToothPicker'
 import { todayKarachi } from '@/lib/karachi'
 
@@ -36,7 +37,7 @@ export default function LabCaseForm({
   labs,
   patients,
   fixedPatient,
-  treatments = [],
+  treatments: treatmentsProp = [],
   defaultTreatmentId,
   defaultTeeth,
   defaultWork,
@@ -53,6 +54,7 @@ export default function LabCaseForm({
   treatments?: { id: string; name: string; teeth: string[] }[]
 }) {
   const router = useRouter()
+  const [treatments, setTreatments] = useState(treatmentsProp)
   const [open, setOpen] = useState(Boolean(defaultTreatmentId && treatments.some((t) => t.id === defaultTreatmentId)) || Boolean(fixedPatient && defaultTeeth && defaultTeeth.length > 0))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -62,6 +64,17 @@ export default function LabCaseForm({
   const startT = treatments.find((t) => t.id === defaultTreatmentId)
   const [treatmentId, setTreatmentId] = useState(startT?.id ?? '')
   const [pq, setPq] = useState('')
+  async function loadTreatments(pid: string) {
+    const { data } = await createClient().from('patient_treatments').select('id, name, teeth, status').eq('patient_id', pid).in('status', ['active', 'planned', 'completed']).order('started_on', { ascending: false }).limit(30)
+    const all = ((data ?? []) as { id: string; name: string; teeth: string[] | null; status: string }[]).map((t) => ({ id: t.id, name: t.name, teeth: t.teeth ?? [], status: t.status }))
+    const labWork = all.filter((t) => t.status !== 'completed' && LAB_WORK_RE.test(t.name))
+    const list = labWork.length > 0 ? labWork : all
+    setTreatments(list)
+    if (labWork.length === 1) {
+      setTreatmentId(labWork[0].id)
+      if (labWork[0].teeth.length) setTeeth(labWork[0].teeth)
+    } else setTreatmentId('')
+  }
   const [pResults, setPResults] = useState<PatientOption[]>([])
 
   async function searchPatients(v: string) {
@@ -289,6 +302,8 @@ export default function LabCaseForm({
                       onClick={() => {
                         setPatientId('')
                         setPickedLabel('')
+                        setTreatments([])
+                        setTreatmentId('')
                       }}
                       className="text-xs text-clinic-teal underline"
                     >
@@ -315,6 +330,7 @@ export default function LabCaseForm({
                               setPickedLabel(`${p.mr_number}, ${p.full_name}`)
                               setPResults([])
                               setPq('')
+                              loadTreatments(p.id)
                             }}
                             className="block w-full px-3 py-2 text-left text-sm hover:bg-clinic-mint"
                           >
@@ -329,8 +345,9 @@ export default function LabCaseForm({
 
               {treatments.length > 0 && (
                 <div>
-                  <label className="text-sm font-medium text-clinic-ink">Kis treatment ka (optional)</label>
+                  <label className="text-sm font-medium text-clinic-ink">Kis ilaaj ka (lab ka kaam is se jurega)</label>
                   <select
+                    data-testid="lab-treatment"
                     value={treatmentId}
                     onChange={(e) => {
                       setTreatmentId(e.target.value)

@@ -8,6 +8,7 @@ import { friendlyError } from '@/lib/errors'
 import { toothTitle as toothLabel } from '@/lib/teeth'
 import { fmtDate, money } from '@/lib/karachi'
 import type { TItem } from './visit/types'
+import { STAGE_TEMPLATES, LAB_WORK_RE } from '@/lib/treatmentStages'
 import PaymentPlan, { type Plan } from './PaymentPlan'
 
 export interface Stage {
@@ -26,11 +27,6 @@ export interface LabLite {
 }
 
 const LONG = /braces|aligner|implant|bone graft|denture/i
-const TEMPLATES: { re: RegExp; stages: string[] }[] = [
-  { re: /braces|aligner/i, stages: ['Records / X-ray / impression', 'Braces lagaye', 'Mahana adjustment (jaari)', 'Braces utare', 'Retainer lagaya'] },
-  { re: /implant/i, stages: ['Planning / CBCT', 'Implant surgery', 'Healing (3-6 mahine)', 'Abutment / impression', 'Crown fit'] },
-  { re: /denture/i, stages: ['Impression', 'Bite / try-in', 'Denture fit', 'Review / adjustment'] },
-]
 
 const STATUS: Record<string, string> = { planned: 'sirf plan', active: 'chal rahi', completed: 'mukammal', cancelled: 'cancel' }
 const LAB: Record<string, string> = { pending: 'lab ko bhejna hai', sent: 'lab ko bheja', in_progress: 'lab mein ban raha', received: 'lab se aa gaya', fitted: 'fit ho gaya' }
@@ -47,6 +43,7 @@ export default function TreatmentCards({
   canBill = false,
   patientName = '',
   phone = null,
+  canLab = false,
 }: {
   patientId: string
   treatments: TItem[]
@@ -58,6 +55,7 @@ export default function TreatmentCards({
   canBill?: boolean
   patientName?: string
   phone?: string | null
+  canLab?: boolean
 }) {
   const router = useRouter()
   const [busy, setBusy] = useState('')
@@ -85,8 +83,8 @@ export default function TreatmentCards({
         {list.map((t) => {
           const st = stages.filter((s) => s.treatment_id === t.id).sort((a, b) => a.sort_order - b.sort_order)
           const tl = labs.filter((l) => l.treatment_id === t.id)
-          const tpl = TEMPLATES.find((x) => x.re.test(t.name))
-          const long = LONG.test(t.name)
+          const tpl = STAGE_TEMPLATES.find((x) => x.re.test(t.name))
+          const long = LONG.test(t.name) || Boolean(tpl)
           return (
             <div key={t.id} className="rounded-xl border border-clinic-teal/15 p-3">
               <div className="flex flex-wrap items-center gap-2">
@@ -107,7 +105,7 @@ export default function TreatmentCards({
               )}
               {canEdit && t.status === 'active' && t.visits.length > 0 && (
                 <Link
-                  href={`/admin/patients/${patientId}?continue=${t.id}`}
+                  href={`/admin/patients/${patientId}/visit/${t.id}`}
                   data-testid="next-visit"
                   className="mt-2 inline-flex min-h-[44px] items-center rounded-full bg-clinic-teal px-5 py-2 text-sm font-semibold text-white"
                 >
@@ -129,6 +127,11 @@ export default function TreatmentCards({
               )}
               {canMoney && t.status !== 'cancelled' && (
                 <PaymentPlan treatmentId={t.id} paid={t.paid} balance={t.balance} plan={plans.find((p) => p.patient_treatment_id === t.id) ?? null} canEdit={canBill} patientName={patientName} phone={phone} />
+              )}
+              {canLab && t.status === 'active' && LAB_WORK_RE.test(t.name) && tl.length === 0 && (
+                <Link href={`/admin/lab?patient=${patientId}&treatment=${t.id}`} data-testid="card-lab" className="mt-2 inline-flex min-h-[40px] items-center rounded-full border border-clinic-teal bg-clinic-mint px-4 py-1.5 text-xs font-semibold text-clinic-teal">
+                  Lab ko bhejein →
+                </Link>
               )}
               {tl.length > 0 && (
                 <p className="mt-1 flex flex-wrap gap-2 text-xs">

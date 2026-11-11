@@ -1,0 +1,24 @@
+const L=require('./lib2.js');
+const res=[];const ok=(n,c,x='')=>{res.push(c);console.log((c?'PASS':'FAIL')+' | '+n+(x!==''?' | '+x:''))};
+const B='http://localhost:3055';
+(async()=>{const r=await L.open(390);const p=r.p;const sfx=Date.now().toString().slice(-5);
+ const pid=await L.newPatient(p,'Fl '+sfx,'0322'+String(Date.now()).slice(-7));
+ await p.goto(B+'/admin/patients/'+pid,{waitUntil:'domcontentloaded'});await p.waitForTimeout(1800);
+ const st=p.getByRole('button',{name:/Naya visit shuru/});if(await st.count()){await st.click();await p.waitForTimeout(800)}
+ await p.getByRole('button',{name:'Agla →'}).click();await p.waitForTimeout(900);
+ await L.addCard(p,{teeth:['Upper Right First Molar'],dx:'Broken tooth',pick:{label:'Zirconia Crown'}}).catch(async()=>{await L.addCard(p,{teeth:[],quick:/crown/i})});
+ ok('Visit 1 mein lab ka button nahi',await p.getByTestId('lab-send').count()===0);
+ await p.getByRole('button',{name:'Agla →'}).click();await p.waitForTimeout(500);await p.getByRole('button',{name:'Agla →'}).click();await p.waitForTimeout(500);
+ const f=p.locator('text=Aaj kitne mile').first();if(await f.count())await f.locator('xpath=following::input[1]').fill('0');
+ await p.getByRole('button',{name:/Visit khatam karein/}).click();await p.waitForTimeout(4000);
+ const t=L.q("select id||'|'||name from patient_treatments where patient_id='"+pid+"'").split('|');
+ await p.goto(B+'/admin/patients/'+pid,{waitUntil:'domcontentloaded'});await p.waitForTimeout(2500);
+ const lb=p.getByTestId('card-lab');ok('Profile ke card par "Lab ko bhejein"',await lb.count()===1,t[1]);
+ ok('Lab link us ilaaj se jura hai',(await lb.getAttribute('href').catch(()=>''))==='/admin/lab?patient='+pid+'&treatment='+t[0]);
+ await lb.click();await p.waitForTimeout(2500);
+ ok('Lab page khula, mareez aur ilaaj bhara hua',p.url().includes('/admin/lab')&&(await p.locator('body').innerText()).includes('Fl '+sfx));
+ ok('Overflow nahi',!(await p.evaluate(()=>document.documentElement.scrollWidth>document.documentElement.clientWidth)));
+ await p.goto(B+'/admin/patients/'+pid+'/visit/'+t[0],{waitUntil:'domcontentloaded'});await p.waitForTimeout(1500);
+ ok('Visit 2 page par bhi lab ka link',await p.getByTestId('fu-lab').count()===1);
+ ok('Crown ke 3 qadam (visit 1 se)',await p.getByTestId('fu-stage').count()===3);
+ await r.b.close();console.log('TOTAL '+res.length+' | FAIL '+res.filter(x=>!x).length);process.exit(0)})().catch(e=>{console.log('CRASH',e.message.slice(0,400));process.exit(1)});

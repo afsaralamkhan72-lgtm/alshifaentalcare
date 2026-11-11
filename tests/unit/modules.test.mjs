@@ -6,7 +6,7 @@ import { friendlyError } from '../../lib/errors.ts'
 import { getYouTubeEmbedUrl } from '../../lib/youtube.ts'
 import { toothLabel, toothTitle, isPrimary, isWisdom, quadrantOf } from '../../lib/teeth.ts'
 import { toBalance } from '../../lib/ledger.ts'
-import { defaultSteps } from '../../lib/treatmentSteps.ts'
+import { stagesFor, MONTHLY_RE, LAB_WORK_RE } from '../../lib/treatmentStages.ts'
 import { t12, hm, dur, dateLabel, nextPayDay, prevMonth, whatsappShareLink } from '../../lib/attendanceUi.ts'
 import { renderTemplate, adabName, salaamLine, mapTemplates, TEMPLATE_DEFAULTS } from '../../lib/messageTemplates.ts'
 import { messageLink, paymentReminderLink } from '../../lib/messages.ts'
@@ -74,15 +74,20 @@ test('ledger: text ke number sahi number bante hain', () => {
   assert.equal(b.old_balance, 0)
 })
 
-test('parchi: har ilaaj ke qadam', () => {
-  assert.equal(defaultSteps('Root Canal Treatment (Anterior)').length, 4)
-  assert.equal(defaultSteps('RCT').length, 4)
-  assert.deepEqual(defaultSteps('PFM Bridge'), ['Daant tarashna aur naap', 'Trial', 'Bridge fit'])
-  assert.equal(defaultSteps('Porcelain Crown').length, 3)
-  assert.deepEqual(defaultSteps('Complete Denture (Both)'), ['Naap', 'Trial', 'Fitting'])
-  assert.equal(defaultSteps('Braces (Metal) - Upper').length, 3)
-  assert.deepEqual(defaultSteps('Composite Filling'), [])
-  assert.deepEqual(defaultSteps('Scaling & Polishing'), [])
+test('qadam: har ilaaj ki ek hi list', () => {
+  assert.equal(stagesFor('Root Canal Treatment (Anterior)').length, 8)
+  assert.equal(stagesFor('RCT').length, 8)
+  assert.equal(stagesFor('RCT').some((x) => /crown/i.test(x)), false)
+  assert.deepEqual(stagesFor('PFM Bridge'), ['Daant tarashna aur naap', 'Trial', 'Bridge fit'])
+  assert.equal(stagesFor('Porcelain Crown').length, 3)
+  assert.equal(stagesFor('Complete Denture (Both)').length, 4)
+  assert.equal(stagesFor('Braces (Metal) - Upper').length, 5)
+  assert.deepEqual(stagesFor('Composite Filling'), [])
+  assert.deepEqual(stagesFor('Scaling & Polishing'), [])
+  assert.equal(MONTHLY_RE.test('Braces (Metal) - Upper'), true)
+  assert.equal(MONTHLY_RE.test('Root Canal'), false)
+  assert.equal(LAB_WORK_RE.test('Zirconia Crown'), true)
+  assert.equal(LAB_WORK_RE.test('Root Canal'), false)
 })
 
 test('attendance: waqt aur tareekh', () => {

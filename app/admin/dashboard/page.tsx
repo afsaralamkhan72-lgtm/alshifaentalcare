@@ -286,12 +286,13 @@ async function CrownPending() {
     (r) => !cover.some((o) => o.patient_id === r.patient_id && /crown|cap|bridge|extract|\bpfm\b|zirconia/i.test(o.name) && (r.teeth.length === 0 || o.teeth.some((t) => r.teeth.includes(t))))
   )
   if (pending.length === 0) return null
+  pending.sort((x, y) => String(y.completed_on ?? '').localeCompare(String(x.completed_on ?? '')))
   return (
     <section data-testid="crown-pending" className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
       <p className="text-sm font-semibold text-amber-900">Crown baqi hai ({pending.length})</p>
       <p className="text-xs text-amber-800">RCT ho chuka hai, lekin us daant par crown ka plan nahi bana.</p>
-      <div className="mt-2 grid gap-1 text-sm">
-        {pending.slice(0, 8).map((r) => (
+      <div className="mt-2 grid max-h-72 gap-1 overflow-y-auto text-sm">
+        {pending.map((r) => (
           <Link key={r.id} href={`/admin/patients/${r.patient_id}`} className="rounded-lg px-2 py-1 hover:bg-amber-100">
             <span className="font-medium">{r.patients?.full_name ?? '—'}</span>
             <span className="ml-1 text-xs text-amber-800">{r.name}{r.teeth.length ? ' (' + r.teeth.join(', ') + ')' : ''} · {r.completed_on ? fmtDate(r.completed_on) : ''}</span>

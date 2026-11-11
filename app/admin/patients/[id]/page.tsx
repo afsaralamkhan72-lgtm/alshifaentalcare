@@ -421,6 +421,7 @@ async function TreatmentCardsSlot({ patientId, patientName, phone, canMoney, can
       canBill={canBill}
       patientName={patientName}
       phone={phone}
+      canLab={canLab}
     />
   )
 }
@@ -541,7 +542,7 @@ async function WorkspaceSection({
   // meri discount ki had (SQL chali na ho to purana rule: owner 100%, baqi 0%)
   const dmRes = await supabase.rpc('my_discount_limit')
   const discountMax = dmRes.error || dmRes.data == null ? (isOwner ? 100 : 0) : Number(dmRes.data)
-  const [treatments, chartRes, catRes, docRes, matRes, qualRes, cvRes, medRes, billRes, rxRes, photoRes, optRes, cvCnt, vnCnt, vsRes] = await Promise.all([
+  const [treatments, chartRes, catRes, docRes, matRes, qualRes, cvRes, medRes, billRes, rxRes, photoRes, optRes, cvCnt, vnCnt, vsRes, stockRes] = await Promise.all([
     getTreatments(patient.id),
     isDental && can('clinical.view')
       ? supabase
@@ -583,6 +584,7 @@ async function WorkspaceSection({
     can('clinical.view') ? supabase.from('clinical_visits').select('id', { count: 'exact', head: true }).eq('patient_id', patient.id).eq('status', 'finished') : Promise.resolve({ count: null }),
     can('clinical.view') ? supabase.from('visit_notes').select('id', { count: 'exact', head: true }).eq('patient_id', patient.id) : Promise.resolve({ count: null }),
     supabase.from('site_settings').select('value').eq('key', 'visit_show').maybeSingle(),
+    can('clinical.edit') ? supabase.from('inventory').select('id, item_name, unit').eq('is_active', true).is('deleted_at', null).order('item_name') : Promise.resolve({ data: [] }),
   ])
   const opts = { complaint: [] as string[], homeo_complaint: [] as string[], diagnosis: [] as string[] }
   if (!optRes.error) for (const o of (optRes.data ?? []) as { kind: keyof typeof opts; label: string }[]) opts[o.kind]?.push(o.label)
@@ -634,6 +636,7 @@ async function WorkspaceSection({
       catalog={catalog}
       materials={materials}
       extraItems={extraItems}
+      stockItems={((stockRes.data ?? []) as { id: string; item_name: string; unit: string | null }[]).map((i) => ({ inventory_id: i.id, name: i.item_name, unit: i.unit }))}
       canSeeRecipes={isOwner}
       doctors={(docRes.data ?? []).map((d) => d.name as string)}
       defaultDoctor={patient.primary_doctor ?? null}

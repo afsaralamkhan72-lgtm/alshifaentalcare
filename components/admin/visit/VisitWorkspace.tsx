@@ -13,7 +13,7 @@ import { friendlyError } from '@/lib/errors'
 import { COMPLAINTS, HOMEO_COMPLAINTS, DIAG_SUGGEST } from '@/lib/clinicOptions'
 import { useTemplates } from '@/lib/useTemplates'
 import { messageLink } from '@/lib/messages'
-import TreatmentSteps from './TreatmentSteps'
+import { stagesFor } from '@/lib/treatmentStages'
 import { askReceipt } from '@/lib/receiptEvent'
 import PaymentDialog from '@/components/admin/PaymentDialog'
 import VisitRewards from '@/components/admin/VisitRewards'
@@ -102,6 +102,8 @@ interface TRow {
   /** Group kaam (Bridge/Partial): har daant ki qeemat ('each') ya poore ki ek ('whole'); gunit = Price List ki qeemat */
   gmode?: 'each' | 'whole'
   gunit?: number
+  /** Is ilaaj ke jo qadam aaj hue (profile ke "Marhale" mein jate hain) */
+  stg?: string[]
 }
 type Applies = 'tooth' | 'mouth' | 'jaw' | 'once'
 const APPLIES_LABEL: Record<Applies, string> = { tooth: 'Har daant ki', mouth: 'Poora muh', jaw: 'Jabda', once: 'Aik dafa' }
@@ -127,6 +129,8 @@ interface Props {
   /** "Doctor khud chunein" wala samaan (recipe mein nahi, doctor haath se likhta hai) */
   canSeeRecipes?: boolean
   extraItems?: { inventory_id: string; name: string; unit: string | null }[]
+  /** Stock ki poori list (visit ke aakhir mein "aur samaan" ke liye) */
+  stockItems?: { inventory_id: string; name: string; unit: string | null }[]
   doctors: string[]
   defaultDoctor: string | null
   medicines: MedOpt[]
@@ -327,7 +331,9 @@ export default function VisitWorkspace(p: Props) {
   const [diags, setDiags] = useState<Diagnosis[]>(v?.diagnoses?.length ? v.diagnoses : [])
   // 9 treatment
   const [rows, setRows] = useState<TRow[]>([])
-  const live = p.treatments.filter((t) => t.status === 'active' || t.status === 'planned')
+  const liveAll = p.treatments.filter((t) => t.status === 'active' || t.status === 'planned')
+  const ongoing = p.treatments.filter((t) => t.status === 'active')
+  const live = p.treatments.filter((t) => t.status === 'planned')
   const [old, setOld] = useState<Record<string, OldRow>>({})
   // 10 prescription
   const [rxCat, setRxCat] = useState<'dental' | 'homeopathic'>(homeo ? 'homeopathic' : 'dental')
@@ -449,7 +455,7 @@ export default function VisitWorkspace(p: Props) {
     }
     for (const t of p.treatments) {
       const c = condOf(t.name)
-      if (!c || !old[t.id]?.tick) continue
+      if (!c || t.status !== 'planned' || !old[t.id]?.tick) continue
       for (const tt of t.teeth) if (!out.some((m) => m.tooth === tt && m.condition === c)) out.push({ tooth: tt, condition: c, surfaces: [], state: 'completed' })
     }
     return out
@@ -859,6 +865,26 @@ export default function VisitWorkspace(p: Props) {
       ...rows.filter((x) => !x.planned && x.name.trim()).map((x) => x.name.trim()),
       ...live.filter((t) => old[t.id]?.tick).map((t) => t.name),
     ]
+    // Aaj shuru hue ilaaj ke qadam (profile ki "Marhale" list): jo tick hue un par aaj ki tareekh
+    {
+      const sbs = createClient()
+      const used = new Set<string>()
+      const today0 = todayKarachi()
+      for (const r of rows) {
+        if (r.planned || !r.name.trim()) continue
+        const labels = stagesFor(r.name)
+        if (labels.length === 0) continue
+        const { data: cands } = await sbs.from('patient_treatments').select('id, teeth').eq('patient_id', p.patient.id).eq('name', r.name.trim()).in('status', ['active', 'completed']).order('created_at', { ascending: false }).limit(20)
+        const want = r.applies === 'tooth' ? [...r.teeth].sort().join(',') : ''
+        const hit = ((cands ?? []) as { id: string; teeth: string[] | null }[]).find((c) => !used.has(c.id) && [...(c.teeth ?? [])].sort().join(',') === want)
+        if (!hit) continue
+        used.add(hit.id)
+        const { count } = await sbs.from('treatment_stages').select('id', { count: 'exact', head: true }).eq('treatment_id', hit.id)
+        if ((count ?? 0) > 0) continue
+        const { error: gErr } = await sbs.from('treatment_stages').insert(labels.map((label, i) => ({ treatment_id: hit.id, patient_id: p.patient.id, label, sort_order: i, done_on: (r.stg ?? []).includes(label) ? today0 : null })))
+        if (gErr) warn += 'Qadam save nahi hue: ' + friendlyError(gErr.message) + ' '
+      }
+    }
     const nextRow = nextDate && nextT.startsWith('row:') ? rows.find((x) => x.key === nextT.slice(4) && !x.planned && x.name.trim()) : undefined
     if (nextRow) {
       const sbn = createClient()
@@ -1236,17 +1262,6 @@ export default function VisitWorkspace(p: Props) {
                       Is ke baad Crown lagayein →
                     </button>
                   )}
-                  {!homeo && canEdit && p.perms.lab && r.teeth.length > 0 && /crown|bridge|denture|veneer|onlay|inlay|post\s*&?\s*core|night\s*guard|retainer/i.test(r.name) && (
-                    <a
-                      href={`/admin/lab?patient=${p.patient.id}&teeth=${encodeURIComponent(r.teeth.join(','))}&work=${encodeURIComponent(r.name)}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      data-testid="lab-send"
-                      className="justify-self-start rounded-full border border-clinic-teal bg-clinic-mint px-3 py-1 text-xs font-semibold text-clinic-teal"
-                    >
-                      Lab ko bhejein →
-                    </a>
-                  )}
                   <div className="flex flex-wrap items-center gap-2 text-sm">
                     {r.planned && (
                       <>
@@ -1262,18 +1277,6 @@ export default function VisitWorkspace(p: Props) {
                   </div>
                   {!r.planned && r.catalog_id && canEdit && p.canSeeRecipes && p.materials[r.catalog_id] === undefined && (
                     <p className="text-xs text-amber-700" data-testid="no-recipe">Is treatment ka samaan (recipe) abhi nahi likha — Price List mein likh dein to stock khud kate ga.</p>
-                  )}
-                  {!r.planned && r.catalog_id && (p.materials[r.catalog_id] ?? []).length > 0 && (
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-clinic-ink/70">
-                      <span>Samaan:</span>
-                      {(p.materials[r.catalog_id] ?? []).map((m) => (
-                        <label key={m.inventory_id} className="flex items-center gap-1">
-                          {m.name}
-                          <input type="number" min={0} value={r.mats[m.inventory_id] ?? ''} onChange={(e) => updRow(r.key, { mats: { ...r.mats, [m.inventory_id]: e.target.value } })} className="w-14 rounded border border-clinic-teal/20 px-1.5 py-1" />
-                          {m.unit}
-                        </label>
-                      ))}
-                    </div>
                   )}
                 </div>
   )
@@ -1523,9 +1526,21 @@ export default function VisitWorkspace(p: Props) {
       </div>
     </Section>
   ) : null
+  const blk_ongoing = ongoing.length > 0 ? (
+        <div className="grid gap-2 rounded-2xl border-2 border-clinic-teal/30 bg-white p-3" data-testid="ongoing-links">
+          <p className="text-xs font-semibold text-clinic-ink/60">Chalte ilaaj ki agli visit yahan nahi likhi jati. Us ilaaj ka apna alag page kholein:</p>
+          {ongoing.map((t) => (
+            <a key={t.id} href={'/admin/patients/' + p.patient.id + '/visit/' + t.id} data-testid="ongoing-link" className="flex min-h-[44px] flex-wrap items-center gap-2 rounded-xl border border-clinic-teal/20 px-3 py-2 text-sm">
+              <span className="font-semibold text-clinic-ink">{t.name}</span>
+              {t.teeth.length > 0 && <span className="text-xs text-clinic-ink/60">({t.teeth.map(toothLabel).join(', ')})</span>}
+              <span className="ml-auto font-semibold text-clinic-teal">Visit {t.visits.length + 1} kholein →</span>
+            </a>
+          ))}
+        </div>
+  ) : null
   const blk_live = live.length > 0 ? (
         <div className="grid gap-2 rounded-2xl border-2 border-clinic-teal/30 bg-white p-3" data-testid="live-treatments">
-          <p className="text-xs font-semibold text-clinic-ink/60">Abhi chal rahi hain (pichli visit se)</p>
+          <p className="text-xs font-semibold text-clinic-ink/60">Plan kiye hue ilaaj (aaj shuru karna ho to tick lagayein)</p>
           {live.map((t) => {
             const o = old[t.id]
             return (
@@ -1548,12 +1563,6 @@ export default function VisitWorkspace(p: Props) {
                     </p>
                   )
                 })()}
-                {t.status === 'active' && <TreatmentSteps treatmentId={t.id} name={t.name} canEdit={canEdit} />}
-                {t.status !== 'planned' && /crown|bridge|denture|veneer|post|retainer|night guard|inlay|onlay/i.test(t.name) && (
-                  <a href={`/admin/lab?patient=${p.patient.id}&treatment=${t.id}`} target="_blank" className="mt-2 inline-block text-xs font-semibold text-clinic-teal underline">
-                    Lab ke liye bhejein →
-                  </a>
-                )}
                 {canEdit && t.status === 'active' && (
                   <div className="mt-2 text-xs">
                     {confirmDone === t.id ? (
@@ -1590,6 +1599,93 @@ export default function VisitWorkspace(p: Props) {
             )
           })}
         </div>
+  ) : null
+
+  const stageRows = rows.filter((r) => !r.planned && r.name.trim() && stagesFor(r.name).length > 0)
+  const blk_stages = !homeo && canEdit && stageRows.length > 0 ? (
+    <section className="rounded-2xl border border-clinic-teal/10 bg-white p-4 sm:p-5" data-testid="v1-stages">
+      <h2 className="font-display text-lg font-semibold text-clinic-ink">Aaj kya kya hua (qadam)</h2>
+      <p className="text-xs text-clinic-ink/60">Jo aaj hua us par tick lagayein. Jo reh gaya wo agli visit mein khud samne aayega.</p>
+      {stageRows.map((r) => (
+        <div key={r.key} className="mt-3" data-testid="v1-stage-row">
+          <p className="text-sm font-semibold text-clinic-ink">
+            {r.name}
+            {r.applies === 'tooth' && r.teeth.length > 0 ? <span className="ml-1 text-xs font-normal text-clinic-ink/60">({r.teeth.map(toothLabel).join(', ')})</span> : null}
+          </p>
+          <ul className="mt-1 grid gap-1">
+            {stagesFor(r.name).map((label) => {
+              const on = (r.stg ?? []).includes(label)
+              return (
+                <li key={label}>
+                  <label className="flex min-h-[40px] items-center gap-2 text-sm" data-testid="v1-stage">
+                    <input type="checkbox" className="h-5 w-5" checked={on} onChange={(e) => updRow(r.key, { stg: e.target.checked ? [...(r.stg ?? []), label] : (r.stg ?? []).filter((x) => x !== label) })} />
+                    <span>{label}</span>
+                  </label>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      ))}
+    </section>
+  ) : null
+  const stockList = (p.stockItems ?? p.extraItems ?? [])
+  const matRows = rows.filter((r) => !r.planned && r.catalog_id && (p.materials[r.catalog_id] ?? []).length > 0)
+  const blk_mat = canEdit && (matRows.length > 0 || stockList.length > 0) ? (
+    <section className="rounded-2xl border border-clinic-teal/10 bg-white p-4 sm:p-5" data-testid="extras">
+      <h2 className="font-display text-lg font-semibold text-clinic-ink">Material kaunsa laga</h2>
+      <p className="text-xs text-clinic-ink/60">Jis par tick hai wo stock se kat jayega. Jo nahi laga us ka tick hata dein.</p>
+      {matRows.map((r) => (
+        <div key={r.key} className="mt-3" data-testid="mat-row">
+          <p className="text-sm font-semibold text-clinic-ink">
+            {r.name}
+            {r.applies === 'tooth' && r.teeth.length > 0 ? <span className="ml-1 text-xs font-normal text-clinic-ink/60">({r.teeth.map(toothLabel).join(', ')})</span> : null}
+          </p>
+          <ul className="mt-1 grid gap-2">
+            {(p.materials[r.catalog_id as string] ?? []).map((m) => {
+              const q = r.mats[m.inventory_id] ?? ''
+              const on = Number(q) > 0
+              return (
+                <li key={m.inventory_id} className="flex flex-wrap items-center gap-2 text-sm" data-testid="mat-item">
+                  <label className="flex min-h-[40px] flex-1 items-center gap-2">
+                    <input type="checkbox" className="h-5 w-5" checked={on} onChange={(e) => updRow(r.key, { mats: { ...r.mats, [m.inventory_id]: e.target.checked ? String(m.default_qty || 1) : '0' } })} />
+                    <span>{m.name}</span>
+                  </label>
+                  {on && (
+                    <span className="flex items-center gap-1">
+                      <input type="number" min={0} step="any" aria-label={'Miqdar ' + m.name} value={q} onChange={(e) => updRow(r.key, { mats: { ...r.mats, [m.inventory_id]: e.target.value } })} className="w-20 rounded-lg border border-clinic-teal/20 px-2 py-1.5" />
+                      <span className="text-xs text-clinic-ink/60">{m.unit ?? ''}</span>
+                    </span>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      ))}
+      {extras.map((e) => (
+        <div key={e.key} className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+          <select aria-label="Samaan" value={e.inventory_id} onChange={(ev) => setExtras(extras.map((x) => (x.key === e.key ? { ...x, inventory_id: ev.target.value } : x)))} className="min-w-0 flex-1 rounded-lg border border-clinic-teal/20 px-2 py-2">
+            <option value="">Samaan chunein</option>
+            {stockList.map((i) => (
+              <option key={i.inventory_id} value={i.inventory_id}>
+                {i.name}
+                {i.unit ? ' (' + i.unit + ')' : ''}
+              </option>
+            ))}
+          </select>
+          <input aria-label="Miqdar" type="number" min={0} step="0.01" value={e.qty} onChange={(ev) => setExtras(extras.map((x) => (x.key === e.key ? { ...x, qty: ev.target.value } : x)))} className="w-20 rounded-lg border border-clinic-teal/20 px-2 py-2" />
+          <button type="button" className="text-xs text-red-600 underline" onClick={() => setExtras(extras.filter((x) => x.key !== e.key))}>
+            Hatayein
+          </button>
+        </div>
+      ))}
+      {stockList.length > 0 && (
+        <button type="button" data-testid="extra-add" onClick={() => setExtras([...extras, { key: newKey(), inventory_id: '', qty: '1' }])} className="mt-3 rounded-full border border-clinic-teal/40 px-4 py-2 text-sm font-semibold text-clinic-teal">
+          + Aur samaan chunein
+        </button>
+      )}
+    </section>
   ) : null
 
   const blk_tx = (
@@ -1638,22 +1734,6 @@ export default function VisitWorkspace(p: Props) {
                 />
               )}
               {(homeo ? rows : rows.filter((r) => !(r.applies === 'tooth' && r.teeth.length > 0) && !(r.applies === 'jaw' && /denture/i.test(r.name)))).map((r) => rowCard(r))}
-              {canEdit && (p.extraItems ?? []).length > 0 && (
-                <div className="rounded-xl border border-dashed border-clinic-teal/30 p-3 text-xs" data-testid="extras">
-                  <p className="font-semibold text-clinic-ink">Doctor khud chunein (agar kuch alag use hua)</p>
-                  {extras.map((e) => (
-                    <div key={e.key} className="mt-2 flex flex-wrap items-center gap-2">
-                      <select aria-label="Samaan" value={e.inventory_id} onChange={(ev) => setExtras(extras.map((x) => (x.key === e.key ? { ...x, inventory_id: ev.target.value } : x)))} className="rounded border border-clinic-teal/20 px-2 py-1">
-                        <option value="">— chunein —</option>
-                        {(p.extraItems ?? []).map((i) => <option key={i.inventory_id} value={i.inventory_id}>{i.name}</option>)}
-                      </select>
-                      <input aria-label="Miqdar" type="number" min={0} step="0.01" value={e.qty} onChange={(ev) => setExtras(extras.map((x) => (x.key === e.key ? { ...x, qty: ev.target.value } : x)))} className="w-16 rounded border border-clinic-teal/20 px-1.5 py-1" />
-                      <button type="button" className="text-red-600 underline" onClick={() => setExtras(extras.filter((x) => x.key !== e.key))}>Hatayein</button>
-                    </div>
-                  ))}
-                  <button type="button" onClick={() => setExtras([...extras, { key: newKey(), inventory_id: '', qty: '1' }])} className="mt-2 rounded-full border border-clinic-teal/30 px-3 py-1 font-semibold text-clinic-teal">+ Samaan</button>
-                </div>
-              )}
               {canEdit && (
                 <div className="flex flex-wrap gap-2">
                 <button type="button" onClick={() => setRows([...rows, { key: newKey(), name: '', catalog_id: null, teeth: [], price: '', planned: false, notes: '', mats: {}, applies: 'tooth', unit: null, manual: false, jaw: '' }])} className="justify-self-start rounded-full border border-clinic-teal/30 px-4 py-1.5 text-sm font-semibold text-clinic-teal">
@@ -1939,7 +2019,7 @@ export default function VisitWorkspace(p: Props) {
                 <label className="text-xs font-medium text-clinic-ink/70">Kis treatment ke liye</label>
                 <select value={nextT} onChange={(e) => setNextT(e.target.value)} disabled={!nextDate} className={input}>
                   <option value="">— checkup —</option>
-                  {live
+                  {liveAll
                     .map((t) => (
                       <option key={t.id} value={t.id}>
                         {t.name}
@@ -1966,7 +2046,7 @@ export default function VisitWorkspace(p: Props) {
                     ))}
                   </optgroup>
                 </select>
-                {live.length === 0 && <p className="mt-1 text-[11px] text-clinic-ink/60">Is mareez ka abhi koi chalu ya plan wala treatment nahi, is liye sirf checkup. Kisi kaam ke liye bulana ho to pehle &quot;Daant aur kaam&quot; mein us kaam ko us kaam ko &quot;Plan (aage ke liye)&quot; ke taur par joreinquot;Sirf plan (baad mein)&quot; chunein.</p>}
+                {liveAll.length === 0 && <p className="mt-1 text-[11px] text-clinic-ink/60">Is mareez ka abhi koi chalu ya plan wala treatment nahi, is liye sirf checkup. Kisi kaam ke liye bulana ho to pehle &quot;Daant aur kaam&quot; mein us kaam ko us kaam ko &quot;Plan (aage ke liye)&quot; ke taur par joreinquot;Sirf plan (baad mein)&quot; chunein.</p>}
               </div>
             </fieldset>
             {!homeo || true ? (
@@ -2080,10 +2160,12 @@ export default function VisitWorkspace(p: Props) {
             )}
           </div>
           <div className={stepCls(2)}>
+            {blk_ongoing}
             {blk_live}
             {blk_cd}
             {!homeo && blk_chart}
             {blk_work}
+            {blk_stages}
             {blk_dx}
             {blk_tx}
           </div>
@@ -2111,6 +2193,7 @@ export default function VisitWorkspace(p: Props) {
             </div>
           )}
           <div className={stepCls(4)}>
+            {blk_mat}
             {blk_bill}
             {blk_next}
           </div>

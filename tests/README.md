@@ -28,3 +28,9 @@ Ye teen qism ke tests hain. Inmein se koi bhi asli (live) data par na chalayein.
 - `tests/e2e/sec1-table-access.js`, `sec2-privilege-escalation.js`: bina login aur kam ijazat wale staff se tables aur functions par koshish (sab band hone chahiyen).
 - `tests/e2e/p106-treatment-steps.js` (parchi), `p104-crown-pending.js` (crown baqi card), `p103-visit-whatsapp.js` (visit ka WhatsApp khulasa).
 - `tests/e2e/roles.js`: test ke liye alag role ka login (sirf local test database).
+
+## Visit 2 ka alag page (11 Nov 2026 shaam)
+- `tests/e2e/fu1-followup-visit.js`: profile ke card se "Visit 2", alag page, qadam, note, stock, payment, agli tareekh, mukammal (50 jaanch, 1280 aur 390).
+- `tests/e2e/fu2-followup-materials-ortho.js`: jura hua material tick, adhoori visit par rok, ortho ki mahana tareekh, permissions (13 jaanch).
+- `tests/e2e/fu3-lab-from-card.js`: lab ka button sirf ilaaj ke card par (7 jaanch).
+- Purane `p52b`, `p52c`, `p53`, `p101`, `p106` ab lagu nahi: wo bare page par chalte ilaaj ka tick aur visit ke andar lab button jaanchte the, jo hata diye gaye.
