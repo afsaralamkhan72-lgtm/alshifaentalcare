@@ -299,22 +299,22 @@ export default function InventoryManager({
             </div>
 
             <form onSubmit={handleAdd} className="mt-4 grid gap-3">
-              <input required placeholder="Item ka naam" value={form.item_name} onChange={(e) => update('item_name', e.target.value)} className={inputClass} />
+              <input required placeholder="Item ka naam" aria-label="Item ka naam" value={form.item_name} onChange={(e) => update('item_name', e.target.value)} className={inputClass} />
               <select value={form.category} onChange={(e) => update('category', e.target.value as InventoryItem['category'])} className={inputClass}>
                 <option value="dental">Dental Material</option>
                 <option value="homeopathic">Homeopathic Medicine</option>
                 <option value="general">General</option>
               </select>
               <div className="grid grid-cols-3 gap-3">
-                <input type="number" step="0.01" min={0} placeholder="Abhi kitna hai" value={form.opening} onChange={(e) => update('opening', e.target.value)} className={inputClass} />
-                <input placeholder="Unit" value={form.unit} onChange={(e) => update('unit', e.target.value)} className={inputClass} />
-                <input type="number" step="0.01" placeholder="Alert at" value={form.reorder_level} onChange={(e) => update('reorder_level', e.target.value)} className={inputClass} />
+                <input type="number" step="0.01" min={0} placeholder="Abhi kitna hai" aria-label="Abhi kitna hai" value={form.opening} onChange={(e) => update('opening', e.target.value)} className={inputClass} />
+                <input placeholder="Unit" aria-label="Unit" value={form.unit} onChange={(e) => update('unit', e.target.value)} className={inputClass} />
+                <input type="number" step="0.01" placeholder="Alert at" aria-label="Alert at" value={form.reorder_level} onChange={(e) => update('reorder_level', e.target.value)} className={inputClass} />
               </div>
               <div>
                 <label className="text-xs text-clinic-ink/50">Expiry Date (optional)</label>
                 <input type="date" value={form.expiry_date} onChange={(e) => update('expiry_date', e.target.value)} className={`mt-1 ${inputClass}`} />
               </div>
-              <input placeholder="Supplier (optional)" value={form.supplier} onChange={(e) => update('supplier', e.target.value)} className={inputClass} />
+              <input placeholder="Supplier (optional)" aria-label="Supplier (optional)" value={form.supplier} onChange={(e) => update('supplier', e.target.value)} className={inputClass} />
               <p className="text-xs text-clinic-ink/50">"Abhi kitna hai" opening stock ke tor par likha jata hai (kharcha nahi banta).</p>
 
               {error && <p className="text-sm text-red-600">{error}</p>}
@@ -402,7 +402,7 @@ export default function InventoryManager({
                         {canManage && flagsOk && <button onClick={() => { setMergeFor(mergeFor === item.id ? null : item.id); setMergeKeep(''); setItemMsg('') }} data-testid="item-merge" className="text-clinic-ink/60">Milayein</button>}
                         {canManage && <button onClick={() => deactivate(item)} className="text-clinic-ink/40">Band</button>}
                         {canManage && flagsOk && !hasHistory[item.id] && (
-                          <button onClick={() => itemRpc('delete_inventory_item', { p_id: item.id }, `"${item.item_name}" delete karein? Is par koi record nahi, ye Recycle Bin mein chala jayega.`)} data-testid="item-delete" className="text-red-600">Delete</button>
+                          <button onClick={() => itemRpc('delete_inventory_item', { p_id: item.id }, `"${item.item_name}" delete karein? Is par koi record nahi, ye Recycle Bin mein chala jayega.`)} data-testid="item-delete" className="text-red-600">Hatayein</button>
                         )}
                       </div>
                     </td>

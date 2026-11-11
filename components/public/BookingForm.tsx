@@ -109,7 +109,7 @@ export default function BookingForm() {
         <input
           required
           type="tel"
-          placeholder="03XX-XXXXXXX"
+          placeholder="03XX-XXXXXXX" aria-label="03XX-XXXXXXX"
           value={form.phone}
           onChange={(e) => update('phone', e.target.value)}
           className={inputClass}

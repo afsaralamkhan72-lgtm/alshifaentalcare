@@ -1,0 +1,15 @@
+const crypto=require('crypto');const {chromium}=require('playwright');
+const S='super-secret-jwt-token-with-at-least-32-characters-long';
+const b=o=>Buffer.from(JSON.stringify(o)).toString('base64url');
+exports.IDS={admin:'11111111-1111-1111-1111-111111111111',recep:'22222222-2222-2222-2222-222222222222',doctor:'33333333-3333-3333-3333-333333333333',noperm:'44444444-4444-4444-4444-444444444444'};
+exports.token=(sub)=>{const h=b({alg:'HS256',typ:'JWT'});const p=b({role:'authenticated',sub,aud:'authenticated',exp:Math.floor(Date.now()/1000)+86400,email:'x@t.com'});
+ return h+'.'+p+'.'+crypto.createHmac('sha256',S).update(h+'.'+p).digest('base64url')};
+exports.open=async(role,w=1280)=>{const sub=exports.IDS[role];const t=exports.token(sub);
+ const sess={access_token:t,refresh_token:'r',expires_in:86400,expires_at:Math.floor(Date.now()/1000)+86400,token_type:'bearer',user:{id:sub,aud:'authenticated',role:'authenticated',email:'x@t.com'}};
+ const br=await chromium.launch();const c=await br.newContext({viewport:{width:w,height:800}});
+ await c.addCookies([{name:'sb-127-auth-token',value:encodeURIComponent(JSON.stringify(sess)),domain:'localhost',path:'/'}]);
+ await c.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/,r=>r.abort());
+ const p=await c.newPage();p.on('pageerror',e=>console.log('PAGEERR',role,e.message.slice(0,160)));return {b:br,p,t}};
+exports.api=async(role,path,opt={})=>{const K=process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;const t=role==='anon'?K:exports.token(exports.IDS[role]);
+ const r=await fetch(process.env.NEXT_PUBLIC_SUPABASE_URL+'/rest/v1/'+path,{method:opt.body?'POST':'GET',headers:{apikey:K,Authorization:'Bearer '+t,'Content-Type':'application/json',Prefer:'return=representation'},body:opt.body?JSON.stringify(opt.body):undefined});
+ const tx=await r.text();return {s:r.status,t:tx.slice(0,160)}};

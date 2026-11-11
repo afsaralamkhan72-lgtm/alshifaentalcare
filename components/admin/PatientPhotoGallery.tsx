@@ -143,7 +143,7 @@ export default function PatientPhotoGallery({
             ))}
           </select>
           <input
-            placeholder="Caption (optional)"
+            placeholder="Caption (optional)" aria-label="Caption (optional)"
             value={caption}
             onChange={(e) => setCaption(e.target.value)}
             className="w-40 rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm"

@@ -6,7 +6,18 @@ import { todayKarachi, addDays } from '@/lib/karachi'
 import { getReminderDays } from '@/lib/reminders'
 import { getStaffProfile, isOwnerRole } from '@/lib/auth'
 
-const SELECT = 'id, patient_name, phone, department, treatment_name, preferred_date, preferred_time, status, created_at, patient_id, doctor, source'
+const SELECT = 'id, patient_name, phone, department, treatment_name, preferred_date, preferred_time, status, created_at, patient_id, doctor, source, treatment_id'
+
+type Sb = Awaited<ReturnType<typeof createClient>>
+async function withVisitNo(sb: Sb, rows: Appointment[]): Promise<Appointment[]> {
+  const ids = [...new Set(rows.map((r) => r.treatment_id).filter((x): x is string => Boolean(x)))]
+  if (ids.length === 0) return rows
+  const { data, error } = await sb.from('visit_notes').select('treatment_id').in('treatment_id', ids).is('voided_at', null)
+  if (error) return rows
+  const n = new Map<string, number>()
+  for (const v of data ?? []) n.set(v.treatment_id as string, (n.get(v.treatment_id as string) ?? 0) + 1)
+  return rows.map((r) => (r.treatment_id && n.has(r.treatment_id) && ['pending', 'confirmed', 'arrived'].includes(r.status) ? { ...r, visit_no: (n.get(r.treatment_id) ?? 0) + 1 } : r))
+}
 
 function shiftDate(dateStr: string, days: number) {
   const d = new Date(dateStr)
@@ -76,7 +87,7 @@ export default async function AppointmentsPage({
         {view === 'missed' && <p className="mt-3 text-sm text-amber-800">Pichle 60 din ki appointments jo na &quot;Aa gaye&quot; hui na cancel. Call / WhatsApp kar ke nayi tareekh dein.</p>}
         {error && <p className="mt-3 text-sm text-red-600">{error.message}</p>}
         <div className="mt-4">
-          <AppointmentBoard appointments={(rows ?? []) as Appointment[]} listOnly showButton={false} emptyText="Is list mein koi appointment nahi." />
+          <AppointmentBoard appointments={await withVisitNo(sb, (rows ?? []) as Appointment[])} listOnly showButton={false} emptyText="Is list mein koi appointment nahi." />
         </div>
       </div>
     )
@@ -97,7 +108,7 @@ export default async function AppointmentsPage({
   if (status !== 'all') query = query.eq('status', status)
 
   const { data } = await query
-  const appointments = (data ?? []) as Appointment[]
+  const appointments = await withVisitNo(supabase, (data ?? []) as Appointment[])
 
   // Counts for the whole day regardless of filter
   const { data: allDay } = await supabase

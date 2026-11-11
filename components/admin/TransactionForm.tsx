@@ -157,7 +157,7 @@ export default function TransactionForm({ expenseCategories }: { expenseCategori
                 type="number"
                 min="0"
                 step="0.01"
-                placeholder="Amount (Rs.)"
+                placeholder="Amount (Rs.)" aria-label="Amount (Rs.)"
                 value={form.amount}
                 onChange={(e) => update('amount', e.target.value)}
                 className={inputClass}
@@ -183,7 +183,7 @@ export default function TransactionForm({ expenseCategories }: { expenseCategori
 
               {form.type === 'income' && (
                 <input
-                  placeholder="Treatment kis doctor ne kiya (optional)"
+                  placeholder="Treatment kis doctor ne kiya (optional)" aria-label="Treatment kis doctor ne kiya (optional)"
                   value={form.treating_doctor}
                   onChange={(e) => update('treating_doctor', e.target.value)}
                   className={inputClass}
@@ -191,7 +191,7 @@ export default function TransactionForm({ expenseCategories }: { expenseCategori
               )}
 
               <textarea
-                placeholder="Description (optional)"
+                placeholder="Description (optional)" aria-label="Description (optional)"
                 value={form.description}
                 onChange={(e) => update('description', e.target.value)}
                 rows={2}

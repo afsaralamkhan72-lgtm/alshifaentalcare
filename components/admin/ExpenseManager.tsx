@@ -124,7 +124,7 @@ export default function ExpenseManager({
             min="0.01"
             step="0.01"
             inputMode="decimal"
-            placeholder="Raqam (Rs.)"
+            placeholder="Raqam (Rs.)" aria-label="Raqam (Rs.)"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             className={input}
@@ -143,7 +143,7 @@ export default function ExpenseManager({
             <option value="jazzcash">JazzCash</option>
           </select>
           <input type="date" max={today} value={date} onChange={(e) => setDate(e.target.value)} className={input} />
-          <input placeholder="Note (optional)" value={note} onChange={(e) => setNote(e.target.value)} className={input} />
+          <input placeholder="Note (optional)" aria-label="Note (optional)" value={note} onChange={(e) => setNote(e.target.value)} className={input} />
         </div>
         <div className="mt-3 flex items-center gap-3">
           <DocUpload folder="expenses" value={receipt} onChange={setReceipt} />
@@ -229,7 +229,7 @@ export default function ExpenseManager({
           ))}
         </div>
         <div className="mt-3 flex gap-2">
-          <input placeholder="Nayi category" value={newCat} onChange={(e) => setNewCat(e.target.value)} className={input} />
+          <input placeholder="Nayi category" aria-label="Nayi category" value={newCat} onChange={(e) => setNewCat(e.target.value)} className={input} />
           <button onClick={addCategory} className="rounded-full border border-clinic-teal px-4 py-2 text-sm font-semibold text-clinic-teal">
             Add
           </button>

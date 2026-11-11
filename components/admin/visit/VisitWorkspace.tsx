@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { fmtDate, money, todayKarachi, addDays } from '@/lib/karachi'
+import { fmtDate, money, numFmt, todayKarachi, addDays } from '@/lib/karachi'
 import { toothTitle as toothLabel, toothLabel as toothShort, PRIMARY, localNumber } from '@/lib/teeth'
 import type { CatalogOpt, MaterialOpt, TItem } from './types'
 import CrownStep from './CrownStep'
@@ -13,6 +13,7 @@ import { friendlyError } from '@/lib/errors'
 import { COMPLAINTS, HOMEO_COMPLAINTS, DIAG_SUGGEST } from '@/lib/clinicOptions'
 import { useTemplates } from '@/lib/useTemplates'
 import { messageLink } from '@/lib/messages'
+import TreatmentSteps from './TreatmentSteps'
 import { askReceipt } from '@/lib/receiptEvent'
 import PaymentDialog from '@/components/admin/PaymentDialog'
 import VisitRewards from '@/components/admin/VisitRewards'
@@ -284,7 +285,7 @@ export default function VisitWorkspace(p: Props) {
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState(0)
   const tpl = useTemplates()
-  const [done, setDone] = useState<{ visit_id: string; prescription_id: string | null; hasInvoice: boolean } | null>(null)
+  const [done, setDone] = useState<{ visit_id: string; prescription_id: string | null; hasInvoice: boolean; sum?: Record<string, string> } | null>(null)
   // Visit ka form khula ho to baqi profile (purani history, treatments ka hisaab) chhup jaye, taake doctor confuse na ho
   useEffect(() => {
     const on = showForm && !done
@@ -460,7 +461,7 @@ export default function VisitWorkspace(p: Props) {
     diagnoses: diags.filter((d) => d.text.trim()),
     next_date: nextDate || '',
     next_time: nextDate ? nextTime : '',
-    next_treatment_id: nextDate && !nextT.startsWith('cat:') ? nextT : '',
+    next_treatment_id: nextDate && !nextT.startsWith('cat:') && !nextT.startsWith('row:') ? nextT : '',
     ...(doctor ? { doctor } : {}), // khali bhejne se RPC ka khud ka (login doctor) wala naam mit jata
     history: { medical_history: medical, dental_history: dental },
     chart: chartOut(),
@@ -854,7 +855,31 @@ export default function VisitWorkspace(p: Props) {
     setBusy('')
     const r = res as { visit_id: string; prescription_id: string | null }
     if (p.perms.collect && paidNum > 0) askReceipt({ patientId: p.patient.id, amount: paidNum, method })
-    setDone({ visit_id: r.visit_id, prescription_id: r.prescription_id, hasInvoice: newCharges > 0 || paidNum > 0 || Boolean((res as { invoice_id?: string }).invoice_id) })
+    const workNames = [
+      ...rows.filter((x) => !x.planned && x.name.trim()).map((x) => x.name.trim()),
+      ...live.filter((t) => old[t.id]?.tick).map((t) => t.name),
+    ]
+    const nextRow = nextDate && nextT.startsWith('row:') ? rows.find((x) => x.key === nextT.slice(4) && !x.planned && x.name.trim()) : undefined
+    if (nextRow) {
+      const sbn = createClient()
+      const vid = (res as { visit_id: string }).visit_id
+      const { data: made } = await sbn.from('patient_treatments').select('id, name').eq('patient_id', p.patient.id).eq('name', nextRow.name.trim()).in('status', ['active', 'completed']).order('created_at', { ascending: false }).limit(1)
+      if (made && made.length) {
+        const { error: aErr } = await sbn.from('appointments').update({ treatment_id: made[0].id, treatment_name: made[0].name }).eq('clinical_visit_id', vid)
+        if (aErr) warn += 'Appointment par treatment ka naam nahi likha ja saka: ' + friendlyError(aErr.message) + ' '
+      }
+    }
+    const nextName = nextDate ? (nextRow ? nextRow.name.trim() : nextT.startsWith('cat:') ? p.catalog.find((c) => c.id === nextT.slice(4))?.name : p.treatments.find((t) => t.id === nextT)?.name) ?? '' : ''
+    const showMoney = p.perms.money
+    const sum: Record<string, string> = {
+      work: [...new Set(workNames)].join('، '),
+      next_date: nextDate ? fmtDate(nextDate) : '',
+      next_time: nextDate ? nextTime : '',
+      next_work: nextName,
+      today_paid: showMoney && paidNum > 0 ? numFmt(paidNum) : '',
+      balance: showMoney ? numFmt(Math.max(0, dueNow - paidNum)) : '',
+    }
+    setDone({ visit_id: r.visit_id, prescription_id: r.prescription_id, hasInvoice: newCharges > 0 || paidNum > 0 || Boolean((res as { invoice_id?: string }).invoice_id), sum })
     if (warn) setMsg({ ok: !warn.replace(warn0, '').trim(), t: warn })
     router.refresh()
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -1417,18 +1442,21 @@ export default function VisitWorkspace(p: Props) {
           </div>
         </div>
   ) : null
+  const blk_cd = !homeo && canEdit && completeNames.length > 0 ? (
+    <div className="grid gap-2 rounded-2xl border-2 border-violet-300 bg-white p-3" data-testid="complete-denture-row">
+      <p className="text-sm font-semibold text-clinic-ink">Poori jaw ki denture lagani hai? Daant chunne ki zarurat nahi, bas dabayein:</p>
+      <div className="flex flex-wrap items-center gap-1.5 text-xs">
+        {completeNames.map((n) => (
+          <button key={n} type="button" data-testid="complete-denture" onClick={() => addCompleteDenture(n)} className="rounded-full border border-violet-300 bg-white px-3 py-1.5 font-semibold text-violet-900">
+            + {n}
+          </button>
+        ))}
+      </div>
+    </div>
+  ) : null
+
   const blk_work = !homeo ? (
     <Section title="Daant aur kaam" hint="Upar chart par daant chunein, masla aur kaam wahin chunein. Yahan sirf un ke cards aate hain, bill khud.">
-      {canEdit && completeNames.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5 text-xs" data-testid="complete-denture-row">
-          <span className="text-clinic-ink/60">Poori jabde ki Denture (daant chunna zaroori nahi):</span>
-          {completeNames.map((n) => (
-            <button key={n} type="button" data-testid="complete-denture" onClick={() => addCompleteDenture(n)} className="rounded-full border border-violet-300 bg-white px-3 py-1.5 font-semibold text-violet-900">
-              + {n}
-            </button>
-          ))}
-        </div>
-      )}
       
       <div className="grid gap-3 sm:grid-cols-2" data-testid="cards">
         {rows.filter((r) => r.group).map((r) => {
@@ -1495,6 +1523,75 @@ export default function VisitWorkspace(p: Props) {
       </div>
     </Section>
   ) : null
+  const blk_live = live.length > 0 ? (
+        <div className="grid gap-2 rounded-2xl border-2 border-clinic-teal/30 bg-white p-3" data-testid="live-treatments">
+          <p className="text-xs font-semibold text-clinic-ink/60">Abhi chal rahi hain (pichli visit se)</p>
+          {live.map((t) => {
+            const o = old[t.id]
+            return (
+              <div key={t.id} className={`rounded-xl border p-3 ${o?.tick ? 'border-clinic-teal bg-clinic-mint/40' : 'border-clinic-teal/15'}`}>
+                <label className="flex flex-wrap items-center gap-2 text-sm">
+                  <input type="checkbox" disabled={!canEdit} checked={Boolean(o?.tick)} onChange={(e) => updOld(t.id, { tick: e.target.checked, price: o?.price || (t.status === 'planned' ? String(t.list_price || t.price || '') : '') })} className="h-5 w-5" />
+                  <span className="font-semibold text-clinic-ink">{t.name}</span>
+                  {t.teeth.length > 0 && <span className="text-xs text-clinic-ink/60">({t.teeth.map(toothLabel).join(', ')})</span>}
+                  <span className={`rounded-full px-2 py-0.5 text-[11px] ${t.status === 'planned' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{t.status === 'planned' ? 'sirf plan' : `visit ${t.visits.length}`}</span>
+                  {p.perms.money && t.status === 'active' && t.balance > 0 && <span className="text-xs text-red-600">baqaya {money(t.balance)}</span>}
+                  <span className="text-xs text-clinic-ink/50">— {t.status === 'planned' ? 'aaj shuru karein' : 'aaj ka visit'}</span>
+                </label>
+                {(() => {
+                  const lv = [...t.visits].sort((a, b) => b.visit_date.localeCompare(a.visit_date))[0]
+                  if (!lv) return null
+                  const what = lv.procedure || lv.notes
+                  return (
+                    <p className="mt-1 text-xs text-clinic-ink/60" data-testid="live-last">
+                      Pichli visit {fmtDate(lv.visit_date)}{what ? ': ' + what : ''}{lv.next_visit ? ' · agli visit: ' + fmtDate(lv.next_visit) : ''}
+                    </p>
+                  )
+                })()}
+                {t.status === 'active' && <TreatmentSteps treatmentId={t.id} name={t.name} canEdit={canEdit} />}
+                {t.status !== 'planned' && /crown|bridge|denture|veneer|post|retainer|night guard|inlay|onlay/i.test(t.name) && (
+                  <a href={`/admin/lab?patient=${p.patient.id}&treatment=${t.id}`} target="_blank" className="mt-2 inline-block text-xs font-semibold text-clinic-teal underline">
+                    Lab ke liye bhejein →
+                  </a>
+                )}
+                {canEdit && t.status === 'active' && (
+                  <div className="mt-2 text-xs">
+                    {confirmDone === t.id ? (
+                      <span className="inline-flex flex-wrap items-center gap-2 rounded-lg bg-amber-50 px-2 py-1.5 text-amber-900">
+                        Kya ye treatment poori ho gayi?
+                        <button type="button" onClick={() => completeTreatment(t.id)} className="rounded-full bg-emerald-600 px-3 py-1 font-semibold text-white">
+                          Haan, mukammal
+                        </button>
+                        <button type="button" onClick={() => setConfirmDone(null)} className="text-clinic-ink/60 underline">
+                          Nahi
+                        </button>
+                      </span>
+                    ) : completeOnFinish[t.id] ? (
+                      <span className="inline-flex flex-wrap items-center gap-2 rounded-lg bg-emerald-50 px-2 py-1.5 text-emerald-900">
+                        ✓ &quot;Visit mukammal karein&quot; dabate hi ye treatment mukammal ho jayegi.
+                        <button type="button" onClick={() => setCompleteOnFinish((m) => ({ ...m, [t.id]: false }))} className="text-clinic-ink/60 underline">
+                          Wapas
+                        </button>
+                      </span>
+                    ) : (
+                      <button type="button" onClick={() => setConfirmDone(t.id)} className="font-semibold text-emerald-700 underline">
+                        Ye treatment mukammal ho gayi
+                      </button>
+                    )}
+                  </div>
+                )}
+                {o?.tick && (
+                  <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_9rem]">
+                    <input value={o.notes} onChange={(e) => updOld(t.id, { notes: e.target.value })} placeholder="Aaj kya kiya (note)" className="rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm" />
+                    {t.status === 'planned' && p.perms.bill && <input type="number" min={0} value={o.price} onChange={(e) => updOld(t.id, { price: e.target.value })} placeholder="Qeemat Rs." className="rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm" />}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+  ) : null
+
   const blk_tx = (
     <>
           {/* 9. TREATMENT */}
@@ -1517,63 +1614,6 @@ export default function VisitWorkspace(p: Props) {
                         {on ? '✓ ' : '+ '}
                         {c.name}
                       </button>
-                    )
-                  })}
-                </div>
-              )}
-              {live.length > 0 && (
-                <div className="grid gap-2">
-                  <p className="text-xs font-semibold text-clinic-ink/60">Pehle se chalti / plan wali treatments</p>
-                  {live.map((t) => {
-                    const o = old[t.id]
-                    return (
-                      <div key={t.id} className={`rounded-xl border p-3 ${o?.tick ? 'border-clinic-teal bg-clinic-mint/40' : 'border-clinic-teal/15'}`}>
-                        <label className="flex flex-wrap items-center gap-2 text-sm">
-                          <input type="checkbox" disabled={!canEdit} checked={Boolean(o?.tick)} onChange={(e) => updOld(t.id, { tick: e.target.checked, price: o?.price || (t.status === 'planned' ? String(t.list_price || t.price || '') : '') })} className="h-5 w-5" />
-                          <span className="font-semibold text-clinic-ink">{t.name}</span>
-                          {t.teeth.length > 0 && <span className="text-xs text-clinic-ink/60">({t.teeth.map(toothLabel).join(', ')})</span>}
-                          <span className={`rounded-full px-2 py-0.5 text-[11px] ${t.status === 'planned' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{t.status === 'planned' ? 'sirf plan' : `visit ${t.visits.length}`}</span>
-                          {p.perms.money && t.status === 'active' && t.balance > 0 && <span className="text-xs text-red-600">baqaya {money(t.balance)}</span>}
-                          <span className="text-xs text-clinic-ink/50">— {t.status === 'planned' ? 'aaj shuru karein' : 'aaj ka visit'}</span>
-                        </label>
-                        {t.status !== 'planned' && /crown|bridge|denture|veneer|post|retainer|night guard|inlay|onlay/i.test(t.name) && (
-                          <a href={`/admin/lab?patient=${p.patient.id}&treatment=${t.id}`} target="_blank" className="mt-2 inline-block text-xs font-semibold text-clinic-teal underline">
-                            Lab ke liye bhejein →
-                          </a>
-                        )}
-                        {canEdit && t.status === 'active' && (
-                          <div className="mt-2 text-xs">
-                            {confirmDone === t.id ? (
-                              <span className="inline-flex flex-wrap items-center gap-2 rounded-lg bg-amber-50 px-2 py-1.5 text-amber-900">
-                                Kya ye treatment poori ho gayi?
-                                <button type="button" onClick={() => completeTreatment(t.id)} className="rounded-full bg-emerald-600 px-3 py-1 font-semibold text-white">
-                                  Haan, mukammal
-                                </button>
-                                <button type="button" onClick={() => setConfirmDone(null)} className="text-clinic-ink/60 underline">
-                                  Nahi
-                                </button>
-                              </span>
-                            ) : completeOnFinish[t.id] ? (
-                              <span className="inline-flex flex-wrap items-center gap-2 rounded-lg bg-emerald-50 px-2 py-1.5 text-emerald-900">
-                                ✓ &quot;Visit mukammal karein&quot; dabate hi ye treatment mukammal ho jayegi.
-                                <button type="button" onClick={() => setCompleteOnFinish((m) => ({ ...m, [t.id]: false }))} className="text-clinic-ink/60 underline">
-                                  Wapas
-                                </button>
-                              </span>
-                            ) : (
-                              <button type="button" onClick={() => setConfirmDone(t.id)} className="font-semibold text-emerald-700 underline">
-                                Ye treatment mukammal ho gayi
-                              </button>
-                            )}
-                          </div>
-                        )}
-                        {o?.tick && (
-                          <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_9rem]">
-                            <input value={o.notes} onChange={(e) => updOld(t.id, { notes: e.target.value })} placeholder="Aaj kya kiya (note)" className="rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm" />
-                            {t.status === 'planned' && p.perms.bill && <input type="number" min={0} value={o.price} onChange={(e) => updOld(t.id, { price: e.target.value })} placeholder="Qeemat Rs." className="rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm" />}
-                          </div>
-                        )}
-                      </div>
                     )
                   })}
                 </div>
@@ -1906,7 +1946,19 @@ export default function VisitWorkspace(p: Props) {
                         {t.teeth.length ? ` (${t.teeth.map(toothLabel).join(', ')})` : ''}
                       </option>
                     ))}
-                                  <optgroup label="Nayi treatment (clinic ki list se)">
+                  {rows.some((r) => !r.planned && r.name.trim()) && (
+                    <optgroup label="Aaj shuru hua kaam">
+                      {rows
+                        .filter((r) => !r.planned && r.name.trim())
+                        .map((r) => (
+                          <option key={r.key} value={'row:' + r.key}>
+                            {r.name.trim()}
+                            {r.applies === 'tooth' && r.teeth.length ? ' (' + r.teeth.map(toothLabel).join(', ') + ')' : ''}
+                          </option>
+                        ))}
+                    </optgroup>
+                  )}
+                  <optgroup label="Nayi treatment (clinic ki list se)">
                     {(homeo ? p.catalog.filter((c) => c.department !== 'dental') : dentalCat).map((c) => (
                       <option key={c.id} value={'cat:' + c.id}>
                         {c.name}
@@ -1948,7 +2000,8 @@ export default function VisitWorkspace(p: Props) {
             )}
             {p.patient.phone && (
               <a
-                href={messageLink('visit_thanks', { full_name: p.patient.full_name, phone: p.patient.phone, gender: (p.patient as { gender?: string | null }).gender ?? null }, {}, tpl)}
+                data-testid="visit-wa"
+                href={messageLink(done?.sum ? 'visit_summary' : 'visit_thanks', { full_name: p.patient.full_name, phone: p.patient.phone, gender: (p.patient as { gender?: string | null }).gender ?? null }, done?.sum ?? {}, tpl)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="rounded-full bg-whatsapp px-5 py-2.5 font-semibold text-white"
@@ -2027,6 +2080,8 @@ export default function VisitWorkspace(p: Props) {
             )}
           </div>
           <div className={stepCls(2)}>
+            {blk_live}
+            {blk_cd}
             {!homeo && blk_chart}
             {blk_work}
             {blk_dx}

@@ -110,14 +110,14 @@ export default function PatientEditModal({ patient }: PatientEditModalProps) {
             <form onSubmit={handleSubmit} className="mt-4 grid gap-3">
               <input
                 required
-                placeholder="Full Name"
+                placeholder="Full Name" aria-label="Full Name"
                 value={form.full_name}
                 onChange={(e) => update('full_name', e.target.value)}
                 className={inputClass}
               />
               <input
                 required
-                placeholder="Phone Number"
+                placeholder="Phone Number" aria-label="Phone Number"
                 value={form.phone}
                 onChange={(e) => update('phone', e.target.value)}
                 className={inputClass}
@@ -133,7 +133,7 @@ export default function PatientEditModal({ patient }: PatientEditModalProps) {
               <div className="grid grid-cols-2 gap-3">
                 <input
                   type="number"
-                  placeholder="Age"
+                  placeholder="Age" aria-label="Age"
                   value={form.age}
                   onChange={(e) => update('age', e.target.value)}
                   className={inputClass}
@@ -156,14 +156,14 @@ export default function PatientEditModal({ patient }: PatientEditModalProps) {
               </div>
               <PatientExtraFields value={extra} onChange={setExtra} age={ageFrom(form.age, form.date_of_birth)} inputClass={inputClass} />
               <textarea
-                placeholder="Address"
+                placeholder="Address" aria-label="Address"
                 value={form.address}
                 onChange={(e) => update('address', e.target.value)}
                 rows={2}
                 className={inputClass}
               />
               <textarea
-                placeholder="Notes"
+                placeholder="Notes" aria-label="Notes"
                 value={form.notes}
                 onChange={(e) => update('notes', e.target.value)}
                 rows={2}

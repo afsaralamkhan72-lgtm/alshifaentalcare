@@ -52,7 +52,7 @@ export default async function TreatmentsPage({ searchParams }: { searchParams: P
         ))}
         <form className="ml-auto flex gap-2">
           <input type="hidden" name="f" value={f} />
-          <input name="q" defaultValue={q} placeholder="Patient / phone / treatment" className="w-56 rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm" />
+          <input name="q" defaultValue={q} placeholder="Patient / phone / treatment" aria-label="Patient / phone / treatment" className="w-56 rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm" />
           <button className="rounded-lg bg-clinic-teal px-4 py-2 text-sm font-semibold text-white">Talash</button>
         </form>
       </div>

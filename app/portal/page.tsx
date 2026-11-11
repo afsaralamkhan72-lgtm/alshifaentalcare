@@ -39,7 +39,7 @@ export default async function PortalEntryPage({
             name="code"
             required
             autoCapitalize="none"
-            placeholder="chand-gulab-noor-47"
+            placeholder="chand-gulab-noor-47" aria-label="chand-gulab-noor-47"
             className="mt-1 w-full rounded-lg border border-clinic-teal/20 px-3 py-2.5 text-sm outline-none focus:border-clinic-teal"
           />
 

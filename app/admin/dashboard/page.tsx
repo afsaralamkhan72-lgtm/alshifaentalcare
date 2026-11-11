@@ -13,6 +13,7 @@ import OwnerToday from '@/components/admin/OwnerToday'
 import MyAttendance from '@/components/admin/MyAttendance'
 import OwnerMoney from '@/components/admin/OwnerMoney'
 import { todayKarachi } from '@/lib/karachi'
+import { prevMonth } from '@/lib/attendanceUi'
 
 function monthBounds(month: string) {
   const [y, m] = month.split('-').map(Number)
@@ -179,6 +180,11 @@ export default async function DashboardPage({
           <BackupReminder />
         </Suspense>
       )}
+      {canSeeMoney && (
+        <Suspense fallback={null}>
+          <PayrollReminder />
+        </Suspense>
+      )}
       <div className="mt-4 flex flex-wrap gap-2">
         {perms.includes('patients.create') && (
           <Link href="/admin/patients?new=1" className="rounded-full bg-clinic-teal px-4 py-2 text-sm font-semibold text-white">+ Naya patient</Link>
@@ -194,6 +200,11 @@ export default async function DashboardPage({
       <Suspense fallback={<SectionLoading />}>
         <TodayBoard perms={perms} />
       </Suspense>
+      {perms.includes('clinical.view') && (
+        <Suspense fallback={null}>
+          <CrownPending />
+        </Suspense>
+      )}
       {canSeeMoney && (
         <Suspense fallback={<SectionLoading />}>
           <OwnerToday />
@@ -231,6 +242,63 @@ async function BackupReminder() {
     <Link href="/admin/settings?s=backup" className="mt-4 block rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
       {days === null ? 'Data ki copy (backup) abhi tak nahi li gayi.' : `Aakhri backup ${days} din pehle liya tha.`} <span className="font-semibold underline">Abhi lein →</span>
     </Link>
+  )
+}
+
+async function PayrollReminder() {
+  const sb = await createClient()
+  const last = prevMonth(todayKarachi())
+  const [{ data: staff }, { data: led }] = await Promise.all([
+    sb.from('staff_members').select('id, full_name, monthly_salary, is_active, joined_on'),
+    sb.from('staff_ledger').select('staff_id').eq('kind', 'salary_due').eq('period', last),
+  ])
+  const done = new Set((led ?? []).map((l) => l.staff_id as string))
+  const missing = (staff ?? []).filter(
+    (x) => x.is_active && Number(x.monthly_salary) > 0 && (!x.joined_on || String(x.joined_on).slice(0, 7) <= last) && !done.has(x.id as string)
+  )
+  if (missing.length === 0) return null
+  return (
+    <Link href="/admin/payroll" data-testid="payroll-reminder" className="mt-4 block rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+      {last} ki salary abhi tayyar nahi hui ({missing.length} staff). <span className="font-semibold underline">Salary page kholein →</span>
+    </Link>
+  )
+}
+
+async function CrownPending() {
+  const sb = await createClient()
+  const since = addDays(todayKarachi(), -365)
+  const { data: rcts } = await sb
+    .from('patient_treatments')
+    .select('id, patient_id, name, teeth, completed_on, patients(full_name)')
+    .eq('status', 'completed')
+    .gte('completed_on', since)
+    .or('name.ilike.%root canal%,name.ilike.%rct%,name.ilike.%pulpectomy%')
+  const list = (rcts ?? []) as unknown as { id: string; patient_id: string; name: string; teeth: string[]; completed_on: string | null; patients: { full_name: string } | null }[]
+  if (list.length === 0) return null
+  const ids = [...new Set(list.map((r) => r.patient_id))]
+  const { data: others } = await sb
+    .from('patient_treatments')
+    .select('patient_id, name, teeth, status')
+    .in('patient_id', ids)
+    .neq('status', 'cancelled')
+  const cover = (others ?? []) as { patient_id: string; name: string; teeth: string[]; status: string }[]
+  const pending = list.filter(
+    (r) => !cover.some((o) => o.patient_id === r.patient_id && /crown|cap|bridge|extract|\bpfm\b|zirconia/i.test(o.name) && (r.teeth.length === 0 || o.teeth.some((t) => r.teeth.includes(t))))
+  )
+  if (pending.length === 0) return null
+  return (
+    <section data-testid="crown-pending" className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+      <p className="text-sm font-semibold text-amber-900">Crown baqi hai ({pending.length})</p>
+      <p className="text-xs text-amber-800">RCT ho chuka hai, lekin us daant par crown ka plan nahi bana.</p>
+      <div className="mt-2 grid gap-1 text-sm">
+        {pending.slice(0, 8).map((r) => (
+          <Link key={r.id} href={`/admin/patients/${r.patient_id}`} className="rounded-lg px-2 py-1 hover:bg-amber-100">
+            <span className="font-medium">{r.patients?.full_name ?? '—'}</span>
+            <span className="ml-1 text-xs text-amber-800">{r.name}{r.teeth.length ? ' (' + r.teeth.join(', ') + ')' : ''} · {r.completed_on ? fmtDate(r.completed_on) : ''}</span>
+          </Link>
+        ))}
+      </div>
+    </section>
   )
 }
 
@@ -540,7 +608,10 @@ async function TodayBoard({ perms }: { perms: string[] }) {
   const todays = (todayRes.data ?? []) as { id: string; patient_name: string; phone: string; treatment_name: string | null; preferred_time: string | null; status: string; patient_id: string | null }[]
   const missed = (missedRes.data ?? []) as { id: string; patient_name: string; phone: string; treatment_name: string | null; preferred_date: string; patient_id: string | null }[]
   const labs = ((labRes.data ?? []) as unknown as { id: string; case_number: string | null; work_type: string | null; lab_name: string; due_date: string | null; status: string; patients: { full_name: string } | null }[])
-    .filter((l) => l.status === 'received' || (l.due_date && l.due_date <= today))
+    .sort((a, b) => {
+      const rank = (l: { status: string; due_date: string | null }) => (l.status === 'received' ? 0 : l.due_date && l.due_date <= today ? 1 : 2)
+      return rank(a) - rank(b)
+    })
   if (!canAppt && !canLab) return null
 
   const who = (a: { patient_id: string | null; patient_name: string; phone: string }) =>
@@ -665,14 +736,14 @@ async function TodayBoard({ perms }: { perms: string[] }) {
             <Link href="/admin/lab" className="text-xs font-semibold text-clinic-teal">Sab →</Link>
           </div>
           {labs.length === 0 ? (
-            <p className="mt-3 text-sm text-clinic-ink/50">Aaj lab ka koi kaam due nahi.</p>
+            <p className="mt-3 text-sm text-clinic-ink/50">Lab mein abhi koi kaam nahi.</p>
           ) : (
             <div className="mt-2 grid gap-1.5 text-sm">
               {labs.slice(0, 8).map((l) => (
                 <Link key={l.id} href={`/admin/lab/${l.id}`} className="rounded-lg px-2 py-1 hover:bg-clinic-mint">
                   <span className="font-medium">{l.patients?.full_name ?? '—'}</span>
                   <span className="ml-1 text-xs text-clinic-ink/50">
-                    {l.work_type} · {l.status === 'received' ? 'aa gaya, fit karna hai' : `due ${fmtDate(l.due_date)}`}
+                    {l.work_type} · {l.status === 'received' ? 'aa gaya, fit karna hai' : `lab mein hai${l.due_date ? ', due ' + fmtDate(l.due_date) : ''}`}
                     {l.status !== 'received' && l.due_date && l.due_date < today && (
                       <b className="ml-1 text-red-600">· {Math.round((new Date(today).getTime() - new Date(l.due_date).getTime()) / 86400000)} din late, lab se poochein</b>
                     )}

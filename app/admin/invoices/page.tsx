@@ -79,7 +79,7 @@ export default async function InvoicesPage({
       </p>
 
       <form className="mt-4 flex flex-wrap gap-2">
-        <input name="q" defaultValue={params.q ?? ''} placeholder="Invoice number ya patient ka naam / phone" className="min-w-[200px] flex-1 rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm" />
+        <input name="q" defaultValue={params.q ?? ''} placeholder="Invoice number ya patient ka naam / phone" aria-label="Invoice number ya patient ka naam / phone" className="min-w-[200px] flex-1 rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm" />
         <select name="when" defaultValue={params.when ?? ''} className="rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm">
           <option value="">Har tareekh</option>
           <option value="today">Aaj</option>

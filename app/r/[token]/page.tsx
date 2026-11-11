@@ -25,7 +25,7 @@ export default async function SharePage({ params, searchParams }: { params: Prom
           <h1 className="font-display text-lg font-semibold text-clinic-ink">Apna record dekhein</h1>
           <p className="mt-2 text-sm text-clinic-ink/70">Hifazat ke liye, clinic mein likhwaye hue phone number ke aakhri 4 hindse likhein.</p>
           <form action={checkLast4.bind(null, token)} className="mt-4 grid gap-3">
-            <input name="last4" inputMode="numeric" pattern="[0-9]{4}" maxLength={4} required autoFocus placeholder="••••" className="rounded-lg border border-clinic-teal/25 px-3 py-3 text-center text-2xl tracking-[0.5em]" />
+            <input name="last4" inputMode="numeric" pattern="[0-9]{4}" maxLength={4} required autoFocus placeholder="••••" aria-label="••••" className="rounded-lg border border-clinic-teal/25 px-3 py-3 text-center text-2xl tracking-[0.5em]" />
             {e && <p className="text-sm text-red-700">Number sahi nahi. Dobara koshish karein.</p>}
             <button className="rounded-full bg-clinic-teal px-5 py-2.5 text-sm font-semibold text-white">Dekhein</button>
           </form>

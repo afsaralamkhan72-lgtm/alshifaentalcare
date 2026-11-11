@@ -241,7 +241,7 @@ export default function DuesList({
                 <input
                   type="number"
                   autoFocus
-                  placeholder="Kitne mile"
+                  placeholder="Kitne mile" aria-label="Kitne mile"
                   value={received}
                   onChange={(e) => setReceived(e.target.value)}
                   className="w-32 rounded-lg border border-clinic-teal/30 px-3 py-1.5 text-sm"
@@ -286,7 +286,7 @@ export default function DuesList({
                     <input
                       type="number"
                       min={0}
-                      placeholder="Discount Rs."
+                      placeholder="Discount Rs." aria-label="Discount Rs."
                       value={disc}
                       onChange={(e) => {
                         setDisc(e.target.value)

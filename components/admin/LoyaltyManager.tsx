@@ -207,7 +207,7 @@ function Settings({ program, rewards, run, busy }: { program: Program; rewards: 
           <div className="mt-3 space-y-3">
         {(['google_review_url', 'facebook_url', 'instagram_url', 'tiktok_url'] as const).map((k) => (
           <label key={k} className="block text-sm">{k === 'google_review_url' ? 'Google Business (review link)' : k.replace('_url', '')} link
-            <input className={inp} placeholder="https://…" value={p[k] ?? ''} onChange={(e) => set(k, e.target.value)} /></label>
+            <input className={inp} placeholder="https://…" aria-label="https://…" value={p[k] ?? ''} onChange={(e) => set(k, e.target.value)} /></label>
         ))}
           </div>
         </details>

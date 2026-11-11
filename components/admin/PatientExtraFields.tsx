@@ -56,7 +56,7 @@ export default function PatientExtraFields({
       {child && (
         <div className="grid gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
           <p className="text-xs font-semibold text-amber-900">Bacha hai: guardian (walid / walida) ka naam {small ? 'zaroori hai' : 'likh lein'}</p>
-          <input required={small} placeholder="Guardian ka naam" value={value.guardian_name} onChange={(e) => set('guardian_name', e.target.value)} className={inputClass} />
+          <input required={small} placeholder="Guardian ka naam" aria-label="Guardian ka naam" value={value.guardian_name} onChange={(e) => set('guardian_name', e.target.value)} className={inputClass} />
           <div className="flex flex-wrap gap-1.5">
             {GUARDIANS.map((g) => (
               <button key={g} type="button" onClick={() => set('guardian_relation', value.guardian_relation === g ? '' : g)} aria-pressed={value.guardian_relation === g} className={`rounded-full px-3 py-1 text-xs font-semibold ${value.guardian_relation === g ? 'bg-clinic-teal text-white' : 'border border-clinic-teal/25 bg-white text-clinic-ink/70'}`}>
@@ -66,10 +66,10 @@ export default function PatientExtraFields({
           </div>
         </div>
       )}
-      <input placeholder="Dusra phone / WhatsApp (optional)" value={value.phone2} onChange={(e) => set('phone2', e.target.value)} className={inputClass} />
+      <input placeholder="Dusra phone / WhatsApp (optional)" aria-label="Dusra phone / WhatsApp (optional)" value={value.phone2} onChange={(e) => set('phone2', e.target.value)} className={inputClass} />
       <div className="grid grid-cols-2 gap-3">
-        <input placeholder="Emergency: naam" value={value.emergency_name} onChange={(e) => set('emergency_name', e.target.value)} className={inputClass} />
-        <input placeholder="Emergency: phone" value={value.emergency_phone} onChange={(e) => set('emergency_phone', e.target.value)} className={inputClass} />
+        <input placeholder="Emergency: naam" aria-label="Emergency: naam" value={value.emergency_name} onChange={(e) => set('emergency_name', e.target.value)} className={inputClass} />
+        <input placeholder="Emergency: phone" aria-label="Emergency: phone" value={value.emergency_phone} onChange={(e) => set('emergency_phone', e.target.value)} className={inputClass} />
       </div>
       <select value={value.referral_source} onChange={(e) => set('referral_source', e.target.value)} className={inputClass} aria-label="Kaise pata chala">
         <option value="">Clinic ka kaise pata chala? (optional)</option>

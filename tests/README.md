@@ -21,3 +21,10 @@ Ye teen qism ke tests hain. Inmein se koi bhi asli (live) data par na chalayein.
 - `tests/e2e/p90-group-work.js`: 4 daant chun kar Bridge = ek hi qatar, 4 alag card nahi, ek treatment (4 daant), Complete Denture alag; visit save.
 - `tests/e2e/p91-visit-mode.js`: visit ka form khula ho to purani history chhupti hai, wapas button, 1280 aur 390 par overflow nahi.
 - `tests/e2e/p93-purge-patient.js`: Recycle Bin se patient hamesha ke liye hatana (button DELETE aur backup tick ke baghair band).
+
+## Naye tests (security, staff ke role, parchi)
+- `npm test`: ab 27 unit tests (har lib module: paise, tareekh, message template, visit khulasa, parchi ke qadam, salary ki tareekh, staff PIN / session, loyalty naam milana).
+- `tests/e2e/sc1-roles-treatments.js`: 4 qisam ke staff (admin, doctor, receptionist, bina ijazat) aur 5 ilaaj (RCT 2 visit, bridge, denture, braces, homeopathic). 46 jaanch, har ek PASS / FAIL likhti hai.
+- `tests/e2e/sec1-table-access.js`, `sec2-privilege-escalation.js`: bina login aur kam ijazat wale staff se tables aur functions par koshish (sab band hone chahiyen).
+- `tests/e2e/p106-treatment-steps.js` (parchi), `p104-crown-pending.js` (crown baqi card), `p103-visit-whatsapp.js` (visit ka WhatsApp khulasa).
+- `tests/e2e/roles.js`: test ke liye alag role ka login (sirf local test database).

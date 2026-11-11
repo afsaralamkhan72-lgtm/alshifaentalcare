@@ -16,6 +16,7 @@ export interface StaffRow {
   phone: string | null
   monthly_salary: number
   is_active: boolean
+  joined_on?: string | null
 }
 export interface BalanceRow {
   staff_id: string
@@ -105,6 +106,13 @@ export default function PayrollManager({
     router.refresh()
   }
 
+  const isMissing = (st: StaffRow) =>
+    st.is_active &&
+    Number(st.monthly_salary) > 0 &&
+    (!st.joined_on || st.joined_on.slice(0, 7) <= lastMonth) &&
+    !ledger.some((l) => l.staff_id === st.id && l.kind === 'salary_due' && l.period === lastMonth)
+  const missingNames = staff.filter(isMissing).map((st) => st.full_name)
+
   const totalOwed = balances.reduce((s, b) => s + Math.max(0, Number(b.balance)), 0)
   const totalExtra = balances.reduce((s, b) => s + Math.max(0, -Number(b.balance)), 0)
 
@@ -120,6 +128,17 @@ export default function PayrollManager({
           {lastMonth} ka mahina tayyar karein
         </button>
       </div>
+      {missingNames.length > 0 && (
+        <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 p-4 text-sm text-amber-900" data-testid="payroll-missing">
+          <p className="font-semibold">{lastMonth} ki salary abhi tayyar nahi hui</p>
+          <p className="mt-1">
+            Jab tak mahina tayyar na ho, staff ka baqaya Rs. 0 dikhta hai aur &quot;Salary di&quot; nahi likh sakte. Pehle neeche wala button dabayein. Ye in ke liye abhi baqi hai: {missingNames.join(', ')}.
+          </p>
+          <button type="button" onClick={generate} className="mt-2 rounded-full bg-clinic-teal px-4 py-2 font-semibold text-white">
+            {lastMonth} ka mahina tayyar karein
+          </button>
+        </div>
+      )}
       {msg && <p className={`text-sm ${msg.ok ? 'text-emerald-700' : 'text-red-600'}`}>{msg.text}</p>}
 
       <div className="grid gap-4">
@@ -129,6 +148,8 @@ export default function PayrollManager({
             s={s}
             today={today}
             period={period}
+            lastMonth={lastMonth}
+            missingLast={isMissing(s)}
             bal={balances.find((b) => b.staff_id === s.id)}
             rows={ledger.filter((l) => l.staff_id === s.id)}
             acc={access.find((a) => a.staff_id === s.id)}
@@ -152,11 +173,15 @@ function StaffCard({
   s,
   today,
   period,
+  lastMonth,
+  missingLast,
   bal,
   rows,
   acc,
 }: {
   period: string
+  lastMonth: string
+  missingLast: boolean
   s: StaffRow
   today: string
   bal?: BalanceRow
@@ -202,7 +227,12 @@ function StaffCard({
       p_key: key,
     })
     setBusy(false)
-    if (error) return setErr(error.message)
+    if (error) {
+      if (/Baqaya sirf/.test(error.message) && missingLast) {
+        return setErr(error.message + ' Wajah: ' + lastMonth + ' ki salary abhi tayyar nahi hui. Pehle upar "' + lastMonth + ' ka mahina tayyar karein" dabayein, ya Advance chunein.')
+      }
+      return setErr(error.message)
+    }
     const amt = Number(amount)
     const word = kind === 'advance' ? 'advance (peshgi)' : kind === 'payout' ? 'tankhwah ada' : kind === 'deduction' ? 'katauti' : 'bonus'
     const after = kind === 'bonus' ? balance + amt : balance - amt
@@ -268,6 +298,16 @@ function StaffCard({
             {s.full_name} <span className="text-xs font-normal text-clinic-ink/50">{s.title}</span>
           </p>
           <p className="text-xs text-clinic-ink/50">Salary {money(s.monthly_salary)} / mahina</p>
+          {s.is_active && Number(s.monthly_salary) > 0 && (() => {
+            const [yy, mm, dd] = today.split('-').map(Number)
+            const dim = new Date(yy, mm, 0).getDate()
+            const part = Math.round((Number(s.monthly_salary) * dd) / dim)
+            return (
+              <p className="text-[11px] text-clinic-ink/50" data-testid="staff-sofar">
+                Is mahine ke {dd}/{dim} din guzre: salary ka andaza {money(part)} (hazri ki katauti shamil nahi, ye abhi khate mein nahi likhi)
+              </p>
+            )
+          })()}
         </div>
         <div className="text-right">
           <p className="text-xs text-clinic-ink/50">{balance < 0 ? 'Zyada liya (agle mahine se kategi)' : 'Baqaya (dena hai)'}</p>
@@ -280,6 +320,11 @@ function StaffCard({
         </div>
       </div>
 
+      {missingLast && (
+        <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-900" data-testid="staff-missing">
+          {lastMonth} ki salary abhi tayyar nahi hui, is liye baqaya Rs. 0 hai. Upar &quot;{lastMonth} ka mahina tayyar karein&quot; dabayein. Abhi paise dene hon to &quot;Advance&quot; chunein.
+        </p>
+      )}
       <div className="mt-3 grid grid-cols-2 gap-2 rounded-xl bg-clinic-teal/5 p-3 text-xs sm:grid-cols-4">
         <Cell label="Pichla baqaya / advance" v={prevBal} />
         <Cell label={`${period} ki salary`} v={curSalary} />
@@ -295,7 +340,7 @@ function StaffCard({
             <option value="bonus">Bonus</option>
             <option value="deduction">Katauti</option>
           </select>
-          <input required type="number" min="0.01" step="0.01" inputMode="decimal" placeholder="Raqam" value={amount} onChange={(e) => setAmount(e.target.value)} className={input} />
+          <input required type="number" min="0.01" step="0.01" inputMode="decimal" placeholder="Raqam" aria-label="Raqam" value={amount} onChange={(e) => setAmount(e.target.value)} className={input} />
           {needsMethod ? (
             <select value={method} onChange={(e) => setMethod(e.target.value)} className={input}>
               <option value="cash">Cash</option>

@@ -24,6 +24,8 @@ export interface Appointment {
   created_at: string
   doctor?: string | null
   source?: string | null
+  treatment_id?: string | null
+  visit_no?: number
 }
 
 const SLOTS = (() => {
@@ -361,6 +363,7 @@ export default function AppointmentBoard({
                       <span className="font-semibold text-clinic-ink">{a.preferred_date ? fmtDate(a.preferred_date) : 'No date'}</span>
                       {a.preferred_time ? <span className="font-semibold text-clinic-teal"> · {a.preferred_time}</span> : ''}
                       {a.treatment_name ? ` · ${a.treatment_name}` : ''}
+                      {a.visit_no ? <span data-testid="appt-visit-no"> · visit {a.visit_no}</span> : ''}
                       {a.doctor ? ` · ${a.doctor}` : ''}
                       {a.source === 'website' ? ' · website se' : ''}
                     </p>

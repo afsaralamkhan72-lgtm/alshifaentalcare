@@ -86,7 +86,7 @@ export default async function StaffEditPage({
         <h2 className="font-display text-lg font-semibold text-clinic-ink">Naya password</h2>
         <form action={resetStaffPassword} className="mt-3 flex flex-wrap items-center gap-2">
           <input type="hidden" name="id" value={s.id} />
-          <input name="password" type="text" minLength={8} required placeholder="Naya password (8+)" className={inputClass} autoComplete="off" />
+          <input name="password" type="text" minLength={8} required placeholder="Naya password (8+)" aria-label="Naya password (8+)" className={inputClass} autoComplete="off" />
           <button className="rounded-full bg-clinic-teal px-4 py-1.5 text-xs font-semibold text-white">Password badlein</button>
         </form>
       </section>

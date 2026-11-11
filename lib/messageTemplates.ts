@@ -12,6 +12,7 @@ export const TEMPLATE_DEFAULTS: { key: string; label: string; body: string; dept
   { key: 'appt_reminder', label: 'Appointment yaad dehani', body: '{header}\n\nآپ کی اپائنٹمنٹ کی یاد دہانی ہے۔\n\n📅 تاریخ: {date}\n🕐 وقت: {time}\n🦷 علاج: {treatment}\n👨‍⚕️ ڈاکٹر: {doctor}\n\nاگر آپ نہ آ سکیں تو براہِ مہربانی ہمیں پہلے بتا دیں۔\n\n{footer}' },
   { key: 'appt_reschedule', label: 'Appointment nayi tareekh', body: '{header}\n\nآپ کی اپائنٹمنٹ کی نئی تاریخ مقرر کر دی گئی ہے۔\n\n📅 تاریخ: {date}\n🕐 وقت: {time}\n👨‍⚕️ ڈاکٹر: {doctor}\n\n{footer}' },
   { key: 'visit_thanks', label: 'Visit ke baad shukriya', body: '{header}\n\nآج آپ نے ہمارے کلینک میں تشریف لا کر ہمیں عزت بخشی، شکریہ۔ اللہ تعالیٰ آپ کو جلد مکمل صحت عطا فرمائے، آمین۔\n\n{footer}' },
+  { key: 'visit_summary', label: 'Visit ke baad khulasa (kaam, paise, agli visit)', body: '{header}\n\nآج آپ نے ہمارے کلینک میں تشریف لا کر ہمیں عزت بخشی، شکریہ۔\n\n🦷 آج کا کام: {work}\n💵 آج موصول: Rs. {today_paid}\n💰 کل بقایا: Rs. {balance}\n\n📅 اگلی ملاقات: {next_date}\n🕐 وقت: {next_time}\n🦷 اگلا کام: {next_work}\n\nاللہ تعالیٰ آپ کو جلد مکمل صحت عطا فرمائے، آمین۔\n\n{footer}' },
   { key: 'baqaya', label: 'Baqaya yaad dehani', body: '{header}\n\nآپ کے حساب کی یاد دہانی:\n\n💰 موجودہ بقایا: Rs. {balance}\n\nبراہِ مہربانی اگلی visit پر یا Easypaisa / JazzCash پر ادا کر دیں: {easypaisa}\n\n{footer}' },
   { key: 'missed', label: 'Appointment par nahi aaye', body: '{header}\n\nآپ اپنی اپائنٹمنٹ پر تشریف نہیں لا سکے۔ نیا وقت لینے کے لیے براہِ مہربانی ہم سے رابطہ فرمائیں۔\n\n{footer}' },
   { key: 'followup', label: 'Follow-up', body: '{header}\n\nآپ کا فالو اپ (دوبارہ معائنہ) واجب ہے۔\n\n📅 تاریخ: {date}\n🦷 علاج: {treatment}\n\nبراہِ مہربانی تشریف لے آئیں یا ہم سے وقت لے لیں۔\n\n{footer}' },
@@ -28,7 +29,7 @@ export const TEMPLATE_DEFAULTS: { key: string; label: string; body: string; dept
   { key: 'receipt', label: 'Payment ki rasid', body: '{header}\n\nآپ کی ادائیگی موصول ہو گئی ہے، شکریہ۔\n\n✅ موصول شدہ رقم: Rs. {amount}\n📅 تاریخ: {paid_date}\n💳 طریقہ: {method}\n\nپہلے کا بقایا: Rs. {old_balance}\nموجودہ بقایا: Rs. {balance}\n{settled_line}\n\n📱 اپنا ریکارڈ دیکھیں:\n{link}\n\nذاتی ایکسس کوڈ:\n{code}\n\n{footer}' },
 ]
 
-export const PLACEHOLDERS = ['{header}', '{footer}', '{adab}', '{name}', '{mr}', '{date}', '{time}', '{doctor}', '{treatment}', '{balance}', '{old_balance}', '{today_charges}', '{today_received}', '{total_charges}', '{total_received}', '{treatments_block}', '{medicine}', '{muddat}', '{amount}', '{paid_date}', '{method}', '{easypaisa}', '{link}', '{code}', '{doctor_name}', '{clinic_name}', '{address}', '{phone}']
+export const PLACEHOLDERS = ['{header}', '{footer}', '{adab}', '{name}', '{mr}', '{date}', '{time}', '{doctor}', '{treatment}', '{balance}', '{old_balance}', '{today_charges}', '{today_received}', '{total_charges}', '{total_received}', '{treatments_block}', '{medicine}', '{muddat}', '{work}', '{today_paid}', '{next_date}', '{next_time}', '{next_work}', '{amount}', '{paid_date}', '{method}', '{easypaisa}', '{link}', '{code}', '{doctor_name}', '{clinic_name}', '{address}', '{phone}']
 
 export function mapTemplates(rows: { key: string; body: string }[] | null | undefined): Tpl {
   const t: Tpl = {}

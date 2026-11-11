@@ -116,8 +116,8 @@ export default async function StaffPage({
               >
                 <input type="hidden" name="user_id" value={u.id} />
                 <span className="mr-2 text-sm font-medium text-clinic-ink">{u.email}</span>
-                <input name="full_name" required placeholder="Naam" className={inputClass} />
-                <input name="phone" placeholder="Phone (optional)" className={inputClass} />
+                <input name="full_name" required placeholder="Naam" aria-label="Naam" className={inputClass} />
+                <input name="phone" placeholder="Phone (optional)" aria-label="Phone (optional)" className={inputClass} />
                 <button className="rounded-full bg-clinic-teal px-4 py-1.5 text-xs font-semibold text-white">
                   Activate (Receptionist)
                 </button>

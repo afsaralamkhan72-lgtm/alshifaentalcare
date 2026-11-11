@@ -238,6 +238,18 @@ export default function ToothChart({
       <div className="min-w-0">
       {arch}
 
+      {canEdit && !pickOnly && (
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs" data-testid="chart-select-all">
+          <span className="text-clinic-ink/60">Ek saath chunein:</span>
+          <button type="button" data-testid="select-upper" onClick={() => onSelect([...new Set([...selected.filter((t) => !isPrimary(t)), ...UR, ...UL])])} className="rounded-full border border-clinic-teal/30 bg-white px-3 py-1.5 font-semibold text-clinic-teal">
+            Upper ke sab daant
+          </button>
+          <button type="button" data-testid="select-lower" onClick={() => onSelect([...new Set([...selected.filter((t) => !isPrimary(t)), ...LR, ...LL])])} className="rounded-full border border-clinic-teal/30 bg-white px-3 py-1.5 font-semibold text-clinic-teal">
+            Lower ke sab daant
+          </button>
+        </div>
+      )}
+
       <p className="mt-2 text-xs text-clinic-ink/60">
         {selected.length ? (
           <>

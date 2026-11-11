@@ -67,7 +67,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
           name="q"
           defaultValue={raw ?? ''}
           autoFocus
-          placeholder="Mareez ka naam, phone, MR number, invoice ya lab case"
+          placeholder="Mareez ka naam, phone, MR number, invoice ya lab case" aria-label="Mareez ka naam, phone, MR number, invoice ya lab case"
           className="w-full max-w-lg rounded-lg border border-clinic-teal/30 px-3 py-2 text-sm outline-none focus:border-clinic-teal"
         />
         <button className="rounded-lg bg-clinic-teal px-4 py-2 text-sm font-semibold text-white">Dhoondein</button>

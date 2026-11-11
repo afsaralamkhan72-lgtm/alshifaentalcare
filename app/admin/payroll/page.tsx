@@ -20,7 +20,7 @@ export default async function PayrollPage() {
   const [staffRes, balRes, ledRes] = await Promise.all([
     supabase
       .from('staff_members')
-      .select('id, full_name, title, phone, monthly_salary, is_active')
+      .select('id, full_name, title, phone, monthly_salary, is_active, joined_on')
       .order('is_active', { ascending: false })
       .order('full_name'),
     supabase.from('staff_balances').select('staff_id, balance, total_advance, unconfirmed'),

@@ -100,7 +100,7 @@ export default async function LabPage({
       </div>
 
       <form className="mt-6 flex gap-2">
-        <input name="q" defaultValue={q} placeholder="Case no., lab ya kaam talash karein" className="w-full max-w-sm rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm" />
+        <input name="q" defaultValue={q} placeholder="Case no., lab ya kaam talash karein" aria-label="Case no., lab ya kaam talash karein" className="w-full max-w-sm rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm" />
         <button className="rounded-lg bg-clinic-teal px-4 py-2 text-sm font-semibold text-white">Talash</button>
       </form>
 

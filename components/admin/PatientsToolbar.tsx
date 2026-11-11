@@ -192,7 +192,7 @@ export default function PatientsToolbar({
                 <input
                   required
                   autoFocus
-                  placeholder="Patient ka poora naam"
+                  placeholder="Patient ka poora naam" aria-label="Patient ka poora naam"
                   value={form.full_name}
                   onChange={(e) => update('full_name', e.target.value)}
                   className="mt-1 w-full rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm outline-none focus:border-clinic-teal"
@@ -203,7 +203,7 @@ export default function PatientsToolbar({
                 <label className="text-sm font-medium text-clinic-ink">Phone *</label>
                 <input
                   required
-                  placeholder="03XX-XXXXXXX"
+                  placeholder="03XX-XXXXXXX" aria-label="03XX-XXXXXXX"
                   value={form.phone}
                   onChange={(e) => update('phone', e.target.value)}
                   className="mt-1 w-full rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm outline-none focus:border-clinic-teal"
@@ -233,7 +233,7 @@ export default function PatientsToolbar({
                   type="number"
                   min={0}
                   max={120}
-                  placeholder="Age (saal)"
+                  placeholder="Age (saal)" aria-label="Age (saal)"
                   value={form.age}
                   onChange={(e) => update('age', e.target.value)}
                   className="rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm outline-none focus:border-clinic-teal"
@@ -267,7 +267,7 @@ export default function PatientsToolbar({
                 <label className="text-xs text-clinic-ink/50">Treating Doctor</label>
                 <input
                   list="toolbar-doctors"
-                  placeholder="Doctor apna naam likhein"
+                  placeholder="Doctor apna naam likhein" aria-label="Doctor apna naam likhein"
                   value={form.primary_doctor}
                   onChange={(e) => update('primary_doctor', e.target.value)}
                   className="mt-1 w-full rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm outline-none focus:border-clinic-teal"
@@ -285,7 +285,7 @@ export default function PatientsToolbar({
               <div className="rounded-xl bg-red-50/60 p-3">
                 <p className="text-sm font-medium text-clinic-ink">Zaroori sawal (doctor ke liye)</p>
                 <input
-                  placeholder="Kisi dawa / cheez se allergy? (nahi to khali chorein)"
+                  placeholder="Kisi dawa / cheez se allergy? (nahi to khali chorein)" aria-label="Kisi dawa / cheez se allergy? (nahi to khali chorein)"
                   value={allergy}
                   onChange={(e) => setAllergy(e.target.value)}
                   className="mt-2 w-full rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm outline-none focus:border-clinic-teal"
@@ -307,11 +307,11 @@ export default function PatientsToolbar({
               </label>
 
               <div className="grid grid-cols-2 gap-3">
-                <input placeholder="CNIC (optional)" value={cnic} onChange={(e) => setCnic(e.target.value)} className="rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm outline-none focus:border-clinic-teal" />
-                <input placeholder="Family: rishtedaar ka MR / phone" value={family} onChange={(e) => setFamily(e.target.value)} className="rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm outline-none focus:border-clinic-teal" />
+                <input placeholder="CNIC (optional)" aria-label="CNIC (optional)" value={cnic} onChange={(e) => setCnic(e.target.value)} className="rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm outline-none focus:border-clinic-teal" />
+                <input placeholder="Family: rishtedaar ka MR / phone" aria-label="Family: rishtedaar ka MR / phone" value={family} onChange={(e) => setFamily(e.target.value)} className="rounded-lg border border-clinic-teal/20 px-3 py-2 text-sm outline-none focus:border-clinic-teal" />
               </div>
               <textarea
-                placeholder="Address (optional)"
+                placeholder="Address (optional)" aria-label="Address (optional)"
                 value={form.address}
                 onChange={(e) => update('address', e.target.value)}
                 rows={2}

@@ -137,7 +137,7 @@ export default function Sidebar({ role, perms }: { role: Role; perms: string[] }
         <form action="/admin/search" method="get" className="px-3 pb-2">
           <input
             name="q"
-            placeholder="Talash (naam / phone)"
+            placeholder="Talash (naam / phone)" aria-label="Talash (naam / phone)"
             className="w-full rounded-lg bg-white/10 px-3 py-2 text-sm text-white outline-none placeholder:text-white/40 focus:bg-white/20"
           />
         </form>
