@@ -9,9 +9,10 @@ import { getPrintCfg } from '@/lib/printSettings'
 import { aftercareFor } from '@/lib/printTemplates'
 import { renderTemplate } from '@/lib/messageTemplates'
 
-export default async function PrescriptionPrintPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function PrescriptionPrintPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ t?: string }> }) {
   await requirePerm('prescriptions.view')
   const { id } = await params
+  const { t: forTreatment } = await searchParams
   const supabase = await createClient()
   const { data: rx } = await supabase
     .from('prescriptions')
@@ -25,6 +26,16 @@ export default async function PrescriptionPrintPage({ params }: { params: Promis
   if (rx.treatment_id) {
     const { data: t } = await supabase.from('patient_treatments').select('name').eq('id', rx.treatment_id).maybeSingle()
     treatmentName = t?.name ?? null
+  }
+  // Ilaaj ke card se aaye hon to us ilaaj ki doosri (purani) prescriptions ke link
+  let others: { id: string; date: string }[] = []
+  if (forTreatment && /^[0-9a-f-]{36}$/.test(forTreatment)) {
+    const { data: vn } = await supabase.from('visit_notes').select('clinical_visit_id').eq('treatment_id', forTreatment).eq('patient_id', rx.patient_id).is('voided_at', null).not('clinical_visit_id', 'is', null)
+    const cv = [...new Set(((vn ?? []) as { clinical_visit_id: string }[]).map((x) => x.clinical_visit_id))]
+    if (cv.length) {
+      const { data: rs } = await supabase.from('prescriptions').select('id, prescribed_date').in('clinical_visit_id', cv).neq('id', rx.id).order('prescribed_date', { ascending: false })
+      others = ((rs ?? []) as { id: string; prescribed_date: string }[]).map((r) => ({ id: r.id, date: r.prescribed_date }))
+    }
   }
   const printCfg = await getPrintCfg()
   const { data: ci } = await supabase.from('site_settings').select('value').eq('key', 'clinic_info').maybeSingle()
@@ -47,6 +58,16 @@ export default async function PrescriptionPrintPage({ params }: { params: Promis
           message={'Assalam o Alaikum ' + (p?.full_name ?? '') + ',\n\nAap ki prescription (' + rx.prescribed_date + ') bhej rahe hain.'}
         />
       </div>
+      {others.length > 0 && (
+        <p className="mb-3 flex flex-wrap gap-3 text-xs print:hidden" data-testid="rx-others">
+          <span className="text-clinic-ink/60">Is ilaaj ki purani prescription:</span>
+          {others.map((o) => (
+            <Link key={o.id} href={'/admin/prescriptions/' + o.id + '/print?t=' + forTreatment} className="font-semibold text-clinic-teal underline">
+              {o.date}
+            </Link>
+          ))}
+        </p>
+      )}
       <RxPrint
         rx={{ items: (rx.items ?? []) as RxItem[], notes_en: rx.notes_en, notes_ur: rx.notes_ur, prescribed_date: rx.prescribed_date, treatmentName, patient: p }}
         dept={dept}

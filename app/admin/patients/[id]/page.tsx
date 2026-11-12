@@ -314,7 +314,7 @@ export default async function PatientDetailPage({ params, searchParams }: Props)
       <div className="profile-extra grid gap-4">
       {canClinical && (
         <Suspense fallback={null}>
-          <TreatmentMiniCards patientId={patient.id} canMoney={canMoney} canClinical={canClinical} />
+          <TreatmentMiniCards patient={{ id: patient.id, full_name: patient.full_name, phone: patient.phone, gender: (patient as { gender?: string | null }).gender ?? null }} canMoney={canMoney} canClinical={canClinical} canRx={can('prescriptions.view')} />
         </Suspense>
       )}
 

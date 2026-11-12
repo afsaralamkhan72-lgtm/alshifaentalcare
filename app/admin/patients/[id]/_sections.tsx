@@ -4,7 +4,9 @@ import { createClient } from '@/lib/supabase/server'
 import type { TItem, TVisit } from '@/components/admin/visit/types'
 import type { Plan as PayPlan, PlanItem } from '@/components/admin/PaymentPlan'
 import TreatmentCards, { type Stage, type LabLite } from '@/components/admin/TreatmentCards'
-import { money, fmtDate } from '@/lib/karachi'
+import { money, fmtDate, numFmt, todayKarachi } from '@/lib/karachi'
+import { messageLink } from '@/lib/messages'
+import { mapTemplates } from '@/lib/messageTemplates'
 
 type Sb = Awaited<ReturnType<typeof createClient>>
 const num = (v: unknown) => Number(v ?? 0)
@@ -232,16 +234,20 @@ export async function HistorySection({ patient, history, canClinical, canMoney, 
 
 
 /** Profile par: har ilaaj ka chhota card (click se us ilaaj ka apna page) + muaine ka card */
-export async function TreatmentMiniCards({ patientId, canMoney, canClinical }: { patientId: string; canMoney: boolean; canClinical: boolean }) {
+export async function TreatmentMiniCards({ patient, canMoney, canClinical, canRx }: { patient: { id: string; full_name: string; phone: string | null; gender?: string | null }; canMoney: boolean; canClinical: boolean; canRx: boolean }) {
+  const patientId = patient.id
   const supabase = await createClient()
-  const [treatments, cvRes] = await Promise.all([
+  const [treatments, docs, tplRes, cvRes] = await Promise.all([
     getTreatments(patientId),
+    loadTreatmentDocs(patientId, canRx),
+    supabase.from('message_templates').select('key, body'),
     canClinical ? supabase.from('clinical_visits').select('id', { count: 'exact', head: true }).eq('patient_id', patientId).eq('status', 'finished') : Promise.resolve({ count: 0 }),
   ])
   const list = treatments.filter((t) => t.status !== 'planned' || t.visits.length > 0)
   const planned = treatments.filter((t) => t.status === 'planned' && t.visits.length === 0)
   const visitCount = cvRes.count ?? 0
   if (list.length === 0 && planned.length === 0 && visitCount === 0) return null
+  const tpl = mapTemplates(tplRes.data as { key: string; body: string }[] | null)
   const chip: Record<string, string> = { planned: 'sirf plan', active: 'chal rahi', completed: 'mukammal', cancelled: 'cancel' }
   const tone: Record<string, string> = { planned: 'bg-amber-100 text-amber-800', active: 'bg-sky-100 text-sky-800', completed: 'bg-emerald-100 text-emerald-800', cancelled: 'bg-gray-100 text-gray-600' }
   return (
@@ -250,18 +256,21 @@ export async function TreatmentMiniCards({ patientId, canMoney, canClinical }: {
       <p className="mb-3 text-xs text-clinic-ink/55">Kisi ilaaj par dabayein: us ki visits, qadam, paise, invoice, prescription aur lab ek jagah.</p>
       <div className="grid gap-2 sm:grid-cols-2">
         {[...list, ...planned].map((t) => (
-          <Link key={t.id} href={'/admin/patients/' + patientId + '/treatment/' + t.id} data-testid="mini-card" className="flex min-h-[64px] flex-col justify-center rounded-xl border border-clinic-teal/15 px-3 py-2 hover:border-clinic-teal hover:bg-clinic-mint/30">
-            <span className="flex flex-wrap items-center gap-2">
-              <span className="font-semibold text-clinic-ink">{t.name}</span>
-              {t.teeth.length > 0 && <span className="text-xs text-clinic-ink/60">({t.teeth.join(', ')})</span>}
-              <span className={'rounded-full px-2 py-0.5 text-[11px] ' + (tone[t.status] ?? '')}>{chip[t.status] ?? t.status}</span>
-            </span>
-            <span className="mt-0.5 text-xs text-clinic-ink/60">
-              {t.visits.length} visit{t.visits.length === 1 ? '' : 's'}
-              {canMoney ? (t.balance > 0 ? <span className="font-semibold text-red-600"> · baqaya {money(t.balance)}</span> : t.charged > 0 ? <span className="text-emerald-700"> · hisaab saaf</span> : null) : null}
-              <span className="ml-1 text-clinic-teal"> · kholein →</span>
-            </span>
-          </Link>
+          <div key={t.id} data-testid="mini-card-box" className="grid gap-2 rounded-xl border border-clinic-teal/15 px-3 py-2">
+            <Link href={'/admin/patients/' + patientId + '/treatment/' + t.id} data-testid="mini-card" className="flex min-h-[48px] flex-col justify-center rounded-lg hover:bg-clinic-mint/30">
+              <span className="flex flex-wrap items-center gap-2">
+                <span className="font-semibold text-clinic-ink">{t.name}</span>
+                {t.teeth.length > 0 && <span className="text-xs text-clinic-ink/60">({t.teeth.join(', ')})</span>}
+                <span className={'rounded-full px-2 py-0.5 text-[11px] ' + (tone[t.status] ?? '')}>{chip[t.status] ?? t.status}</span>
+              </span>
+              <span className="mt-0.5 text-xs text-clinic-ink/60">
+                {t.visits.length} visit{t.visits.length === 1 ? '' : 's'}
+                {canMoney ? (t.balance > 0 ? <span className="font-semibold text-red-600"> · baqaya {money(t.balance)}</span> : t.charged > 0 ? <span className="text-emerald-700"> · hisaab saaf</span> : null) : null}
+                <span className="ml-1 text-clinic-teal"> · kholein →</span>
+              </span>
+            </Link>
+            {t.visits.length > 0 && <TreatmentDocButtons patient={patient} t={t} docs={docs.get(t.id)} canMoney={canMoney} tpl={tpl} />}
+          </div>
         ))}
         {canClinical && visitCount > 0 && (
           <Link href={'/admin/patients/' + patientId + '/checkups'} data-testid="checkup-card" className="flex min-h-[64px] flex-col justify-center rounded-xl border border-clinic-teal/15 bg-clinic-mint/20 px-3 py-2 hover:border-clinic-teal">
@@ -274,5 +283,102 @@ export async function TreatmentMiniCards({ patientId, canMoney, canClinical }: {
         )}
       </div>
     </section>
+  )
+}
+
+export interface TreatmentDocs {
+  rx: { id: string; date: string }[]
+  next: { date: string; time: string | null } | null
+  doneStages: string[]
+}
+
+/** Har ilaaj ke kaghzat: us ki prescriptions (nayi pehle), agli appointment, ho chuke qadam */
+export async function loadTreatmentDocs(patientId: string, canRx: boolean): Promise<Map<string, TreatmentDocs>> {
+  const supabase = await createClient()
+  const today = todayKarachi()
+  const [vn, rxRes, apRes, stRes] = await Promise.all([
+    supabase.from('visit_notes').select('treatment_id, clinical_visit_id').eq('patient_id', patientId).is('voided_at', null).not('clinical_visit_id', 'is', null),
+    canRx ? supabase.from('prescriptions').select('id, clinical_visit_id, prescribed_date, created_at').eq('patient_id', patientId).not('clinical_visit_id', 'is', null).order('prescribed_date', { ascending: false }).order('created_at', { ascending: false }) : Promise.resolve({ data: [] }),
+    supabase.from('appointments').select('treatment_id, preferred_date, preferred_time, status').eq('patient_id', patientId).in('status', ['pending', 'confirmed']).gte('preferred_date', today).not('treatment_id', 'is', null).order('preferred_date'),
+    supabase.from('treatment_stages').select('treatment_id, label, done_on, sort_order').eq('patient_id', patientId).not('done_on', 'is', null).order('sort_order'),
+  ])
+  const out = new Map<string, TreatmentDocs>()
+  const get = (tid: string) => {
+    let d = out.get(tid)
+    if (!d) {
+      d = { rx: [], next: null, doneStages: [] }
+      out.set(tid, d)
+    }
+    return d
+  }
+  const byVisit = new Map<string, string[]>()
+  for (const n of (vn.data ?? []) as { treatment_id: string | null; clinical_visit_id: string }[]) {
+    if (n.treatment_id) byVisit.set(n.clinical_visit_id, [...(byVisit.get(n.clinical_visit_id) ?? []), n.treatment_id])
+  }
+  for (const r of (rxRes.data ?? []) as { id: string; clinical_visit_id: string; prescribed_date: string }[]) {
+    for (const tid of byVisit.get(r.clinical_visit_id) ?? []) get(tid).rx.push({ id: r.id, date: r.prescribed_date })
+  }
+  for (const a of (apRes.data ?? []) as { treatment_id: string; preferred_date: string; preferred_time: string | null }[]) {
+    const d = get(a.treatment_id)
+    if (!d.next) d.next = { date: a.preferred_date, time: a.preferred_time }
+  }
+  if (!('error' in stRes && stRes.error)) {
+    for (const s of (stRes.data ?? []) as { treatment_id: string; label: string }[]) get(s.treatment_id).doneStages.push(s.label)
+  }
+  return out
+}
+
+/** Ilaaj ke card par (click kiye baghair) aur ilaaj ke page ke upar: Invoice | Prescription | WhatsApp */
+export function TreatmentDocButtons({
+  patient,
+  t,
+  docs,
+  canMoney,
+  tpl,
+}: {
+  patient: { id: string; full_name: string; phone: string | null; gender?: string | null }
+  t: TItem
+  docs: TreatmentDocs | undefined
+  canMoney: boolean
+  tpl: Record<string, string>
+}) {
+  const rx = docs?.rx ?? []
+  const btn = 'inline-flex min-h-[40px] items-center rounded-full px-4 py-1.5 text-xs font-semibold'
+  const wa = patient.phone
+    ? messageLink(
+        'treatment_summary',
+        { full_name: patient.full_name, phone: patient.phone, gender: patient.gender ?? null },
+        {
+          work: t.name + (t.teeth.length ? ' (' + t.teeth.join(', ') + ')' : ''),
+          done: (docs?.doneStages ?? []).join('، '),
+          visits: t.visits.length ? String(t.visits.length) : '',
+          charged: canMoney && t.charged > 0 ? numFmt(t.charged) : '',
+          paid: canMoney && t.charged > 0 ? numFmt(t.paid) : '',
+          balance: canMoney && t.charged > 0 ? numFmt(Math.max(0, t.balance)) : '',
+          next_date: docs?.next ? fmtDate(docs.next.date) : '',
+          next_time: docs?.next?.time ?? '',
+        },
+        tpl,
+      )
+    : null
+  if (!canMoney && rx.length === 0 && !wa) return null
+  return (
+    <div className="flex flex-wrap gap-2" data-testid="doc-buttons">
+      {canMoney && (
+        <Link href={'/admin/patients/' + patient.id + '/treatment/' + t.id + '/invoice'} data-testid="card-invoice" className={btn + ' bg-clinic-teal text-white'}>
+          Invoice
+        </Link>
+      )}
+      {rx.length > 0 && (
+        <Link href={'/admin/prescriptions/' + rx[0].id + '/print?t=' + t.id} data-testid="card-rx" className={btn + ' bg-clinic-teal text-white'}>
+          Prescription{rx.length > 1 ? ' (' + rx.length + ')' : ''}
+        </Link>
+      )}
+      {wa && (
+        <a href={wa} target="_blank" rel="noreferrer" data-testid="card-wa" className={btn + ' bg-whatsapp text-white'}>
+          WhatsApp
+        </a>
+      )}
+    </div>
   )
 }

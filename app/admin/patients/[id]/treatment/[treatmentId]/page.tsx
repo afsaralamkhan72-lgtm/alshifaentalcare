@@ -6,7 +6,7 @@ import { fmtDate, money } from '@/lib/karachi'
 import { mapTemplates } from '@/lib/messageTemplates'
 import PaymentDialog from '@/components/admin/PaymentDialog'
 import VisitDoneBanner from '@/components/admin/visit/VisitDoneBanner'
-import { getTreatments, TreatmentCardsSlot } from '../../_sections'
+import { getTreatments, TreatmentCardsSlot, loadTreatmentDocs, TreatmentDocButtons } from '../../_sections'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,6 +26,7 @@ export default async function TreatmentPage({ params }: { params: Promise<{ id: 
   const t = treatments.find((x) => x.id === treatmentId)
   if (!t) notFound()
 
+  const docs = await loadTreatmentDocs(id, can('prescriptions.view'))
   const [vnRes, tplRes, pbRes] = await Promise.all([
     supabase.from('visit_notes').select('id, visit_no, visit_date, procedure, notes, clinical_visit_id').eq('treatment_id', treatmentId).is('voided_at', null).order('visit_no'),
     supabase.from('message_templates').select('key, body'),
@@ -59,6 +60,13 @@ export default async function TreatmentPage({ params }: { params: Promise<{ id: 
       </div>
 
       <VisitDoneBanner treatmentId={treatmentId} patient={{ full_name: patient.full_name, phone: patient.phone, gender: (patient.gender as string | null) ?? null }} tpl={mapTemplates(tplRes.data as { key: string; body: string }[] | null)} />
+
+      {t.visits.length > 0 && (
+        <section className="rounded-2xl border border-clinic-teal/10 bg-white p-4" data-testid="tp-docs">
+          <h2 className="mb-2 font-display text-lg font-semibold text-clinic-ink">Kaghzat</h2>
+          <TreatmentDocButtons patient={{ id: patient.id, full_name: patient.full_name, phone: patient.phone, gender: (patient.gender as string | null) ?? null }} t={t} docs={docs.get(treatmentId)} canMoney={canMoney} tpl={mapTemplates(tplRes.data as { key: string; body: string }[] | null)} />
+        </section>
+      )}
 
       <TreatmentCardsSlot only={treatmentId} patientId={id} patientName={patient.full_name} phone={patient.phone ?? null} canMoney={canMoney} canBill={can('billing.create')} canEdit={can('clinical.edit')} canLab={can('lab.view')} />
 
