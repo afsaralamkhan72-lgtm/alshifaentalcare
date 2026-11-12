@@ -5,6 +5,8 @@ import { requirePerm } from '@/lib/auth'
 import { CLINIC } from '@/clinic.config'
 import { fmtDate, money } from '@/lib/karachi'
 import SheetPrintButton from '@/components/admin/SheetPrintButton'
+import DocShare from '@/components/print/DocShare'
+import { numFmt } from '@/lib/karachi'
 
 type Inv = { id: string; invoice_number: string; total: number; paid_amount: number; invoice_items: { name: string; tooth: string | null; qty: number; unit_price: number }[] }
 
@@ -38,7 +40,15 @@ export default async function VisitInvoicePage({ params }: { params: Promise<{ i
         <Link href={`/admin/patients/${v.patient_id}`} className="text-sm text-clinic-ink/50 hover:text-clinic-teal">
           ← Patient
         </Link>
-        <SheetPrintButton />
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <DocShare
+            fileName={'Invoice-' + (p?.mr_number ?? 'mareez') + '-' + v.visit_date + '.pdf'}
+            patientId={v.patient_id}
+            phone={p?.phone ?? null}
+            message={'Assalam o Alaikum ' + (p?.full_name ?? '') + ',\n\n' + CLINIC.name + ' ka invoice (' + fmtDate(v.visit_date) + ')\nBill: Rs. ' + numFmt(total) + '\nAaj mila: Rs. ' + numFmt(todayPaid) + (bal != null ? '\nKul baqaya: Rs. ' + numFmt(Math.max(0, bal)) : '')}
+          />
+          <SheetPrintButton />
+        </div>
       </div>
       <div id="print-sheet" className="rounded-2xl border border-clinic-teal/10 bg-white p-8 text-clinic-ink">
         <header className="flex items-start justify-between border-b-2 border-clinic-teal pb-4">

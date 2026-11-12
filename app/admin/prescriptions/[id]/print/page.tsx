@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { requirePerm } from '@/lib/auth'
 import RxPrint from '@/components/print/RxPrint'
+import DocShare from '@/components/print/DocShare'
 import { type RxItem } from '@/components/PrescriptionSheet'
 import { getPrintCfg } from '@/lib/printSettings'
 import { aftercareFor } from '@/lib/printTemplates'
@@ -38,6 +39,13 @@ export default async function PrescriptionPrintPage({ params }: { params: Promis
         <Link href={`/admin/patients/${rx.patient_id}`} className="text-sm text-clinic-ink/50 hover:text-clinic-teal">
           ← Patient
         </Link>
+        <DocShare
+          fileName={'Prescription-' + (p?.full_name ?? 'mareez').replace(/[^A-Za-z0-9]+/g, '-') + '-' + rx.prescribed_date + '.pdf'}
+          patientId={rx.patient_id}
+          rxId={rx.id}
+          phone={p?.phone ?? null}
+          message={'Assalam o Alaikum ' + (p?.full_name ?? '') + ',\n\nAap ki prescription (' + rx.prescribed_date + ') bhej rahe hain.'}
+        />
       </div>
       <RxPrint
         rx={{ items: (rx.items ?? []) as RxItem[], notes_en: rx.notes_en, notes_ur: rx.notes_ur, prescribed_date: rx.prescribed_date, treatmentName, patient: p }}

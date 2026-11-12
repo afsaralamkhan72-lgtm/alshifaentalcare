@@ -44,6 +44,7 @@ export default function TreatmentCards({
   patientName = '',
   phone = null,
   canLab = false,
+  single = false,
 }: {
   patientId: string
   treatments: TItem[]
@@ -56,12 +57,13 @@ export default function TreatmentCards({
   patientName?: string
   phone?: string | null
   canLab?: boolean
+  single?: boolean
 }) {
   const router = useRouter()
   const [busy, setBusy] = useState('')
   const [err, setErr] = useState('')
   const [custom, setCustom] = useState<Record<string, string>>({})
-  const list = treatments.filter((t) => t.status !== 'planned' || t.visits.length > 0)
+  const list = single ? treatments : treatments.filter((t) => t.status !== 'planned' || t.visits.length > 0)
   if (list.length === 0) return null
 
   async function run(key: string, fn: () => PromiseLike<{ error: { message: string } | null }>) {
@@ -76,8 +78,8 @@ export default function TreatmentCards({
 
   return (
     <section className="mt-4 rounded-2xl border border-clinic-teal/10 bg-white p-4 sm:p-5">
-      <h2 className="font-display text-lg font-semibold text-clinic-ink">Treatments ka hisaab</h2>
-      <p className="mb-3 text-xs text-clinic-ink/55">Har treatment: kitni visits hui, kharcha, mila, baqaya, tasveerein aur lab ki halat.</p>
+      {!single && <h2 className="font-display text-lg font-semibold text-clinic-ink">Treatments ka hisaab</h2>}
+      {!single && <p className="mb-3 text-xs text-clinic-ink/55">Har treatment: kitni visits hui, kharcha, mila, baqaya, tasveerein aur lab ki halat.</p>}
       {err && <p className="mb-2 rounded-lg bg-red-50 p-2 text-sm text-red-700">{err}</p>}
       <div className="grid gap-3">
         {list.map((t) => {

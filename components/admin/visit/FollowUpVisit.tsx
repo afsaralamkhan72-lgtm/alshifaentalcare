@@ -8,7 +8,7 @@ import { fmtDate, money, numFmt } from '@/lib/karachi'
 import { friendlyError } from '@/lib/errors'
 import { toothLabel } from '@/lib/teeth'
 import { messageLink } from '@/lib/messages'
-import { askReceipt } from '@/lib/receiptEvent'
+import { saveVisitDone } from './VisitDoneBanner'
 import { stagesFor, MONTHLY_RE, LAB_WORK_RE } from '@/lib/treatmentStages'
 
 export interface FuVisit {
@@ -115,8 +115,6 @@ export default function FollowUpVisit({
   const [newStage, setNewStage] = useState('')
   const [busy, setBusy] = useState('')
   const [err, setErr] = useState('')
-  const [warn, setWarn] = useState('')
-  const [done, setDone] = useState<{ prescription_id: string | null; sum: Record<string, string> } | null>(null)
   const finishKey = useRef('')
   const keyN = useRef(0)
   const newKey = () => 'k' + ++keyN.current
@@ -195,6 +193,7 @@ export default function FollowUpVisit({
       if (sErr) w += 'Qadam par tick save nahi hua: ' + friendlyError(sErr.message) + ' '
     }
     let payFail = false
+    let paidOk = 0
     if (canCollect && paidNum > 0) {
       let left = paidNum
       let n = 0
@@ -209,7 +208,7 @@ export default function FollowUpVisit({
         }
         left = Math.round((left - part) * 100) / 100
       }
-      if (left < paidNum) askReceipt({ patientId: patient.id, amount: paidNum - left, method })
+      paidOk = Math.round((paidNum - left) * 100) / 100
       if (payFail) setPaid(String(paidNum - left))
     }
     const usage = new Map<string, number>()
@@ -234,21 +233,24 @@ export default function FollowUpVisit({
       if (cErr) w += 'Ilaaj mukammal nahi likha ja saka: ' + friendlyError(cErr.message) + ' '
     }
     const r = res as { prescription_id?: string | null }
-    setWarn(w)
-    setBusy('')
-    setDone({
+    saveVisitDone(treatment.id, {
+      title: 'Visit ' + visitNo + ' mukammal ho gayi' + (complete ? ' · ilaaj mukammal' : ''),
+      warn: w.trim() || undefined,
+      visit_id: vid as string,
       prescription_id: r.prescription_id ?? null,
+      hasInvoice: Boolean(mny) && paidOk > 0,
       sum: {
-        work: treatment.name + (procedure ? ' (' + procedure + ')' : ''),
+        work: treatment.name + (teethTxt ? ' (' + teethTxt + ')' : '') + (procedure ? ': ' + procedure : ''),
         next_date: !complete && nextDate ? fmtDate(nextDate) : '',
         next_time: !complete && nextDate ? nextTime : '',
         next_work: !complete && nextDate ? treatment.name : '',
-        today_paid: mny && paidNum > 0 && !payFail ? numFmt(paidNum) : '',
-        balance: mny && !payFail ? numFmt(Math.max(0, mny.patientBalance - paidNum)) : '',
+        today_paid: mny && paidOk > 0 ? numFmt(paidOk) : '',
+        balance: mny ? numFmt(Math.max(0, mny.patientBalance - paidOk)) : '',
       },
+      at: Date.now(),
     })
+    router.push('/admin/patients/' + patient.id + '/treatment/' + treatment.id)
     router.refresh()
-    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   const header = (
@@ -271,34 +273,6 @@ export default function FollowUpVisit({
       )}
     </div>
   )
-
-  if (done) {
-    return (
-      <div className="grid gap-3">
-        {header}
-        <div className="rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-4" data-testid="fu-done">
-          <p className="font-display text-lg font-semibold text-emerald-900">✓ Visit {visitNo} mukammal ho gayi</p>
-          {warn && <p className="mt-2 rounded-lg bg-amber-100 px-3 py-2 text-sm text-amber-900">{warn}</p>}
-          {complete && /root canal|\brct\b/i.test(treatment.name) && <p className="mt-2 text-sm text-emerald-900">RCT mukammal. Is daant par crown lagana ho to profile se naya visit khol kar crown jodein.</p>}
-          <div className="mt-3 flex flex-wrap gap-2">
-            {patient.phone && (
-              <a data-testid="fu-wa" href={messageLink('visit_summary', { full_name: patient.full_name, phone: patient.phone, gender: patient.gender }, done.sum, tpl)} target="_blank" rel="noreferrer" className="inline-flex min-h-[44px] items-center rounded-full bg-emerald-600 px-5 py-2 text-sm font-semibold text-white">
-                WhatsApp
-              </a>
-            )}
-            {done.prescription_id && (
-              <a href={'/admin/prescriptions/' + done.prescription_id + '/print'} target="_blank" className="inline-flex min-h-[44px] items-center rounded-full bg-clinic-teal px-5 py-2 text-sm font-semibold text-white">
-                Prescription PDF
-              </a>
-            )}
-            <Link href={'/admin/patients/' + patient.id} data-testid="fu-back" className="inline-flex min-h-[44px] items-center rounded-full border border-clinic-teal/40 px-5 py-2 text-sm font-semibold text-clinic-teal">
-              Profile par wapas
-            </Link>
-          </div>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className="grid gap-3 pb-24" data-testid="fu-page">

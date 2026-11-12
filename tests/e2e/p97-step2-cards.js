@@ -46,14 +46,11 @@ async function fin(p){
   await p.getByTestId('entry-add').click();await p.waitForTimeout(500);
   console.log(' group cards:',await p.getByTestId('group-card').count());
   // 5) partial denture on 21,22,23
-  for(const n of [21,22,23])await tap(p,n);
-  await p.getByTestId('grp-denture').click();
-  const dt=await p.getByTestId('grp-type').locator('option').allInnerTexts();console.log(' partial types:',dt.join(' | '));
-  await p.getByTestId('entry-add').click();await p.waitForTimeout(500);
-  console.log(' group cards after denture:',await p.getByTestId('group-card').count());
+  console.log(' (partial denture ab hisse se banti hai)');
   // 6) complete denture without teeth
-  console.log(' complete types:',(await p.getByTestId('complete-denture').allInnerTexts()).join(' | '));
-  await p.getByTestId('complete-denture').first().click();await p.waitForTimeout(500);
+  await p.getByTestId('dent-region').filter({hasText:/^Upper$/}).click();await p.waitForTimeout(300);
+  console.log(' denture types:',(await p.getByTestId('dent-type').allInnerTexts()).join(' | '));
+  await p.getByTestId('dent-type').first().click();await p.waitForTimeout(500);
   console.log(' denture cards:',await p.getByTestId('denture-card').count());
   console.log(' overflow:',await p.evaluate(()=>document.documentElement.scrollWidth>document.documentElement.clientWidth));
   const cols=await p.evaluate(()=>{const o={};document.querySelectorAll('span.absolute.inset-0').forEach(e=>{const f=e.style.backgroundColor;if(f)o[f]=(o[f]||0)+1});return o});

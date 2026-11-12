@@ -17,7 +17,7 @@ import type { Plan as PayPlan, PlanItem } from '@/components/admin/PaymentPlan'
 import ArchiveCardView, { type ArchiveCard } from '@/components/admin/ArchiveCardView'
 import TreatmentCards, { type Stage, type LabLite } from '@/components/admin/TreatmentCards'
 import TreatmentPlanCard, { type Installment, type Plan } from '@/components/admin/TreatmentPlanCard'
-import { todayKarachi, money, fmtDate } from '@/lib/karachi'
+import { todayKarachi, money, fmtDate, addDays } from '@/lib/karachi'
 import { toBalance, type PatientBalance } from '@/lib/ledger'
 import WhatsAppMenu from '@/components/admin/WhatsAppMenu'
 import { effectiveApplies } from '@/lib/applies'
@@ -25,6 +25,8 @@ import AppointmentBoard from '@/components/admin/AppointmentBoard'
 import { apptReminderLink, generalLink, paymentReminderLink, messageLink } from '@/lib/messages'
 import { mapTemplates } from '@/lib/messageTemplates'
 import PaymentDialog from '@/components/admin/PaymentDialog'
+import { topUsed } from '@/lib/similar'
+import { getTreatments, TreatmentMiniCards, type PatientRow } from './_sections'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -49,65 +51,6 @@ function medicalAlerts(mh: Record<string, unknown> | null | undefined): string[]
   return out
 }
 
-async function loadTreatments(supabase: Sb, patientId: string): Promise<TItem[]> {
-  const [tRes, vRes, bRes, payRes, invRes, phRes] = await Promise.all([
-    supabase
-      .from('patient_treatments')
-      .select('id, name, teeth, status, price, list_price, doctor, started_on, completed_on, cancel_reason')
-      .eq('patient_id', patientId)
-      .order('started_on', { ascending: false })
-      .order('created_at', { ascending: false }),
-    supabase
-      .from('visit_notes')
-      .select('id, treatment_id, visit_no, visit_date, procedure, notes, next_visit')
-      .eq('patient_id', patientId)
-      .not('treatment_id', 'is', null)
-      .is('voided_at', null),
-    supabase.from('treatment_balances').select('treatment_id, charged, paid, balance').eq('patient_id', patientId),
-    supabase.from('payments').select('id, invoice_id, paid_on, amount, method, kind, created_at').eq('patient_id', patientId).order('created_at'),
-    supabase.from('invoices').select('id, patient_treatment_id').eq('patient_id', patientId).not('patient_treatment_id', 'is', null),
-    supabase
-      .from('patient_photos')
-      .select('id, storage_path, caption, category, treatment_id, visit_id')
-      .eq('patient_id', patientId)
-      .not('treatment_id', 'is', null),
-  ])
-  const visits = new Map<string, TVisit[]>()
-  for (const v of vRes.data ?? []) {
-    const list = visits.get(v.treatment_id as string) ?? []
-    list.push(v as TVisit)
-    visits.set(v.treatment_id as string, list)
-  }
-  const bal = new Map((bRes.data ?? []).map((b) => [b.treatment_id as string, b]))
-  const invT = new Map((invRes.data ?? []).map((i) => [i.id as string, i.patient_treatment_id as string]))
-  const pays = new Map<string, NonNullable<TItem['payments']>>()
-  for (const p of payRes.data ?? []) {
-    const tid = invT.get(p.invoice_id as string)
-    if (!tid) continue
-    ;(pays.get(tid) ?? pays.set(tid, []).get(tid)!).push({ id: p.id, paid_on: p.paid_on, amount: num(p.amount), method: p.method, kind: p.kind })
-  }
-  const photos = new Map<string, NonNullable<TItem['photos']>>()
-  for (const ph of phRes.data ?? []) {
-    ;(photos.get(ph.treatment_id as string) ?? photos.set(ph.treatment_id as string, []).get(ph.treatment_id as string)!).push(ph as NonNullable<TItem['photos']>[number])
-  }
-  return (tRes.data ?? []).map((t) => {
-    const b = bal.get(t.id)
-    return {
-      ...t,
-      teeth: (t.teeth ?? []) as string[],
-      price: num(t.price),
-      list_price: num(t.list_price),
-      charged: num(b?.charged),
-      paid: num(b?.paid),
-      balance: num(b?.balance),
-      visits: visits.get(t.id) ?? [],
-      payments: pays.get(t.id) ?? [],
-      photos: photos.get(t.id) ?? [],
-    } as TItem
-  })
-}
-
-const getTreatments = cache(async (patientId: string) => loadTreatments(await createClient(), patientId))
 
 function SectionHead({ n, title }: { n: number; title: string }) {
   return (
@@ -340,6 +283,21 @@ export default async function PatientDetailPage({ params, searchParams }: Props)
         )}
       </section>
 
+      {canMoney && balance && (
+        <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-clinic-teal/10 bg-white p-4" data-testid="total-hisab">
+          <div>
+            <h2 className="font-display text-lg font-semibold text-clinic-ink">Kul hisaab</h2>
+            <p className="mt-1 text-sm">
+              Kul bill {money(balance.total_charges)} · Kul mila {money(balance.total_paid)} ·{' '}
+              <span className={balance.balance > 0 ? 'font-semibold text-red-600' : 'font-semibold text-emerald-700'}>Kul baqaya {money(Math.max(0, balance.balance))}</span>
+            </p>
+          </div>
+          {(isOwner || can('billing.collect')) && balance.balance > 0 && (
+            <PaymentDialog patient={{ id: patient.id, full_name: patient.full_name, phone: patient.phone, mr_number: patient.mr_number, portal_code: patient.portal_code }} balance={balance.balance} size="sm" />
+          )}
+        </section>
+      )}
+
       {archiveCard && <ArchiveCardView card={archiveCard} canMoney={canMoney} />}
 
       {!canClinical && !canMoney && !can('appointments.view') && (
@@ -356,13 +314,7 @@ export default async function PatientDetailPage({ params, searchParams }: Props)
       <div className="profile-extra grid gap-4">
       {canClinical && (
         <Suspense fallback={null}>
-          <TreatmentCardsSlot patientId={patient.id} patientName={patient.full_name} phone={patient.phone ?? null} canMoney={canMoney} canBill={can('billing.create')} canEdit={can('clinical.edit')} canLab={can('lab.view')} />
-        </Suspense>
-      )}
-
-      {canClinical && (
-        <Suspense fallback={null}>
-          <HistorySection patient={patient} history={history} canClinical={canClinical} canMoney={canMoney} canRx={can('prescriptions.view')} />
+          <TreatmentMiniCards patientId={patient.id} canMoney={canMoney} canClinical={canClinical} />
         </Suspense>
       )}
 
@@ -377,149 +329,6 @@ export default async function PatientDetailPage({ params, searchParams }: Props)
 }
 
 /* ------------------------------------------------------------ */
-type PatientRow = {
-  age?: number | null
-  date_of_birth?: string | null
-  id: string
-  full_name: string
-  phone: string
-  department: string
-  mr_number: string | null
-  primary_doctor?: string | null
-  portal_code?: string | null
-}
-
-async function TreatmentCardsSlot({ patientId, patientName, phone, canMoney, canBill, canEdit, canLab }: { patientId: string; patientName: string; phone: string | null; canMoney: boolean; canBill: boolean; canEdit: boolean; canLab: boolean }) {
-  const supabase = await createClient()
-  const treatments = await getTreatments(patientId)
-  const [labRes, stRes, planRes] = await Promise.all([
-    canLab ? supabase.from('lab_cases').select('id, treatment_id, work_type, status, due_date').eq('patient_id', patientId).is('deleted_at', null) : Promise.resolve({ data: [] }),
-    supabase.from('treatment_stages').select('id, treatment_id, label, sort_order, done_on').eq('patient_id', patientId),
-    canMoney
-      ? supabase.from('payment_plans').select('id, patient_treatment_id, base_paid, planned_amount, payment_plan_items(id, no, due_date, amount)').eq('patient_id', patientId).eq('status', 'active')
-      : Promise.resolve({ data: [], error: null }),
-  ])
-  // SQL abhi nahi chali ho to plans khali (page na toote)
-  const plans: PayPlan[] = planRes.error
-    ? []
-    : ((planRes.data ?? []) as unknown as (Omit<PayPlan, 'items'> & { payment_plan_items: PlanItem[] })[]).map((p) => ({
-        id: p.id,
-        patient_treatment_id: p.patient_treatment_id,
-        base_paid: Number(p.base_paid),
-        planned_amount: Number(p.planned_amount),
-        items: (p.payment_plan_items ?? []).map((i) => ({ ...i, amount: Number(i.amount) })),
-      }))
-  return (
-    <TreatmentCards
-      patientId={patientId}
-      treatments={treatments}
-      labs={(labRes.data ?? []) as LabLite[]}
-      stages={('error' in stRes && stRes.error ? [] : stRes.data ?? []) as Stage[]}
-      canMoney={canMoney}
-      canEdit={canEdit}
-      plans={plans}
-      canBill={canBill}
-      patientName={patientName}
-      phone={phone}
-      canLab={canLab}
-    />
-  )
-}
-
-async function HistorySection({ patient, history, canClinical, canMoney, canRx }: { patient: PatientRow; history: Record<string, unknown> | null; canClinical: boolean; canMoney: boolean; canRx: boolean }) {
-  const supabase = await createClient()
-  const { data } = canClinical
-    ? await supabase
-        .from('clinical_visits')
-        .select('id, visit_date, complaint, diagnoses, doctor')
-        .eq('patient_id', patient.id)
-        .eq('status', 'finished')
-        .order('visit_date', { ascending: false })
-        .order('created_at', { ascending: false })
-        .limit(30)
-    : { data: [] }
-  type CV = { id: string; visit_date: string; complaint: { items?: string[]; other?: string; duration?: string }; diagnoses: { text: string; teeth?: string[] }[]; doctor: string | null }
-  const visits = (data ?? []) as CV[]
-  if (visits.length === 0 && !history) return null
-
-  // Har visit ki poori tasveer: kya kaam hua, bill/mila/baqaya, prescription, tasveerein
-  const ids = visits.map((v) => v.id)
-  const [vnRes, invRes, rxRes, phRes] = ids.length
-    ? await Promise.all([
-        supabase.from('visit_notes').select('clinical_visit_id, procedure, patient_treatments(name, teeth)').in('clinical_visit_id', ids).is('voided_at', null),
-        canMoney ? supabase.from('invoices').select('clinical_visit_id, total, paid_amount, status').in('clinical_visit_id', ids).neq('status', 'void') : Promise.resolve({ data: [] }),
-        canRx ? supabase.from('prescriptions').select('id, clinical_visit_id').in('clinical_visit_id', ids) : Promise.resolve({ data: [] }),
-        supabase.from('patient_photos').select('clinical_visit_id').in('clinical_visit_id', ids),
-      ])
-    : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }]
-  const done = new Map<string, string[]>()
-  for (const n of (vnRes.data ?? []) as unknown as { clinical_visit_id: string; procedure: string | null; patient_treatments: { name: string; teeth: string[] | null } | null }[]) {
-    const t = n.patient_treatments
-    const label = t ? `${t.name}${t.teeth?.length ? ` (${t.teeth.join(', ')})` : ''}` : n.procedure
-    if (label) done.set(n.clinical_visit_id, [...(done.get(n.clinical_visit_id) ?? []), label])
-  }
-  const invMoney = new Map<string, { total: number; paid: number }>()
-  for (const i of (invRes.data ?? []) as { clinical_visit_id: string; total: number; paid_amount: number }[]) {
-    const m = invMoney.get(i.clinical_visit_id) ?? { total: 0, paid: 0 }
-    invMoney.set(i.clinical_visit_id, { total: m.total + Number(i.total), paid: m.paid + Number(i.paid_amount) })
-  }
-  const rxBy = new Map(((rxRes.data ?? []) as { id: string; clinical_visit_id: string }[]).map((r) => [r.clinical_visit_id, r.id]))
-  const photoN = new Map<string, number>()
-  for (const f of (phRes.data ?? []) as { clinical_visit_id: string }[]) photoN.set(f.clinical_visit_id, (photoN.get(f.clinical_visit_id) ?? 0) + 1)
-
-  return (
-    <div className="grid gap-3">
-      {canClinical && history && (
-        <Link href={`/admin/patients/${patient.id}/history?view=summary`} className="justify-self-start text-xs font-semibold text-clinic-teal hover:underline">
-          Poori purani history (print / PDF)
-        </Link>
-      )}
-      {visits.length > 0 && (
-        <details className="rounded-xl border border-clinic-teal/10 bg-white" open={visits.length <= 3}>
-          <summary className="cursor-pointer px-4 py-2.5 text-sm font-semibold text-clinic-ink">
-            Pichle visits <span className="ml-1 rounded-full bg-clinic-mint px-2 py-0.5 text-xs text-clinic-teal">{visits.length}</span>
-          </summary>
-          <ul className="divide-y divide-clinic-teal/10 border-t border-clinic-teal/10 px-4 text-sm">
-            {visits.map((v) => (
-              <li key={v.id} className="flex flex-wrap items-start justify-between gap-2 py-2">
-                <div className="min-w-0">
-                  <p className="text-xs text-clinic-ink/50">
-                    {fmtDate(v.visit_date)}
-                    {v.doctor ? ` · ${v.doctor}` : ''}
-                  </p>
-                  <p className="text-clinic-ink">
-                    {[...(v.complaint?.items ?? []).filter((x) => x !== 'Other'), v.complaint?.other].filter(Boolean).join(', ') || '—'}
-                    {v.complaint?.duration ? <span className="text-clinic-ink/50"> ({v.complaint.duration})</span> : null}
-                  </p>
-                  {(v.diagnoses ?? []).length > 0 && <p className="text-xs text-clinic-teal">Dx: {(v.diagnoses ?? []).map((d) => d.text + (d.teeth?.length ? ` (${d.teeth.join(', ')})` : '')).join(' · ')}</p>}
-                  {(done.get(v.id) ?? []).length > 0 && <p className="text-xs text-clinic-ink/80">Kaam: {(done.get(v.id) ?? []).join(' · ')}</p>}
-                  {invMoney.get(v.id) && (
-                    <p className="text-xs text-clinic-ink/70">
-                      Bill {money(invMoney.get(v.id)!.total)} · Mila {money(invMoney.get(v.id)!.paid)}
-                      {invMoney.get(v.id)!.total - invMoney.get(v.id)!.paid > 0 && <span className="text-red-600"> · Baqaya {money(invMoney.get(v.id)!.total - invMoney.get(v.id)!.paid)}</span>}
-                    </p>
-                  )}
-                  {(photoN.get(v.id) ?? 0) > 0 && <p className="text-xs text-clinic-ink/60">Tasveerein: {photoN.get(v.id)}</p>}
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  <Link href={`/admin/visits/${v.id}/print`} target="_blank" className="text-xs font-semibold text-clinic-teal hover:underline">
-                    Record / PDF
-                  </Link>
-                  {rxBy.get(v.id) && (
-                    <Link href={`/admin/prescriptions/${rxBy.get(v.id)}/print`} target="_blank" className="text-xs font-semibold text-clinic-teal hover:underline">
-                      Prescription
-                    </Link>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
-    </div>
-  )
-}
-
 async function WorkspaceSection({
   patient,
   perms,
@@ -542,7 +351,7 @@ async function WorkspaceSection({
   // meri discount ki had (SQL chali na ho to purana rule: owner 100%, baqi 0%)
   const dmRes = await supabase.rpc('my_discount_limit')
   const discountMax = dmRes.error || dmRes.data == null ? (isOwner ? 100 : 0) : Number(dmRes.data)
-  const [treatments, chartRes, catRes, docRes, matRes, qualRes, cvRes, medRes, billRes, rxRes, photoRes, optRes, cvCnt, vnCnt, vsRes, stockRes] = await Promise.all([
+  const [treatments, chartRes, catRes, docRes, matRes, qualRes, cvRes, medRes, billRes, rxRes, photoRes, optRes, cvCnt, vnCnt, vsRes, stockRes, usedRes] = await Promise.all([
     getTreatments(patient.id),
     isDental && can('clinical.view')
       ? supabase
@@ -585,6 +394,7 @@ async function WorkspaceSection({
     can('clinical.view') ? supabase.from('visit_notes').select('id', { count: 'exact', head: true }).eq('patient_id', patient.id) : Promise.resolve({ count: null }),
     supabase.from('site_settings').select('value').eq('key', 'visit_show').maybeSingle(),
     can('clinical.edit') ? supabase.from('inventory').select('id, item_name, unit').eq('is_active', true).is('deleted_at', null).order('item_name') : Promise.resolve({ data: [] }),
+    can('clinical.edit') ? supabase.from('patient_treatments').select('name').neq('status', 'cancelled').gte('created_at', addDays(todayKarachi(), -365)).order('created_at', { ascending: false }).limit(1500) : Promise.resolve({ data: [] }),
   ])
   const opts = { complaint: [] as string[], homeo_complaint: [] as string[], diagnosis: [] as string[] }
   if (!optRes.error) for (const o of (optRes.data ?? []) as { kind: keyof typeof opts; label: string }[]) opts[o.kind]?.push(o.label)
@@ -636,6 +446,7 @@ async function WorkspaceSection({
       catalog={catalog}
       materials={materials}
       extraItems={extraItems}
+      topUsed={topUsed(((usedRes.data ?? []) as { name: string }[]).map((x) => x.name), 30)}
       stockItems={((stockRes.data ?? []) as { id: string; item_name: string; unit: string | null }[]).map((i) => ({ inventory_id: i.id, name: i.item_name, unit: i.unit }))}
       canSeeRecipes={isOwner}
       doctors={(docRes.data ?? []).map((d) => d.name as string)}

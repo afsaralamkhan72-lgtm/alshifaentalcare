@@ -18,6 +18,7 @@ import { makeGateCookie, validToken, cookieName } from '../../lib/shareGate.ts'
 import { normalizeLayout, DEFAULT_LAYOUT } from '../../lib/printLayout.ts'
 import { rxTemplatesFor, aftercareFor } from '../../lib/printTemplates.ts'
 import { HISTORY_STEPS } from '../../lib/history-steps.ts'
+import { similarNames, topUsed } from '../../lib/similar.ts'
 
 test('applies: treatment kis par lagti hai', () => {
   assert.equal(guessApplies('Consultation / Checkup'), 'once')
@@ -220,4 +221,22 @@ test('history form: har sawal ka key alag hai', () => {
   const keys = HISTORY_STEPS.flatMap((s) => (s.fields ?? []).map((f) => f.key ?? f.k ?? f.name))
   assert.ok(HISTORY_STEPS.length > 0)
   assert.equal(new Set(keys.filter(Boolean)).size, keys.filter(Boolean).length)
+})
+
+test('milta julta naam: spelling ka farq pakadta hai, alag kaam nahi', () => {
+  const list = ['Flexible Denture', 'Composite Filling', 'Amalgam Filling', 'Root Canal Treatment (Molar)', 'Simple Extraction', 'Zirconia Crown']
+  assert.deepEqual(similarNames('Flexi denture', list), ['Flexible Denture'])
+  assert.deepEqual(similarNames('Composit filling', list), ['Composite Filling'])
+  assert.deepEqual(similarNames('zirconia crwn', list), ['Zirconia Crown'])
+  assert.deepEqual(similarNames('Flexible Denture', list), [])
+  assert.deepEqual(similarNames('Bone Graft', list), [])
+  assert.deepEqual(similarNames('Night Guard', list), [])
+  assert.deepEqual(similarNames('abc', list), [])
+  assert.equal(similarNames('Filling', list).includes('Simple Extraction'), false)
+})
+
+test('zyada chalne wale kaam: ginti ke hisab se', () => {
+  assert.deepEqual(topUsed(['GIC Filling', 'Scaling', 'gic filling', 'Crown', 'GIC Filling', 'Scaling'], 2), ['GIC Filling', 'Scaling'])
+  assert.deepEqual(topUsed([], 5), [])
+  assert.deepEqual(topUsed(['A', 'B'], 5), ['A', 'B'])
 })

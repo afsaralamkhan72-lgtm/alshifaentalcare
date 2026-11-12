@@ -14,7 +14,7 @@ import { COMPLAINTS, HOMEO_COMPLAINTS, DIAG_SUGGEST } from '@/lib/clinicOptions'
 import { useTemplates } from '@/lib/useTemplates'
 import { messageLink } from '@/lib/messages'
 import { stagesFor } from '@/lib/treatmentStages'
-import { askReceipt } from '@/lib/receiptEvent'
+import { similarNames } from '@/lib/similar'
 import PaymentDialog from '@/components/admin/PaymentDialog'
 import VisitRewards from '@/components/admin/VisitRewards'
 
@@ -104,6 +104,8 @@ interface TRow {
   gunit?: number
   /** Is ilaaj ke jo qadam aaj hue (profile ke "Marhale" mein jate hain) */
   stg?: string[]
+  /** Doctor ne keh diya: ye milte julte naam wala nahi, bilkul naya kaam hai */
+  isNew?: boolean
 }
 type Applies = 'tooth' | 'mouth' | 'jaw' | 'once'
 const APPLIES_LABEL: Record<Applies, string> = { tooth: 'Har daant ki', mouth: 'Poora muh', jaw: 'Jabda', once: 'Aik dafa' }
@@ -129,6 +131,8 @@ interface Props {
   /** "Doctor khud chunein" wala samaan (recipe mein nahi, doctor haath se likhta hai) */
   canSeeRecipes?: boolean
   extraItems?: { inventory_id: string; name: string; unit: string | null }[]
+  /** Clinic mein sab se zyada hone wale kaam (pichli visits ki ginti se), upar ke button ke liye */
+  topUsed?: string[]
   /** Stock ki poori list (visit ke aakhir mein "aur samaan" ke liye) */
   stockItems?: { inventory_id: string; name: string; unit: string | null }[]
   doctors: string[]
@@ -289,7 +293,7 @@ export default function VisitWorkspace(p: Props) {
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState(0)
   const tpl = useTemplates()
-  const [done, setDone] = useState<{ visit_id: string; prescription_id: string | null; hasInvoice: boolean; sum?: Record<string, string> } | null>(null)
+  const [done, setDone] = useState<{ visit_id: string; prescription_id: string | null; hasInvoice: boolean; sum?: Record<string, string>; links?: { id: string; name: string }[] } | null>(null)
   // Visit ka form khula ho to baqi profile (purani history, treatments ka hisaab) chhup jaye, taake doctor confuse na ho
   useEffect(() => {
     const on = showForm && !done
@@ -344,6 +348,12 @@ export default function VisitWorkspace(p: Props) {
   const [extra, setExtra] = useState<{ label: string; amount: string }[]>([])
   const [discount, setDiscount] = useState('')
   const [paid, setPaid] = useState('')
+  /** Do ya zyada ilaaj hon to doctor khud batata hai kis ke kitne mile */
+  const [split, setSplit] = useState<Record<string, string>>({})
+  const [dReg, setDReg] = useState('')
+  const [pickQ, setPickQ] = useState('')
+  const [pickGrp, setPickGrp] = useState('')
+  const [rctAuto, setRctAuto] = useState(false)
   const [method, setMethodRaw] = useState('cash')
   const setMethod = (m: string) => {
     setMethodRaw(m)
@@ -612,7 +622,7 @@ export default function VisitWorkspace(p: Props) {
     const c = p.catalog.find((x) => x.name.toLowerCase() === name.trim().toLowerCase())
     const mats: Record<string, string> = {}
     if (c) for (const m of p.materials[c.id] ?? []) mats[m.inventory_id] = String(m.default_qty)
-    if (!c) return updRow(r.key, { name, catalog_id: null, mats: {} })
+    if (!c) return updRow(r.key, { name, catalog_id: null, mats: {}, isNew: false })
     const applies: Applies = c.applies_to ?? 'tooth'
     const teeth = applies === 'tooth' ? (r.teeth.length ? r.teeth : sel.slice(0, 1)) : []
     const next = { applies, unit: applies === 'tooth' ? c.price : null, manual: false, price: String(c.price) }
@@ -651,7 +661,15 @@ export default function VisitWorkspace(p: Props) {
   const disc = Math.min(Number(discount) || 0, discCap)
   const newCharges = treatTotal + medTotal + extraTotal - disc
   const dueNow = p.balance + newCharges
-  const paidNum = Number(paid) || 0
+  const buckets: { key: string; label: string; max: number }[] = [
+    ...rows.filter((r) => !r.planned && r.name.trim() && (Number(r.price) || 0) > 0).map((r) => ({ key: 'row:' + r.key, label: r.name.trim() + (r.applies === 'tooth' && r.teeth.length ? ' (' + r.teeth.map(toothLabel).join(', ') + ')' : ''), max: Number(r.price) || 0 })),
+    ...live.filter((t) => old[t.id]?.tick && (Number(old[t.id]?.price) || 0) > 0).map((t) => ({ key: 'old:' + t.id, label: t.name, max: Number(old[t.id]?.price) || 0 })),
+    ...(medTotal + extraTotal - disc > 0 ? [{ key: 'visit', label: 'Dawa / extra charge', max: medTotal + extraTotal - disc }] : []),
+    ...(p.balance > 0 ? [{ key: 'prev', label: 'Purana baqaya', max: p.balance }] : []),
+  ]
+  const splitMode = p.perms.collect && buckets.length >= 2
+  const splitOf = (k: string, max: number) => Math.min(max, Math.max(0, Number(split[k]) || 0))
+  const paidNum = splitMode ? Math.round(buckets.reduce((x, b) => x + (Number(split[b.key]) || 0), 0) * 100) / 100 : Number(paid) || 0
   const savingRef = useRef(false)
   const busyRef = useRef('')
   busyRef.current = busy
@@ -728,6 +746,13 @@ export default function VisitWorkspace(p: Props) {
   async function finish() {
     if (busy) return
     if (paidNum > dueNow + 0.001) return setMsg({ ok: false, t: `Mili raqam kul baqaya (${money(dueNow)}) se zyada hai` })
+    if (splitMode) {
+      const over = buckets.find((b) => (Number(split[b.key]) || 0) > b.max + 0.001 || (Number(split[b.key]) || 0) < 0)
+      if (over) {
+        setStep(4)
+        return setMsg({ ok: false, t: `"${over.label}" ke aage likhi raqam us ke bill (${money(over.max)}) se zyada hai` })
+      }
+    }
     if (lines.some((l) => !l.name.trim())) {
       setStep(3)
       return setMsg({ ok: false, t: 'Qadam 3 (Dawa): har dawa ka naam likhein' })
@@ -794,7 +819,7 @@ export default function VisitWorkspace(p: Props) {
       p_extra: extra.filter((e) => Number(e.amount) > 0),
       p_treatments: treatments,
       p_discount: p.perms.bill && p.perms.discountMax > 0 ? disc : 0,
-      p_paid: p.perms.collect ? paidNum : 0,
+      p_paid: p.perms.collect && !splitMode ? paidNum : 0,
       p_method: method,
       p_key: finishKey.current,
     })
@@ -802,20 +827,33 @@ export default function VisitWorkspace(p: Props) {
       setBusy('')
       return setMsg({ ok: false, t: friendlyError(error.message) })
     }
-    // Bridge/Denture ki qeemat Price List mein khali (0) thi aur doctor ne likhi: list mein save karein (pehle se bhari qeemat kabhi nahi badalti)
+    // Price List mein jo missing hai sirf wohi save hota hai: khali (0) qeemat, ya bilkul naya kaam. Pehle se bhari qeemat kabhi nahi badalti.
     let warn0 = ''
-    if (p.perms.bill) {
+    if (p.perms.bill && p.perms.owner) {
       const seen = new Set<string>()
       const saved: string[] = []
       for (const r of rows) {
-        if (!r.catalog_id || !(r.group || (r.applies === 'jaw' && /denture/i.test(r.name))) || seen.has(r.catalog_id)) continue
-        const cat = p.catalog.find((x) => x.id === r.catalog_id)
         const tot = Number(r.price) || 0
-        if (!cat || Number(cat.price) > 0 || tot <= 0) continue
-        seen.add(r.catalog_id)
-        const unit = r.group && (r.gmode ?? 'each') === 'each' && r.teeth.length > 0 ? Math.round(tot / r.teeth.length) : Math.round(tot)
-        const { data: up } = await createClient().from('treatment_catalog').update({ price: unit }).eq('id', r.catalog_id).eq('price', 0).select('id')
-        if (up && up.length) saved.push(`${cat.name} Rs. ${unit}`)
+        const nm = r.name.trim()
+        if (!nm || tot <= 0) continue
+        const per = (r.group && (r.gmode ?? 'each') === 'each') || (r.applies === 'tooth' && !r.group) ? Math.max(1, r.teeth.length) : 1
+        const unit = Math.round(tot / per)
+        if (r.catalog_id) {
+          if (seen.has(r.catalog_id)) continue
+          const cat = p.catalog.find((x) => x.id === r.catalog_id)
+          if (!cat || Number(cat.price) > 0) continue
+          seen.add(r.catalog_id)
+          const { data: up } = await createClient().from('treatment_catalog').update({ price: unit }).eq('id', r.catalog_id).eq('price', 0).select('id')
+          if (up && up.length) saved.push(`${cat.name} Rs. ${unit}`)
+        } else {
+          const k = nm.toLowerCase()
+          if (seen.has(k) || p.catalog.some((x) => eq(x.name, nm))) continue
+          seen.add(k)
+          const { data: dup } = await createClient().from('treatment_catalog').select('id').ilike('name', nm.replace(/[%_]/g, ' ')).limit(1)
+          if (dup && dup.length) continue
+          const { error: insErr } = await createClient().from('treatment_catalog').insert({ name: nm, price: unit, department: homeo ? 'homeopathic' : 'dental', category: /denture/i.test(nm) ? 'Denture' : 'Other', applies_to: r.applies })
+          if (!insErr) saved.push(`${nm} Rs. ${unit} (naya kaam)`)
+        }
       }
       if (saved.length) warn0 = 'Price List mein save hui: ' + saved.join(', ') + '. '
     }
@@ -860,12 +898,13 @@ export default function VisitWorkspace(p: Props) {
     } catch {}
     setBusy('')
     const r = res as { visit_id: string; prescription_id: string | null }
-    if (p.perms.collect && paidNum > 0) askReceipt({ patientId: p.patient.id, amount: paidNum, method })
     const workNames = [
       ...rows.filter((x) => !x.planned && x.name.trim()).map((x) => x.name.trim()),
       ...live.filter((t) => old[t.id]?.tick).map((t) => t.name),
     ]
     // Aaj shuru hue ilaaj ke qadam (profile ki "Marhale" list): jo tick hue un par aaj ki tareekh
+    const madeLinks: { id: string; name: string }[] = []
+    const rowTid: Record<string, string> = {}
     {
       const sbs = createClient()
       const used = new Set<string>()
@@ -873,16 +912,71 @@ export default function VisitWorkspace(p: Props) {
       for (const r of rows) {
         if (r.planned || !r.name.trim()) continue
         const labels = stagesFor(r.name)
-        if (labels.length === 0) continue
         const { data: cands } = await sbs.from('patient_treatments').select('id, teeth').eq('patient_id', p.patient.id).eq('name', r.name.trim()).in('status', ['active', 'completed']).order('created_at', { ascending: false }).limit(20)
         const want = r.applies === 'tooth' ? [...r.teeth].sort().join(',') : ''
         const hit = ((cands ?? []) as { id: string; teeth: string[] | null }[]).find((c) => !used.has(c.id) && [...(c.teeth ?? [])].sort().join(',') === want)
         if (!hit) continue
         used.add(hit.id)
+        rowTid[r.key] = hit.id
+        madeLinks.push({ id: hit.id, name: r.name.trim() })
+        if (labels.length === 0) continue
         const { count } = await sbs.from('treatment_stages').select('id', { count: 'exact', head: true }).eq('treatment_id', hit.id)
         if ((count ?? 0) > 0) continue
         const { error: gErr } = await sbs.from('treatment_stages').insert(labels.map((label, i) => ({ treatment_id: hit.id, patient_id: p.patient.id, label, sort_order: i, done_on: (r.stg ?? []).includes(label) ? today0 : null })))
         if (gErr) warn += 'Qadam save nahi hue: ' + friendlyError(gErr.message) + ' '
+      }
+    }
+    const paidBy: { label: string; amount: number }[] = []
+    if (splitMode && paidNum > 0) {
+      const sbp = createClient()
+      let n = 0
+      const touched = new Set<string>()
+      const payInvoices = async (label: string, want: number, invs: { id: string; total: number; paid_amount: number }[]) => {
+        let left = want
+        for (const iv of invs) {
+          if (left <= 0) break
+          const due = Math.round((Number(iv.total) - Number(iv.paid_amount)) * 100) / 100
+          if (due <= 0) continue
+          const part = Math.min(left, due)
+          const { error: pErr } = await sbp.rpc('collect_payment', { p_invoice_id: iv.id, p_amount: part, p_method: method, p_key: finishKey.current + ':sp' + n++ })
+          if (pErr) {
+            warn += `"${label}" ki ${money(left)} payment save nahi hui: ` + friendlyError(pErr.message) + ' '
+            break
+          }
+          left = Math.round((left - part) * 100) / 100
+        }
+        if (left > 0 && !warn.includes('"' + label + '"')) warn += `"${label}" ke ${money(left)} kisi bill par nahi lag sake. `
+        if (want - left > 0) paidBy.push({ label, amount: Math.round((want - left) * 100) / 100 })
+      }
+      const invFor = async (tid: string) => {
+        const { data } = await sbp.from('invoices').select('id, total, paid_amount').eq('patient_treatment_id', tid).eq('status', 'active').order('created_at')
+        const list = (data ?? []) as { id: string; total: number; paid_amount: number }[]
+        list.forEach((i) => touched.add(i.id))
+        return list
+      }
+      for (const b of buckets) {
+        const want = splitOf(b.key, b.max)
+        if (b.key.startsWith('row:')) {
+          const tid = rowTid[b.key.slice(4)]
+          const invs = tid ? await invFor(tid) : []
+          if (want > 0) await payInvoices(b.label, want, invs)
+        } else if (b.key.startsWith('old:')) {
+          const invs = await invFor(b.key.slice(4))
+          if (want > 0) await payInvoices(b.label, want, invs)
+        } else if (b.key === 'visit') {
+          const vInv = (res as { invoice_id?: string | null }).invoice_id
+          if (vInv) touched.add(vInv)
+          if (want > 0) {
+            const { data } = vInv ? await sbp.from('invoices').select('id, total, paid_amount').eq('id', vInv) : { data: [] }
+            await payInvoices(b.label, want, (data ?? []) as { id: string; total: number; paid_amount: number }[])
+          }
+        }
+      }
+      const prev = buckets.find((b) => b.key === 'prev')
+      const wantPrev = prev ? splitOf('prev', prev.max) : 0
+      if (prev && wantPrev > 0) {
+        const { data } = await sbp.from('invoices').select('id, total, paid_amount').eq('patient_id', p.patient.id).eq('status', 'active').order('invoice_date').order('created_at')
+        await payInvoices(prev.label, wantPrev, ((data ?? []) as { id: string; total: number; paid_amount: number }[]).filter((i) => !touched.has(i.id)))
       }
     }
     const nextRow = nextDate && nextT.startsWith('row:') ? rows.find((x) => x.key === nextT.slice(4) && !x.planned && x.name.trim()) : undefined
@@ -902,10 +996,10 @@ export default function VisitWorkspace(p: Props) {
       next_date: nextDate ? fmtDate(nextDate) : '',
       next_time: nextDate ? nextTime : '',
       next_work: nextName,
-      today_paid: showMoney && paidNum > 0 ? numFmt(paidNum) : '',
-      balance: showMoney ? numFmt(Math.max(0, dueNow - paidNum)) : '',
+      today_paid: showMoney && paidNum > 0 ? (splitMode ? numFmt(paidBy.reduce((x, b) => x + b.amount, 0)) + (paidBy.length > 1 ? ' (' + paidBy.map((b) => b.label + ': Rs. ' + numFmt(b.amount)).join('، ') + ')' : '') : numFmt(paidNum)) : '',
+      balance: showMoney ? numFmt(Math.max(0, dueNow - (splitMode ? paidBy.reduce((x, b) => x + b.amount, 0) : paidNum))) : '',
     }
-    setDone({ visit_id: r.visit_id, prescription_id: r.prescription_id, hasInvoice: newCharges > 0 || paidNum > 0 || Boolean((res as { invoice_id?: string }).invoice_id), sum })
+    setDone({ visit_id: r.visit_id, prescription_id: r.prescription_id, hasInvoice: newCharges > 0 || paidNum > 0 || Boolean((res as { invoice_id?: string }).invoice_id), sum, links: madeLinks })
     if (warn) setMsg({ ok: !warn.replace(warn0, '').trim(), t: warn })
     router.refresh()
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -1189,6 +1283,26 @@ export default function VisitWorkspace(p: Props) {
                       hatao
                     </button>
                   </div>
+                  {(() => {
+                    if (r.catalog_id || r.isNew || !r.name.trim()) return null
+                    const sims = similarNames(r.name, p.catalog.filter((c) => (homeo ? c.department === 'homeopathic' : c.department !== 'homeopathic')).map((c) => c.name))
+                    if (sims.length === 0) return null
+                    return (
+                      <div className="grid gap-1.5 rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900" data-testid="similar-box">
+                        <p>List mein ye pehle se hai. Kya aap ka matlab yehi hai?</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {sims.map((n) => (
+                            <button key={n} type="button" data-testid="similar-yes" onClick={() => pickCatalog(r, n)} className="min-h-9 rounded-full bg-clinic-teal px-3 py-1 font-semibold text-white">
+                              Haan: {n}
+                            </button>
+                          ))}
+                          <button type="button" data-testid="similar-no" onClick={() => updRow(r.key, { isNew: true })} className="min-h-9 rounded-full border border-amber-400 bg-white px-3 py-1 font-semibold text-amber-900">
+                            Nahi, ye naya kaam hai
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })()}
                   {!homeo && (
                     <div className="grid gap-1.5">
                       {!r.catalog_id && !r.group && (
@@ -1287,16 +1401,45 @@ export default function VisitWorkspace(p: Props) {
   const completeNames = uniqNames(dentalCat.filter((c) => /complete denture/i.test(c.name)).map((c) => c.name))
   const singleNames = uniqNames(toothCat.filter((c) => !/bridge|denture/i.test(c.name)).map((c) => c.name))
   const quickNames: string[] = []
+  // Pehle wo kaam jo clinic mein sab se zyada hote hain (pichli visits ki ginti), phir aam kaam
+  for (const u of p.topUsed ?? []) {
+    const hit = singleNames.find((n) => eq(n, u))
+    if (!hit || quickNames.length >= 8) continue
+    if (/root canal/i.test(hit) && quickNames.some((q) => /root canal/i.test(q))) continue
+    if (!quickNames.includes(hit)) quickNames.push(hit)
+  }
   for (const k of [/filling/i, /root canal|\brct\b/i, /crown/i, /extraction/i, /implant/i]) {
+    if (quickNames.length >= 8 || quickNames.some((q) => k.test(q))) continue
     const hit = singleNames.find((n) => k.test(n))
     if (hit && !quickNames.includes(hit)) quickNames.push(hit)
   }
   const selTeeth = sel.slice().sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+  // RCT daant ke hisab se: aage ka (1-3), premolar (4-5), daarh (6-8)
+  const rctFor = (tooth: string): string | null => {
+    const d = Number(tooth.slice(-1))
+    const cls = d >= 1 && d <= 3 ? 'anterior' : d <= 5 ? 'premolar' : 'molar'
+    return singleNames.find((n) => /root canal/i.test(n) && new RegExp('\\(' + cls + '\\)', 'i').test(n) && !/^re-/i.test(n)) ?? null
+  }
+  const PICK_GROUPS: { k: string; re: RegExp }[] = [
+    { k: 'Filling', re: /filling|cavity|pulp cap/i },
+    { k: 'RCT', re: /root canal|\brct\b|pulpotomy|pulpectomy/i },
+    { k: 'Crown', re: /crown|veneer|post|core|inlay|onlay/i },
+    { k: 'Extraction', re: /extract|impact|surgical/i },
+  ]
+  const pickList = singleNames.filter((n) => {
+    if (pickQ.trim() && !n.toLowerCase().includes(pickQ.trim().toLowerCase())) return false
+    if (!pickGrp) return true
+    if (pickGrp === 'Baqi') return !PICK_GROUPS.some((g) => g.re.test(n))
+    return PICK_GROUPS.find((g) => g.k === pickGrp)?.re.test(n) ?? true
+  })
   const isGrp = entTx === 'GRP:bridge' || entTx === 'GRP:denture'
   const isComplete = entTx === 'GRP:denture' && entDKind === 'complete'
   const grpNames = entTx === 'GRP:bridge' ? bridgeNames : entDKind === 'complete' ? completeNames : partialNames
   const catPrice = (n: string) => Number(p.catalog.find((x) => eq(x.name, n))?.price) || 0
   function resetEntry() {
+    setPickQ('')
+    setPickGrp('')
+    setRctAuto(false)
     setEntTx('')
     setEntDx('')
     setEntType('')
@@ -1319,7 +1462,7 @@ export default function VisitWorkspace(p: Props) {
     }
     if (!entTx.trim() && !entDx.trim()) return
     for (const t of selTeeth) {
-      if (entTx.trim()) addTxTooth(entTx, t, workPlanned)
+      if (entTx.trim()) addTxTooth(rctAuto && /root canal/i.test(entTx) ? rctFor(t) ?? entTx : entTx, t, workPlanned)
       if (entDx.trim()) addDxTooth(entDx, t)
     }
     resetEntry()
@@ -1387,21 +1530,42 @@ export default function VisitWorkspace(p: Props) {
             <p className="text-xs font-bold text-clinic-ink">Kaam (Treatment)</p>
             <div className="flex flex-wrap gap-1.5" role="group" aria-label="Kaam">
               {quickNames.map((n) => (
-                <button key={n} type="button" data-testid="quick-tx" aria-pressed={entTx === n} onClick={() => { setEntTx(entTx === n ? '' : n); setEntType('') }} className={`min-h-10 rounded-full px-3.5 py-1.5 text-sm font-semibold ${entTx === n ? 'bg-clinic-teal text-white' : 'border border-clinic-teal/40 bg-white text-clinic-teal'}`}>
-                  {entTx === n ? '✓ ' : ''}{n}
+                <button key={n} type="button" data-testid="quick-tx" aria-pressed={entTx === n} onClick={() => { const isR = /root canal/i.test(n); setRctAuto(isR && entTx !== n); setEntTx(entTx === n ? '' : n); setEntType('') }} className={`min-h-10 rounded-full px-3.5 py-1.5 text-sm font-semibold ${entTx === n ? 'bg-clinic-teal text-white' : 'border border-clinic-teal/40 bg-white text-clinic-teal'}`}>
+                  {entTx === n ? '✓ ' : ''}{/root canal/i.test(n) ? 'Root Canal (daant ke hisab se)' : n}
                 </button>
               ))}
-              {([['GRP:bridge', 'Bridge'], ['GRP:denture', 'Denture']] as const).map(([k, l]) => (
+              {([['GRP:bridge', 'Bridge']] as const).map(([k, l]) => (
                 <button key={k} type="button" data-testid={'grp-' + k.slice(4)} aria-pressed={entTx === k} onClick={() => { setEntTx(entTx === k ? '' : k); setEntType('') }} className={`min-h-10 rounded-full px-3.5 py-1.5 text-sm font-semibold ${entTx === k ? 'bg-violet-700 text-white' : 'border-2 border-violet-300 bg-white text-violet-900'}`}>
                   {entTx === k ? '✓ ' : ''}{l}
                 </button>
               ))}
             </div>
             {!isGrp && (
-              <select aria-label="Koi aur kaam" data-testid="entry-tx-select" value={quickNames.includes(entTx) ? '' : entTx} onChange={(e) => setEntTx(e.target.value)} className="rounded-lg border border-clinic-teal/25 bg-white px-3 py-2 text-sm">
-                <option value="">Koi aur kaam (list se)…</option>
-                {singleNames.map((n) => <option key={n} value={n}>{n}</option>)}
-              </select>
+              <div className="grid gap-1.5" data-testid="tx-picker">
+                <div className="flex flex-wrap gap-1.5 text-xs" role="group" aria-label="Kaam ki qism">
+                  {[...PICK_GROUPS.map((g) => g.k), 'Baqi'].map((g) => (
+                    <button key={g} type="button" data-testid="pick-group" aria-pressed={pickGrp === g} onClick={() => setPickGrp(pickGrp === g ? '' : g)} className={'min-h-9 rounded-full px-3 py-1 font-semibold ' + (pickGrp === g ? 'bg-clinic-ink text-white' : 'border border-clinic-ink/25 bg-white text-clinic-ink/80')}>
+                      {g}
+                    </button>
+                  ))}
+                </div>
+                <input value={pickQ} onChange={(e) => setPickQ(e.target.value)} placeholder="Kaam ka naam likh kar dhoondein" aria-label="Kaam ka naam likh kar dhoondein" data-testid="pick-search" className="rounded-lg border border-clinic-teal/25 bg-white px-3 py-2 text-sm" />
+                {(pickQ.trim() || pickGrp) && (
+                  <div className="flex max-h-40 flex-wrap gap-1.5 overflow-y-auto" data-testid="pick-results">
+                    {pickList.slice(0, 30).map((n) => (
+                      <button key={n} type="button" data-testid="pick-item" aria-pressed={entTx === n} onClick={() => { setRctAuto(false); setEntTx(entTx === n ? '' : n) }} className={'min-h-9 rounded-full px-3 py-1 text-xs font-semibold ' + (entTx === n ? 'bg-clinic-teal text-white' : 'border border-clinic-teal/40 bg-white text-clinic-teal')}>
+                        {entTx === n ? '✓ ' : ''}
+                        {n}
+                      </button>
+                    ))}
+                    {pickList.length === 0 && <span className="text-xs text-clinic-ink/60">Is naam ka kaam list mein nahi. Neeche "+ Treatment" se naya likh sakte hain, wo list mein save ho jayega.</span>}
+                  </div>
+                )}
+                <select aria-label="Koi aur kaam" data-testid="entry-tx-select" value={quickNames.includes(entTx) ? '' : entTx} onChange={(e) => { setRctAuto(false); setEntTx(e.target.value) }} className="rounded-lg border border-clinic-teal/25 bg-white px-3 py-2 text-sm">
+                  <option value="">Poori list…</option>
+                  {singleNames.map((n) => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </div>
             )}
           </div>
           {isGrp && (
@@ -1445,16 +1609,49 @@ export default function VisitWorkspace(p: Props) {
           </div>
         </div>
   ) : null
-  const blk_cd = !homeo && canEdit && completeNames.length > 0 ? (
+  const DENT_REGIONS: { k: string; jaw: 'Upar' | 'Neeche'; full: boolean }[] = [
+    { k: 'Upper', jaw: 'Upar', full: true },
+    { k: 'Lower', jaw: 'Neeche', full: true },
+    { k: 'Partial Upper Right', jaw: 'Upar', full: false },
+    { k: 'Partial Upper Left', jaw: 'Upar', full: false },
+    { k: 'Partial Lower Right', jaw: 'Neeche', full: false },
+    { k: 'Partial Lower Left', jaw: 'Neeche', full: false },
+  ]
+  const dentTypesAll = uniqNames(dentalCat.filter((c) => /denture/i.test(c.name) && !/repair|relin|adjust|\(both\)/i.test(c.name) && !c.name.includes(' - ')).map((c) => c.name))
+  const dentReg = DENT_REGIONS.find((x) => x.k === dReg)
+  const dentTypes = dentReg ? dentTypesAll.filter((n) => (dentReg.full ? !/partial/i.test(n) : !/complete/i.test(n))) : []
+  function addDenture(type: string) {
+    if (!dentReg) return
+    const clean = type.replace(/\s*\(upper or lower\)/i, '').trim()
+    const name = clean + ' - ' + dentReg.k
+    const exact = p.catalog.find((x) => eq(x.name, name))
+    const base = p.catalog.find((x) => eq(x.name, type))
+    const cat = exact ?? (base && Number(base.price) > 0 ? base : undefined)
+    setRows((rs) => (rs.some((r) => eq(r.name, name)) ? rs : [...rs, { key: newKey(), name, catalog_id: cat?.id ?? null, teeth: [], price: cat && Number(cat.price) > 0 ? String(cat.price) : '', planned: workPlanned, notes: '', mats: {}, applies: 'jaw', unit: null, manual: true, jaw: dentReg.jaw, group: false }]))
+    setDReg('')
+  }
+  const blk_cd = !homeo && canEdit && dentTypesAll.length > 0 ? (
     <div className="grid gap-2 rounded-2xl border-2 border-violet-300 bg-white p-3" data-testid="complete-denture-row">
-      <p className="text-sm font-semibold text-clinic-ink">Poori jaw ki denture lagani hai? Daant chunne ki zarurat nahi, bas dabayein:</p>
+      <p className="text-sm font-semibold text-clinic-ink">Denture lagani hai? Daant chunne ki zarurat nahi. Pehle hissa chunein:</p>
       <div className="flex flex-wrap items-center gap-1.5 text-xs">
-        {completeNames.map((n) => (
-          <button key={n} type="button" data-testid="complete-denture" onClick={() => addCompleteDenture(n)} className="rounded-full border border-violet-300 bg-white px-3 py-1.5 font-semibold text-violet-900">
-            + {n}
+        {DENT_REGIONS.map((r) => (
+          <button key={r.k} type="button" data-testid="dent-region" aria-pressed={dReg === r.k} onClick={() => setDReg(dReg === r.k ? '' : r.k)} className={'min-h-10 rounded-full border px-3 py-1.5 font-semibold ' + (dReg === r.k ? 'border-violet-600 bg-violet-600 text-white' : 'border-violet-300 bg-white text-violet-900')}>
+            {r.k}
           </button>
         ))}
       </div>
+      {dentReg && (
+        <div className="grid gap-1.5" data-testid="dent-types">
+          <p className="text-xs text-clinic-ink/70">Ab {dentReg.k} ki qism chunein:</p>
+          <div className="flex flex-wrap items-center gap-1.5 text-xs">
+            {dentTypes.map((n) => (
+              <button key={n} type="button" data-testid="dent-type" onClick={() => addDenture(n)} className="min-h-10 rounded-full border border-clinic-teal/40 bg-clinic-mint/40 px-3 py-1.5 font-semibold text-clinic-teal">
+                + {n.replace(/\s*\(upper or lower\)/i, '')}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   ) : null
 
@@ -1956,7 +2153,7 @@ export default function VisitWorkspace(p: Props) {
                     <span>Kul baqaya</span>
                     <span className={dueNow > 0 ? 'text-red-600' : ''}>{money(dueNow)}</span>
                   </p>
-                  {p.perms.collect && dueNow > 0 && (
+                  {p.perms.collect && !splitMode && dueNow > 0 && (
                     <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
                       <span className="font-semibold">Aaj kitne mile</span>
                       <span className="flex items-center gap-2">
@@ -1971,6 +2168,34 @@ export default function VisitWorkspace(p: Props) {
                           Poora mil gaya ({money(dueNow)})
                         </button>
                       </span>
+                    </div>
+                  )}
+                  {splitMode && dueNow > 0 && (
+                    <div className="mt-2 grid gap-2 rounded-lg bg-clinic-mint/30 p-2" data-testid="split-pay">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-semibold">Aaj kis ke kitne mile</span>
+                        <select value={method} onChange={(e) => setMethod(e.target.value)} aria-label="Tareeqa" className="rounded-lg border border-clinic-teal/20 px-2 py-1.5">
+                          <option value="cash">Cash</option>
+                          <option value="bank">Bank</option>
+                          <option value="easypaisa">EasyPaisa</option>
+                          <option value="jazzcash">JazzCash</option>
+                        </select>
+                      </div>
+                      {buckets.map((b) => (
+                        <label key={b.key} className="flex flex-wrap items-center justify-between gap-2" data-testid="split-row">
+                          <span className="min-w-0 flex-1">
+                            {b.label} <span className="text-xs text-clinic-ink/60">({money(b.max)})</span>
+                          </span>
+                          <input type="number" min={0} max={b.max} value={split[b.key] ?? ''} onChange={(e) => setSplit({ ...split, [b.key]: e.target.value })} aria-label={'Mile: ' + b.label} placeholder="0" className="w-28 rounded-lg border border-clinic-teal/20 px-2 py-1.5 text-right" />
+                        </label>
+                      ))}
+                      <button type="button" data-testid="split-all" onClick={() => setSplit(Object.fromEntries(buckets.map((b) => [b.key, String(b.max)])))} className="justify-self-start rounded-full bg-clinic-teal px-3 py-1.5 text-xs font-semibold text-white">
+                        Poora mil gaya ({money(dueNow)})
+                      </button>
+                      <p className="flex justify-between font-semibold">
+                        <span>Aaj kul mile</span>
+                        <span data-testid="split-total">{money(paidNum)}</span>
+                      </p>
                     </div>
                   )}
                   {paidNum > 0 && (
@@ -2072,30 +2297,41 @@ export default function VisitWorkspace(p: Props) {
         <div className="rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-4">
           <p className="font-semibold text-emerald-800">✓ Aaj ka visit mukammal ho gaya</p>
           {msg && <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">{msg.t}</p>}
-          <div className="mt-3 flex flex-wrap gap-2 text-sm">
-            {fin.prescription_id && (
-              <a href={`/admin/prescriptions/${fin.prescription_id}/print`} target="_blank" className="rounded-full bg-clinic-teal px-5 py-2.5 font-semibold text-white">
-                Prescription PDF
-              </a>
-            )}
-            {p.patient.phone && (
-              <a
-                data-testid="visit-wa"
-                href={messageLink(done?.sum ? 'visit_summary' : 'visit_thanks', { full_name: p.patient.full_name, phone: p.patient.phone, gender: (p.patient as { gender?: string | null }).gender ?? null }, done?.sum ?? {}, tpl)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-full bg-whatsapp px-5 py-2.5 font-semibold text-white"
-              >
-                WhatsApp
-              </a>
-            )}
-            {fin.hasInvoice && p.perms.money && (
-              <a href={`/admin/visits/${fin.id}/invoice`} target="_blank" className="rounded-full bg-clinic-teal px-5 py-2.5 font-semibold text-white">
-                Invoice PDF
-              </a>
-            )}
-            {fin.hasInvoice && p.perms.collect && p.balance > 0 && <PaymentDialog patient={p.patient} balance={p.balance} />}
-          </div>
+          {done && (
+            <div className="mt-3 flex flex-wrap gap-2 text-sm" data-testid="v1-done-buttons">
+              {fin.hasInvoice && p.perms.money && (
+                <a href={`/admin/visits/${fin.id}/invoice`} target="_blank" data-testid="done-invoice" className="inline-flex min-h-[44px] items-center rounded-full bg-clinic-teal px-5 py-2.5 font-semibold text-white">
+                  Invoice
+                </a>
+              )}
+              {fin.prescription_id && (
+                <a href={`/admin/prescriptions/${fin.prescription_id}/print`} target="_blank" data-testid="done-rx" className="inline-flex min-h-[44px] items-center rounded-full bg-clinic-teal px-5 py-2.5 font-semibold text-white">
+                  Prescription
+                </a>
+              )}
+              {p.patient.phone && (
+                <a
+                  data-testid="visit-wa"
+                  href={messageLink(done.sum ? 'visit_summary' : 'visit_thanks', { full_name: p.patient.full_name, phone: p.patient.phone, gender: (p.patient as { gender?: string | null }).gender ?? null }, done.sum ?? {}, tpl)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex min-h-[44px] items-center rounded-full bg-whatsapp px-5 py-2.5 font-semibold text-white"
+                >
+                  WhatsApp
+                </a>
+              )}
+            </div>
+          )}
+          {done && (done.links ?? []).length > 0 && (
+            <div className="mt-3 grid gap-1 text-sm" data-testid="v1-done-links">
+              <p className="text-xs text-emerald-900/80">Aaj shuru hue ilaaj (dabane se us ka apna page):</p>
+              {(done.links ?? []).map((l) => (
+                <a key={l.id} href={'/admin/patients/' + p.patient.id + '/treatment/' + l.id} className="font-semibold text-clinic-teal underline">
+                  {l.name} →
+                </a>
+              ))}
+            </div>
+          )}
           {p.hasPlanned && p.perms.money && (
             <a href={`/admin/patients/${p.patient.id}/estimate`} target="_blank" className="mt-3 inline-block text-xs font-semibold text-clinic-teal underline">
               Treatment plan ka estimate (print)

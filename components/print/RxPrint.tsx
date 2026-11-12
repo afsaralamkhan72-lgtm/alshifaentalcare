@@ -244,8 +244,8 @@ export default function RxPrint({
       `}</style>
       <div className="mb-4 grid gap-3 rounded-2xl border border-clinic-teal/10 bg-white p-4 print:hidden">
         <div className="flex flex-wrap items-center gap-3">
-          <label className="flex items-center gap-2 text-sm">Template
-            <select value={tpl} onChange={(e) => chooseTpl(e.target.value)} className={input}>
+          <label className="flex min-w-0 max-w-full items-center gap-2 text-sm">Template
+            <select value={tpl} onChange={(e) => chooseTpl(e.target.value)} className={input + ' min-w-0 max-w-full'}>
               {tpls.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
             </select>
           </label>

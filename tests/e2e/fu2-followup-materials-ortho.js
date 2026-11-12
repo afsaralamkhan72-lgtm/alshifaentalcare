@@ -22,7 +22,7 @@ const B='http://localhost:3055';
  await p.getByTestId('fu-mat').filter({hasText:'Composite'}).locator('input[type=checkbox]').check();
  await p.getByTestId('fu-note').fill('Polish');
  ok('Visit 2: baqaya ho to payment ka dabba',await p.getByTestId('fu-pay').count()===1);
- await p.getByTestId('fu-finish').click();await p.waitForSelector('[data-testid=fu-done]',{timeout:20000});
+ await p.getByTestId('fu-finish').click();await p.waitForSelector('[data-testid=visit-done-banner]',{timeout:25000});
  ok('Visit 2: tick wala material kata',Number(L.q("select quantity from inventory where item_name='Composite Syringe'"))===q0-2);
  ok('Visit 2: note save hua',L.q("select notes from visit_notes where treatment_id='"+tid+"' and visit_no=2")==='Polish');
  // C. draft block
@@ -44,10 +44,10 @@ const B='http://localhost:3055';
  ok('Ortho: agli tareekh khud agle mahine ki',nd.slice(0,7)===exp.getFullYear()+'-'+String(exp.getMonth()+1).padStart(2,'0'),nd);
  ok('Ortho: 5 qadam visit 1 se bane hue',await p.getByTestId('fu-stage').count()===5);
  await p.getByTestId('fu-stage').nth(2).locator('input').check();await p.getByTestId('fu-paid').fill('3000');
- await p.getByTestId('fu-finish').click();await p.waitForSelector('[data-testid=fu-done]',{timeout:20000});
+ await p.getByTestId('fu-finish').click();await p.waitForSelector('[data-testid=visit-done-banner]',{timeout:25000});
  ok('Ortho: qist 3000 lagi, appointment bani',Number(L.q("select paid from treatment_balances where treatment_id='"+to+"'"))===8000&&L.q("select count(*) from appointments where patient_id='"+po+"' and treatment_id='"+to+"'")==='1',L.q("select paid,balance from treatment_balances where treatment_id='"+to+"'"));
- await p.goto(B+'/admin/patients/'+po,{waitUntil:'domcontentloaded'});await p.waitForTimeout(2500);
- ok('Profile par wahi qadam (ek hi list)',/Mahana adjustment/.test(await p.locator('body').innerText()));
+ await p.goto(B+'/admin/patients/'+po+'/treatment/'+to,{waitUntil:'domcontentloaded'});await p.waitForTimeout(2500);
+ ok('Ilaaj ke page par wahi qadam (ek hi list)',/Mahana adjustment/.test(await p.locator('body').innerText()));
  await r.b.close();
  // E. permissions
  const rr=await R.open('recep');await rr.p.goto(B+'/admin/patients/'+po+'/visit/'+to,{waitUntil:'domcontentloaded'});await rr.p.waitForTimeout(1500);
