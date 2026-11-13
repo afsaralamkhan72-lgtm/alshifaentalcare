@@ -28,7 +28,19 @@ export interface PrintLayout {
   letterhead: { data: string | null; top: number; bottom: number; left: number; right: number }
   /** clinic ki mohar (stamp) ki tasveer */
   stamp: string | null
+  /** "Do doctor wala" template: dono taraf doctor, beech mein pata aur timing */
+  duo: { left: DuoDoctor; right: DuoDoctor; address: string; timings: string }
 }
+
+export interface DuoDoctor {
+  name: string
+  degree: string
+  title: string
+  /** doctor ke neeche chhota naam aur us ka number */
+  sub_name: string
+  sub_phone: string
+}
+export const EMPTY_DOCTOR: DuoDoctor = { name: '', degree: '', title: '', sub_name: '', sub_phone: '' }
 
 export const DEFAULT_LAYOUT: PrintLayout = {
   scale: 1,
@@ -43,6 +55,7 @@ export const DEFAULT_LAYOUT: PrintLayout = {
   },
   letterhead: { data: null, top: 40, bottom: 25, left: 12, right: 12 },
   stamp: null,
+  duo: { left: { ...EMPTY_DOCTOR }, right: { ...EMPTY_DOCTOR }, address: '', timings: '' },
 }
 
 const num = (v: unknown, d: number, lo: number, hi: number) => {
@@ -59,6 +72,11 @@ export function normalizeLayout(raw: unknown): PrintLayout {
   const l = (r.letterhead && typeof r.letterhead === 'object' ? r.letterhead : {}) as Record<string, unknown>
   const show = { ...DEFAULT_LAYOUT.show }
   for (const k of Object.keys(show) as (keyof typeof show)[]) if (typeof s[k] === 'boolean') show[k] = s[k] as boolean
+  const du = (r.duo && typeof r.duo === 'object' ? r.duo : {}) as Record<string, unknown>
+  const doc = (v: unknown): DuoDoctor => {
+    const o = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>
+    return { name: str(o.name, '').slice(0, 80), degree: str(o.degree, '').slice(0, 120), title: str(o.title, '').slice(0, 120), sub_name: str(o.sub_name, '').slice(0, 80), sub_phone: str(o.sub_phone, '').slice(0, 40) }
+  }
   const accent = typeof r.accent === 'string' && /^#[0-9a-fA-F]{6}$/.test(r.accent) ? r.accent : null
   return {
     scale: num(r.scale, 1, 0.7, 1.4),
@@ -79,6 +97,7 @@ export function normalizeLayout(raw: unknown): PrintLayout {
       right: num(l.right, DEFAULT_LAYOUT.letterhead.right, 0, 60),
     },
     stamp: typeof r.stamp === 'string' && r.stamp.startsWith('data:image/') ? r.stamp : null,
+    duo: { left: doc(du.left), right: doc(du.right), address: str(du.address, '').slice(0, 200), timings: str(du.timings, '').slice(0, 160) },
   }
 }
 

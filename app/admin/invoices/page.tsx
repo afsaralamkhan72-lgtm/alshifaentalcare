@@ -15,7 +15,8 @@ export default async function InvoicesPage({
 
   let q = supabase
     .from('invoices')
-    .select('id, invoice_number, invoice_date, total, paid_amount, balance, status, patients(full_name, mr_number)')
+    .select('id, invoice_number, invoice_date, total, paid_amount, balance, status, patients!inner(full_name, mr_number)')
+    .is('patients.deleted_at', null)
     .order('invoice_date', { ascending: false })
     .order('invoice_number', { ascending: false })
     .limit(150)

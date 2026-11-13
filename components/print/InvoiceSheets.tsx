@@ -5,7 +5,9 @@ import ClinicLogo from '@/components/ClinicLogo'
 import LogoMark from '@/components/print/LogoMark'
 import { CLINIC } from '@/clinic.config'
 import { fmtDate, money } from '@/lib/karachi'
-import { BILL_TEMPLATES, type PrintLogo } from '@/lib/printTemplates'
+import { BILL_TEMPLATES, type PrintLogo, type PrintWhat } from '@/lib/printTemplates'
+import DuoSheet, { ExtraPart, FitOnePage, RxBody, type DuoPatient } from '@/components/print/Duo'
+import type { RxSheetData } from '@/components/PrescriptionSheet'
 import { accentOf, DEFAULT_LAYOUT, type PrintLayout } from '@/lib/printLayout'
 import LetterheadFrame from '@/components/print/LetterheadFrame'
 import SoftHeader from '@/components/print/SoftHeader'
@@ -40,9 +42,9 @@ const BLUE = '#0b5fa5'
 const BLUE_D = '#073b6b'
 const BLUE_L = '#e8f2fb'
 
-function Classic({ d, logo, logoUrl }: { d: InvData; logo: PrintLogo; logoUrl: string | null }) {
+function Classic({ d, logo, logoUrl, extra, sid }: { d: InvData; logo: PrintLogo; logoUrl: string | null; extra: React.ReactNode; sid: string | undefined }) {
   return (
-    <div id="invoice-sheet" className="relative mt-3 rounded-2xl border border-clinic-teal/10 bg-white p-6 sm:p-8">
+    <div id={sid} className="relative mt-3 rounded-2xl border border-clinic-teal/10 bg-white p-6 sm:p-8">
       {d.voided && (
         <p className="absolute right-6 top-6 rotate-6 rounded border-2 border-red-500 px-3 py-1 font-display text-lg font-bold uppercase text-red-500">Cancelled</p>
       )}
@@ -106,13 +108,14 @@ function Classic({ d, logo, logoUrl }: { d: InvData; logo: PrintLogo; logoUrl: s
       </div>
       {d.voided && d.voidReason && <p className="mt-4 text-xs text-red-700">Cancel ki wajah: {d.voidReason}</p>}
       {d.notes && <p className="mt-4 text-xs text-clinic-ink/60">Note: {d.notes}</p>}
+      {extra}
       <p className="mt-8 text-center text-xs text-clinic-ink/50">{CLINIC.doctor.name} · {CLINIC.name}</p>
     </div>
   )
 }
 
 /** Neela template: oopar patti, beech mein jadwal (lambi ho to agle safhe par), neeche hisaab aur clinic ki maloomat. Kuch ek doosre par nahi aata. */
-function Blue({ d, logo, logoUrl }: { d: InvData; logo: PrintLogo; logoUrl: string | null }) {
+function Blue({ d, logo, logoUrl, extra, sid }: { d: InvData; logo: PrintLogo; logoUrl: string | null; extra: React.ReactNode; sid: string | undefined }) {
   const th: React.CSSProperties = { background: BLUE, color: '#fff', padding: '8px 10px', fontSize: 12, textAlign: 'left' }
   const td: React.CSSProperties = { padding: '8px 10px', fontSize: 13, borderBottom: `1px solid ${BLUE_L}`, verticalAlign: 'top', overflowWrap: 'anywhere' }
   const row = (k: string, v: string, strong?: boolean, color?: string) => (
@@ -122,7 +125,7 @@ function Blue({ d, logo, logoUrl }: { d: InvData; logo: PrintLogo; logoUrl: stri
   )
   return (
     <div
-      id="invoice-sheet"
+      id={sid}
       className="relative mt-3 overflow-hidden rounded-2xl border bg-white"
       style={{ borderColor: BLUE_L, minHeight: '24cm', display: 'flex', flexDirection: 'column', color: BLUE_D }}
     >
@@ -191,6 +194,7 @@ function Blue({ d, logo, logoUrl }: { d: InvData; logo: PrintLogo; logoUrl: stri
 
       {d.voided && d.voidReason && <p style={{ padding: '10px 24px 0', fontSize: 12, color: '#b91c1c' }}>Cancel ki wajah: {d.voidReason}</p>}
       {d.notes && <p style={{ padding: '10px 24px 0', fontSize: 12 }}><b>Notes:</b> {d.notes}</p>}
+      {extra && <div style={{ padding: '0 24px' }}>{extra}</div>}
 
       <div style={{ marginTop: 'auto', padding: '24px 24px 0', display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, breakInside: 'avoid', pageBreakInside: 'avoid' }}>
         <div>
@@ -223,7 +227,7 @@ const GREEN = '#1b7f3b'
 const GREEN_D = '#14562a'
 
 /** Software wala neela-safed bill: header, patient ki tafseel, jadwal, hisaab, QR, dastkhat. Settings se har cheez on/off. */
-function Soft({ d, logo, logoUrl, layout }: { d: InvData; logo: PrintLogo; logoUrl: string | null; layout: PrintLayout }) {
+function Soft({ d, logo, logoUrl, layout, extra, sid }: { d: InvData; logo: PrintLogo; logoUrl: string | null; layout: PrintLayout; extra: React.ReactNode; sid: string | undefined }) {
   const acc = accentOf(layout)
   const lh = Boolean(layout.letterhead.data)
   const sh = layout.show
@@ -234,7 +238,7 @@ function Soft({ d, logo, logoUrl, layout }: { d: InvData; logo: PrintLogo; logoU
   )
   const paidStamp = d.total > 0 && d.balance <= 0 && !d.voided
   return (
-    <LetterheadFrame layout={layout} id="invoice-sheet">
+    <LetterheadFrame layout={layout} id={sid ?? 'invoice-sheet-in'}>
       <div style={{ position: 'relative', fontSize: `${14 * layout.scale}px`, color: 'rgb(var(--c-ink))', background: '#fff', borderRadius: lh ? 0 : 14, border: lh ? 'none' : '1px solid rgb(var(--c-mint))', overflow: 'hidden' }}>
         {d.voided && <p style={{ position: 'absolute', right: 24, top: 150, transform: 'rotate(6deg)', border: '2px solid #ef4444', color: '#ef4444', padding: '2px 12px', fontWeight: 700, fontSize: 18, textTransform: 'uppercase' }}>Cancelled</p>}
         {!lh && <SoftHeader logo={logo} logoUrl={logoUrl} layout={layout} />}
@@ -282,6 +286,7 @@ function Soft({ d, logo, logoUrl, layout }: { d: InvData; logo: PrintLogo; logoU
           </div>
           {d.voided && d.voidReason && <p style={{ marginTop: 10, fontSize: '0.85em', color: '#b91c1c' }}>Cancel ki wajah: {d.voidReason}</p>}
           {d.notes && <p style={{ marginTop: 10, fontSize: '0.85em' }}>Note: {d.notes}</p>}
+          {extra}
           {(sh.signature || (sh.stamp && layout.stamp)) && (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16, marginTop: 28, breakInside: 'avoid' }}>
               {sh.signature ? <div style={{ width: 200, borderTop: '1px solid currentColor', paddingTop: 4, fontSize: '0.85em' }}>Patient ke dastkhat</div> : <span />}
@@ -304,7 +309,7 @@ function Soft({ d, logo, logoUrl, layout }: { d: InvData; logo: PrintLogo; logoU
 }
 
 /** Hara bill (Patient Bill / Invoice / بل): hara header, patti, dabbe, PAID stamp, darood ka dabba, footer, dastkhat aur mohar. */
-function Green({ d, logo, logoUrl, layout }: { d: InvData; logo: PrintLogo; logoUrl: string | null; layout: PrintLayout }) {
+function Green({ d, logo, logoUrl, layout, extra, sid }: { d: InvData; logo: PrintLogo; logoUrl: string | null; layout: PrintLayout; extra: React.ReactNode; sid: string | undefined }) {
   const G = layout.accent ?? GREEN
   const lh = Boolean(layout.letterhead.data)
   const sh = layout.show
@@ -317,7 +322,7 @@ function Green({ d, logo, logoUrl, layout }: { d: InvData; logo: PrintLogo; logo
   )
   const paidStamp = d.total > 0 && d.balance <= 0 && !d.voided
   return (
-    <LetterheadFrame layout={layout} id="invoice-sheet">
+    <LetterheadFrame layout={layout} id={sid ?? 'invoice-sheet-in'}>
       <div style={{ position: 'relative', fontSize: `${14 * layout.scale}px`, color: '#111', background: '#fff', overflow: 'hidden', borderRadius: lh ? 0 : 14, border: lh ? 'none' : `1px solid ${G}` }}>
         {d.voided && <p style={{ position: 'absolute', right: 24, top: 150, transform: 'rotate(6deg)', border: '2px solid #ef4444', color: '#ef4444', padding: '2px 12px', fontWeight: 700, fontSize: 18, textTransform: 'uppercase' }}>Cancelled</p>}
         {!lh && (
@@ -389,6 +394,7 @@ function Green({ d, logo, logoUrl, layout }: { d: InvData; logo: PrintLogo; logo
           </div>
           {d.voided && d.voidReason && <p style={{ marginTop: 10, fontSize: '0.85em', color: '#b91c1c' }}>Cancel ki wajah: {d.voidReason}</p>}
           {d.notes && <p style={{ marginTop: 10, fontSize: '0.85em' }}>Note: {d.notes}</p>}
+          {extra}
           {sh.darood && layout.texts.darood.trim() && <p style={{ marginTop: 14, border: `1px solid ${G}`, background: '#eef7f0', borderRadius: 12, padding: '10px 14px', textAlign: 'center', whiteSpace: 'pre-line', direction: 'rtl', fontSize: '1.1em' }}>{layout.texts.darood}</p>}
           <div style={{ marginTop: 12, background: G, color: '#fff', borderRadius: 8, padding: '7px 14px', display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8, fontSize: '0.9em' }}>
             <span>{layout.texts.website.trim() || CLINIC.address.full}</span>
@@ -409,19 +415,81 @@ function Green({ d, logo, logoUrl, layout }: { d: InvData; logo: PrintLogo; logo
   )
 }
 
-export default function InvoiceSheets({ d, logo, logoUrl, defaultTpl, layout = DEFAULT_LAYOUT }: { d: InvData; logo: PrintLogo; logoUrl: string | null; defaultTpl: string; layout?: PrintLayout }) {
+export default function InvoiceSheets({
+  d, logo, logoUrl, defaultTpl, layout = DEFAULT_LAYOUT, rx = null, rxId = null, rxHref = null, patient = null, initialWhat = 'bill', preview = false,
+}: {
+  /** Settings ka namoona: chunaav ke button nahi dikhte */
+  preview?: boolean
+  d: InvData
+  logo: PrintLogo
+  logoUrl: string | null
+  defaultTpl: string
+  layout?: PrintLayout
+  /** isi visit ki prescription (ho to "dono aik sath" chhap sakta hai) */
+  rx?: RxSheetData | null
+  rxId?: string | null
+  rxHref?: string | null
+  patient?: DuoPatient | null
+  initialWhat?: PrintWhat
+}) {
   const [tpl, setTpl] = useState(BILL_TEMPLATES.some((t) => t.id === defaultTpl) ? defaultTpl : 'soft')
+  const [what, setWhat] = useState<PrintWhat>(initialWhat === 'both' && rx ? 'both' : 'bill')
+  const both = what === 'both' && Boolean(rx)
+  const extra = both && rx ? <ExtraPart><RxBody rx={rx} title="Prescription" /></ExtraPart> : null
+  const lhFrame = (tpl === 'soft' || tpl === 'green') && Boolean(layout.letterhead.data)
+  const wrap = both && tpl !== 'duo' && !lhFrame
+  const sid = wrap ? undefined : 'invoice-sheet'
+  function chooseWhat(v: PrintWhat) {
+    if (v === 'rx') {
+      if (rxHref) window.location.assign(rxHref + (rxHref.includes('?') ? '&' : '?') + 'tpl=' + (tpl === 'duo' ? 'duo' : ''))
+      return
+    }
+    setWhat(v)
+  }
+  const sel = 'min-w-0 max-w-full rounded-lg border border-clinic-teal/25 px-3 py-1.5 text-sm'
+  const sheet =
+    tpl === 'duo' ? (
+      <DuoSheet
+        id="invoice-sheet"
+        layout={layout}
+        patient={patient ?? { name: d.patientName, mr: d.mr, age: d.age ?? null, gender: null, address: null, phone: d.phone }}
+        date={d.date}
+        rx={both ? rx : null}
+        bill={{ id: d.id ?? null, numbers: [d.number], items: d.items, subtotal: d.subtotal, discount: d.discountAmount, total: d.total, paid: d.paid, balance: d.balance }}
+        verify={d.voided ? null : both && rxId ? { table: 'prescriptions', id: rxId } : d.id ? { table: 'invoices', id: d.id } : null}
+        cancelled={d.voided}
+      />
+    ) : tpl === 'soft' ? (
+      <Soft d={d} logo={logo} logoUrl={logoUrl} layout={layout} extra={extra} sid={sid} />
+    ) : tpl === 'green' ? (
+      <Green d={d} logo={logo} logoUrl={logoUrl} layout={layout} extra={extra} sid={sid} />
+    ) : tpl === 'blue' ? (
+      <Blue d={d} logo={logo} logoUrl={logoUrl} extra={extra} sid={sid} />
+    ) : (
+      <Classic d={d} logo={logo} logoUrl={logoUrl} extra={extra} sid={sid} />
+    )
   return (
     <div>
       <style>{`#invoice-sheet, #invoice-sheet * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }`}</style>
-      <label className="mt-3 flex items-center gap-2 text-sm print:hidden">
-        Bill ka template
-        <select value={tpl} onChange={(e) => setTpl(e.target.value)} className="rounded-lg border border-clinic-teal/25 px-3 py-1.5 text-sm">
-          {BILL_TEMPLATES.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
-        </select>
-      </label>
-      {tpl === 'soft' ? <Soft d={d} logo={logo} logoUrl={logoUrl} layout={layout} /> : tpl === 'green' ? <Green d={d} logo={logo} logoUrl={logoUrl} layout={layout} /> : tpl === 'blue' ? <Blue d={d} logo={logo} logoUrl={logoUrl} /> : <Classic d={d} logo={logo} logoUrl={logoUrl} />}
-      {d.id && !d.voided && (
+      <div className={preview ? 'hidden' : 'mt-3 flex flex-wrap items-center gap-3 print:hidden'}>
+        <label className="flex min-w-0 max-w-full items-center gap-2 text-sm">
+          Bill ka template
+          <select data-testid="bill-tpl" value={tpl} onChange={(e) => setTpl(e.target.value)} className={sel}>
+            {BILL_TEMPLATES.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+          </select>
+        </label>
+        <label className="flex min-w-0 max-w-full items-center gap-2 text-sm">
+          Kya chhape
+          <select data-testid="print-what" value={what} onChange={(e) => chooseWhat(e.target.value as PrintWhat)} className={sel}>
+            <option value="bill">Sirf Invoice</option>
+            {rx && <option value="both">Invoice + Prescription aik sath</option>}
+            {rx && rxHref && <option value="rx">Sirf Prescription</option>}
+          </select>
+        </label>
+      </div>
+      {!rx && !preview && <p className="mt-1 text-[11px] text-clinic-ink/50 print:hidden" data-testid="no-rx-note">Is visit mein dawa nahi likhi gayi, is liye &quot;aik sath&quot; ka option nahi hai.</p>}
+      {wrap ? <div className="mt-3"><FitOnePage id="invoice-sheet" watch={[tpl, what]}>{sheet}</FitOnePage></div> : tpl === 'duo' ? <div className="mt-3">{sheet}</div> : sheet}
+      {d.id && !d.voided && tpl !== 'duo' && (
         <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-end' }}>
           <VerifyQr table="invoices" id={d.id} />
         </div>

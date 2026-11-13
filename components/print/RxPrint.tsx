@@ -2,15 +2,13 @@
 
 import { useMemo, useState } from 'react'
 import { toInternationalPKNumber } from '@/lib/phone'
-import QRCode from 'qrcode'
 import VerifyQr from '@/components/print/VerifyQr'
-import { createClient } from '@/lib/supabase/client'
-import { friendlyError } from '@/lib/errors'
 import { CLINIC } from '@/clinic.config'
 import { fmtDate } from '@/lib/karachi'
 import PrescriptionSheet, { type RxSheetData } from '@/components/PrescriptionSheet'
 import LogoMark from '@/components/print/LogoMark'
-import { rxTemplatesFor, aftercareFor, type PrintLogo } from '@/lib/printTemplates'
+import { rxTemplatesFor, aftercareFor, type PrintLogo, type PrintWhat } from '@/lib/printTemplates'
+import DuoSheet, { BillBody, ExtraPart, FitOnePage, type BillPart, type DuoPatient } from '@/components/print/Duo'
 import { DEFAULT_LAYOUT, type PrintLayout } from '@/lib/printLayout'
 import LetterheadFrame from '@/components/print/LetterheadFrame'
 import SoftHeader from '@/components/print/SoftHeader'
@@ -62,14 +60,14 @@ function CareBox({ text, color }: { text: string; color: string }) {
 }
 
 function Pad({
-  id, rx, logo, logoUrl, filled, care, qr,
-}: { id: string; rx: RxSheetData; logo: PrintLogo; logoUrl: string | null; filled: boolean; care: string; qr: string | null }) {
+  id, rx, logo, logoUrl, filled, care, qr, extra, sid,
+}: { id: string; rx: RxSheetData; logo: PrintLogo; logoUrl: string | null; filled: boolean; care: string; qr: React.ReactNode; extra: React.ReactNode; sid: string | undefined }) {
   const t = THEME[id] ?? THEME.pad_red
   const p = rx.patient
   const homeo = id === 'pad_green'
   const cell: React.CSSProperties = { borderBottom: `1px solid ${t.main}66`, padding: '3px 4px', minHeight: 24, flex: 1 }
   return (
-    <div id="print-sheet" style={{ background: '#fff', color: '#111', border: `1px solid ${t.light}`, borderRadius: 12, overflow: 'hidden', minHeight: '24cm', display: 'flex', flexDirection: 'column' }}>
+    <div id={sid} style={{ background: '#fff', color: '#111', border: `1px solid ${t.light}`, borderRadius: 12, overflow: 'hidden', minHeight: extra ? undefined : '24cm', display: 'flex', flexDirection: 'column' }}>
       {homeo ? (
         <div style={{ padding: '16px 22px 10px', textAlign: 'center', borderBottom: `3px double ${t.main}`, background: t.light }}>
           <div style={{ display: 'flex', justifyContent: 'center' }}>{(logo.data || logoUrl) && <LogoMark logo={logo} fallbackUrl={logoUrl} />}</div>
@@ -141,17 +139,12 @@ function Pad({
           </div>
         )}
         {care.trim() && <CareBox text={care} color={t.main} />}
+        {extra}
       </div>
 
       <div style={{ padding: '0 22px 12px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, breakInside: 'avoid', pageBreakInside: 'avoid' }}>
         <div style={{ fontSize: 11 }}>
-          {qr && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={qr} alt="QR" style={{ width: 84, height: 84 }} />
-              <span style={{ maxWidth: 120, lineHeight: 1.5 }}>Apna record dekhne ke liye scan karein</span>
-            </div>
-          )}
+          {qr}
         </div>
         <div style={{ textAlign: 'center', fontSize: 11 }}>
           <div style={{ width: 170, borderTop: '1px solid #444' }} />
@@ -167,18 +160,22 @@ function Pad({
 }
 
 export default function RxPrint({
-  rx, dept, patientId, rxId, logo, logoUrl, defaultTpl, aftercare, phone, patientName, layout = DEFAULT_LAYOUT,
+  rx, dept, rxId, logo, logoUrl, defaultTpl, aftercare, phone, layout = DEFAULT_LAYOUT, bill = null, billHref = null, patientInfo, initialWhat = 'rx',
 }: {
+  /** isi visit ka bill (ho to "dono aik sath" chhap sakta hai) */
+  bill?: BillPart | null
+  /** "Sirf Invoice" ke liye bill ka page */
+  billHref?: string | null
+  patientInfo: DuoPatient
+  initialWhat?: PrintWhat
   rx: RxSheetData
   dept: string
-  patientId: string
   rxId: string
   logo: PrintLogo
   logoUrl: string | null
   defaultTpl: string
   aftercare: Record<string, string>
   phone: string | null
-  patientName: string
   layout?: PrintLayout
 }) {
   const tpls = rxTemplatesFor(dept)
@@ -187,10 +184,7 @@ export default function RxPrint({
   const [filled, setFilled] = useState(true)
   const [careKey, setCareKey] = useState((tpl === 'pad_bw' || tpl === 'pad_green') && cares[0] ? cares[0].key : '')
   const [careText, setCareText] = useState((tpl === 'pad_bw' || tpl === 'pad_green') && cares[0] ? aftercare[cares[0].key] ?? '' : '')
-  const [qr, setQr] = useState<string | null>(null)
-  const [link, setLink] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState('')
+  const [what, setWhat] = useState<PrintWhat>(initialWhat === 'both' && bill ? 'both' : 'rx')
 
   function chooseTpl(v: string) {
     setTpl(v)
@@ -201,28 +195,6 @@ export default function RxPrint({
     setCareText(k ? aftercare[k] ?? '' : '')
   }
 
-  async function makeQr() {
-    setBusy(true)
-    setErr('')
-    const { data, error } = await createClient().rpc('create_share_link', { p_patient: patientId, p_prescription: rxId })
-    if (error || !data) {
-      setBusy(false)
-      return setErr(friendlyError(error?.message ?? 'Link nahi bana'))
-    }
-    const url = `${window.location.origin}/r/${data as string}`
-    setLink(url)
-    setQr(await QRCode.toDataURL(url, { margin: 1, width: 300 }))
-    setBusy(false)
-  }
-
-  async function revoke() {
-    if (!confirm('Is marez ke tamam purane QR links band kar dein?')) return
-    const { error } = await createClient().rpc('revoke_share_links', { p_patient: patientId })
-    if (error) return setErr(friendlyError(error.message))
-    setQr(null)
-    setLink('')
-  }
-
   const waDigits = toInternationalPKNumber(phone ?? '')
   function waSend(text: string) {
     window.open(`https://wa.me/${waDigits}?text=${encodeURIComponent(text)}`, '_blank', 'noopener')
@@ -230,6 +202,20 @@ export default function RxPrint({
   const careMsg = `${careText.trim()}\n\n${CLINIC.name}`
 
   const isPad = tpl.startsWith('pad_')
+  const both = what === 'both' && Boolean(bill)
+  const extra = both && bill ? <ExtraPart><BillBody bill={bill} title="Invoice" /></ExtraPart> : null
+  // Prescription par sirf aik QR: "asli hai" (tasdeeq) wala
+  const qr = <VerifyQr table="prescriptions" id={rxId} />
+  // Dono aik sath hon to purane templates ko bhi aik safhe mein samaya jata hai
+  const wrap = both && tpl !== 'duo' && !(tpl === 'soft' && layout.letterhead.data)
+  const sid = wrap ? undefined : 'print-sheet'
+  function chooseWhat(v: PrintWhat) {
+    if (v === 'bill') {
+      if (billHref) window.location.assign(billHref + (billHref.includes('?') ? '&' : '?') + 'tpl=' + (tpl === 'duo' ? 'duo' : ''))
+      return
+    }
+    setWhat(v)
+  }
   const input = 'rounded-lg border border-clinic-teal/25 px-3 py-1.5 text-sm'
   return (
     <div>
@@ -247,6 +233,13 @@ export default function RxPrint({
           <label className="flex min-w-0 max-w-full items-center gap-2 text-sm">Template
             <select value={tpl} onChange={(e) => chooseTpl(e.target.value)} className={input + ' min-w-0 max-w-full'}>
               {tpls.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+            </select>
+          </label>
+          <label className="flex min-w-0 max-w-full items-center gap-2 text-sm">Kya chhape
+            <select data-testid="print-what" value={what} onChange={(e) => chooseWhat(e.target.value as PrintWhat)} className={input + ' min-w-0 max-w-full'}>
+              <option value="rx">Sirf Prescription</option>
+              {bill && <option value="both">Prescription + Invoice aik sath</option>}
+              {bill && billHref && <option value="bill">Sirf Invoice</option>}
             </select>
           </label>
           {isPad && (
@@ -280,58 +273,34 @@ export default function RxPrint({
           </div>
         )}
 
-        <div className="flex flex-wrap items-center gap-3 border-t border-clinic-teal/10 pt-3">
-          <button type="button" disabled={busy} onClick={makeQr} className="rounded-full border border-clinic-teal px-4 py-1.5 text-sm font-semibold text-clinic-teal disabled:opacity-40">
-            {qr ? 'Naya QR banayein' : 'QR code lagayein'}
-          </button>
-          {qr && <button type="button" onClick={revoke} className="text-sm text-red-600 underline">purane links band karein</button>}
-          {link && waDigits && (
-            <button type="button" onClick={() => waSend(`Assalam o Alaikum ${patientName},\n\nAap ka record aur prescription yahan dekhein (kuch din tak chalega):\n${link}\n\n${CLINIC.name}`)} className="rounded-full bg-whatsapp px-4 py-1.5 text-sm font-semibold text-white">Link WhatsApp par bhejein</button>
-          )}
-          {!waDigits && <span className="text-xs text-clinic-ink/50">Phone number nahi hai, WhatsApp nahi ho sakta.</span>}
-        </div>
-        {err && <p className="text-sm text-red-700">{err}</p>}
-        <p className="text-[11px] text-clinic-ink/50">Purane link ko dobara na bhejein; QR har print par naya banta hai aur kuch din baad khud band ho jata hai.</p>
+        {!bill && <p className="text-[11px] text-clinic-ink/50" data-testid="no-bill-note">Is visit ka bill nahi mila, is liye &quot;aik sath&quot; ka option nahi hai.</p>}
       </div>
 
-      {tpl === 'soft' ? (
-        <LetterheadFrame layout={layout} id="print-sheet">
-          <div style={{ background: '#fff', color: 'rgb(var(--c-ink))', fontSize: `${14 * layout.scale}px`, borderRadius: layout.letterhead.data ? 0 : 14, border: layout.letterhead.data ? 'none' : '1px solid rgb(var(--c-mint))', overflow: 'hidden', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-            {!layout.letterhead.data && <SoftHeader logo={logo} logoUrl={logoUrl} layout={layout} />}
-            <div style={{ padding: layout.letterhead.data ? 0 : '12px 24px 20px' }}>
-              <PrescriptionSheet rx={rx} bare />
-              {qr && layout.show.qr && (
-                <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 10 }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={qr} alt="QR" width={90} height={90} />
-                  <span style={{ fontSize: 12 }}>Apna record khud dekhein, QR scan karein</span>
-                </div>
-              )}
-              {layout.show.signature && <div style={{ marginTop: 26, width: 200, borderTop: '1px solid currentColor', paddingTop: 4, fontSize: 12 }}>Doctor ke dastkhat</div>}
-              {layout.show.stamp && layout.stamp && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={layout.stamp} alt="Mohar" style={{ height: 80, width: 'auto', marginTop: 8 }} />
-              )}
+      {(() => {
+        const sheet = tpl === 'duo' ? (
+          <DuoSheet id="print-sheet" layout={layout} patient={patientInfo} date={rx.prescribed_date} rx={rx} bill={both ? bill : null} verify={{ table: 'prescriptions', id: rxId }} />
+        ) : tpl === 'soft' ? (
+          <LetterheadFrame layout={layout} id={wrap ? 'print-sheet-in' : 'print-sheet'}>
+            <div style={{ background: '#fff', color: 'rgb(var(--c-ink))', fontSize: `${14 * layout.scale}px`, borderRadius: layout.letterhead.data ? 0 : 14, border: layout.letterhead.data ? 'none' : '1px solid rgb(var(--c-mint))', overflow: 'hidden', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+              {!layout.letterhead.data && <SoftHeader logo={logo} logoUrl={logoUrl} layout={layout} />}
+              <div style={{ padding: layout.letterhead.data ? 0 : '12px 24px 20px' }}>
+                <PrescriptionSheet rx={rx} bare extra={extra} />
+                <div style={{ marginTop: 14 }}>{qr}</div>
+                {layout.show.signature && <div style={{ marginTop: 26, width: 200, borderTop: '1px solid currentColor', paddingTop: 4, fontSize: 12 }}>Doctor ke dastkhat</div>}
+                {layout.show.stamp && layout.stamp && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={layout.stamp} alt="Mohar" style={{ height: 80, width: 'auto', marginTop: 8 }} />
+                )}
+              </div>
             </div>
-          </div>
-        </LetterheadFrame>
-      ) : isPad ? (
-        <Pad id={tpl} rx={rx} logo={logo} logoUrl={logoUrl} filled={filled} care={careKey ? careText : ''} qr={qr} />
-      ) : (
-        <div>
-          <PrescriptionSheet rx={rx} />
-          {qr && (
-            <div className="mt-3 flex items-center gap-2 print:hidden">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={qr} alt="QR" width={96} height={96} />
-              <span className="text-xs text-clinic-ink/60">QR sirf Pad templates par chhapta hai.</span>
-            </div>
-          )}
-        </div>
-      )}
-      <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-end' }}>
-        <VerifyQr table="prescriptions" id={rxId} />
-      </div>
+          </LetterheadFrame>
+        ) : isPad ? (
+          <Pad id={tpl} rx={rx} logo={logo} logoUrl={logoUrl} filled={filled} care={careKey ? careText : ''} qr={qr} extra={extra} sid={sid} />
+        ) : (
+          <PrescriptionSheet rx={rx} sheetId={sid ?? null} extra={extra} qr={qr} />
+        )
+        return wrap ? <FitOnePage id="print-sheet" watch={[tpl, filled, careText, what]}>{sheet}</FitOnePage> : sheet
+      })()}
     </div>
   )
 }

@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { friendlyError } from '@/lib/errors'
-import { DEFAULT_LAYOUT, type PrintLayout } from '@/lib/printLayout'
+import { DEFAULT_LAYOUT, type DuoDoctor, type PrintLayout } from '@/lib/printLayout'
 import type { PrintLogo } from '@/lib/printTemplates'
 import InvoiceSheets, { type InvData } from '@/components/print/InvoiceSheets'
 
@@ -127,6 +127,7 @@ export default function PrintLayoutSettings({ initial, logo }: { initial: PrintL
   const [tpl, setTpl] = useState('soft')
 
   const set = (patch: Partial<PrintLayout>) => setL((x) => ({ ...x, ...patch }))
+  const duoDoc = (side: 'left' | 'right', patch: Partial<DuoDoctor>) => setL((x) => ({ ...x, duo: { ...x.duo, [side]: { ...x.duo[side], ...patch } } }))
   const lh = (patch: Partial<PrintLayout['letterhead']>) => setL((x) => ({ ...x, letterhead: { ...x.letterhead, ...patch } }))
 
   async function save() {
@@ -247,22 +248,57 @@ export default function PrintLayoutSettings({ initial, logo }: { initial: PrintL
         </div>
       </section>
 
+      <section className={card} data-testid="duo-settings">
+        <h2 className="font-display text-lg font-semibold text-clinic-ink">&quot;Do doctor wala&quot; template</h2>
+        <p className="mt-1 text-xs text-clinic-ink/60">Upar dono taraf doctor, un ke neeche chhota naam aur number, beech mein pata aur timing. Ye invoice aur prescription dono par lagta hai. Jo khana khali ho wo nahi chhapta.</p>
+        <div className="mt-3 grid gap-4 sm:grid-cols-2">
+          {(['left', 'right'] as const).map((side) => (
+            <div key={side} className="grid gap-2 rounded-xl border border-clinic-teal/15 p-3">
+              <p className="text-sm font-semibold text-clinic-ink">{side === 'left' ? 'Baayein taraf ka doctor' : 'Daayein taraf ka doctor'}</p>
+              <label className="grid gap-1 text-sm">Doctor ka naam
+                <input data-testid={'duo-' + side + '-name'} value={l.duo[side].name} onChange={(e) => duoDoc(side, { name: e.target.value })} className={input} />
+              </label>
+              <label className="grid gap-1 text-sm">Degree
+                <input data-testid={'duo-' + side + '-degree'} value={l.duo[side].degree} onChange={(e) => duoDoc(side, { degree: e.target.value })} className={input} />
+              </label>
+              <label className="grid gap-1 text-sm">Ohda
+                <input data-testid={'duo-' + side + '-title'} value={l.duo[side].title} onChange={(e) => duoDoc(side, { title: e.target.value })} className={input} />
+              </label>
+              <label className="grid gap-1 text-sm">Neeche chhota naam
+                <input data-testid={'duo-' + side + '-sub'} value={l.duo[side].sub_name} onChange={(e) => duoDoc(side, { sub_name: e.target.value })} className={input} />
+              </label>
+              <label className="grid gap-1 text-sm">Us ka phone number
+                <input data-testid={'duo-' + side + '-phone'} value={l.duo[side].sub_phone} onChange={(e) => duoDoc(side, { sub_phone: e.target.value })} className={input} inputMode="tel" />
+              </label>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 grid gap-3">
+          <label className="grid gap-1 text-sm">Beech mein pata (khali = clinic ka apna pata)
+            <input data-testid="duo-address" value={l.duo.address} onChange={(e) => setL({ ...l, duo: { ...l.duo, address: e.target.value } })} className={input} />
+          </label>
+          <label className="grid gap-1 text-sm">Beech mein clinic ki timing (khali = clinic ki apni timing)
+            <input data-testid="duo-timings" value={l.duo.timings} onChange={(e) => setL({ ...l, duo: { ...l.duo, timings: e.target.value } })} className={input} />
+          </label>
+        </div>
+      </section>
+
       <section className={card}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-display text-lg font-semibold text-clinic-ink">Live preview (namoona bill)</h2>
           <div className="flex gap-2 text-sm">
-            {[['soft', 'Neela-Safed'], ['green', 'Hara']].map(([id, lb]) => (
+            {[['soft', 'Neela-Safed'], ['green', 'Hara'], ['duo', 'Do doctor wala']].map(([id, lb]) => (
               <button key={id} type="button" onClick={() => setTpl(id)} className={`rounded-full px-3 py-1 font-semibold ${tpl === id ? 'bg-clinic-teal text-white' : 'border border-clinic-teal/25'}`}>{lb}</button>
             ))}
           </div>
         </div>
-        <div style={{ zoom: hasLh ? 0.7 : 0.85 }} className="mt-3 [&_label]:hidden">
-          <InvoiceSheets key={tpl} d={SAMPLE} logo={logo} logoUrl={null} defaultTpl={tpl} layout={l} />
+        <div style={{ zoom: tpl === 'duo' ? 1 : hasLh ? 0.7 : 0.85 }} className="mt-3">
+          <InvoiceSheets preview key={tpl} d={SAMPLE} logo={logo} logoUrl={null} defaultTpl={tpl} layout={l} />
         </div>
       </section>
 
       <div className="flex flex-wrap gap-3">
-        <button type="button" disabled={busy === 'save'} onClick={save} className="rounded-full bg-clinic-teal px-6 py-2.5 text-sm font-semibold text-white disabled:opacity-40">Mehfooz karein</button>
+        <button type="button" data-testid="layout-save" disabled={busy === 'save'} onClick={save} className="rounded-full bg-clinic-teal px-6 py-2.5 text-sm font-semibold text-white disabled:opacity-40">Mehfooz karein</button>
         <button type="button" onClick={() => setL(DEFAULT_LAYOUT)} className="text-sm underline">Sab pehle jaisa karein (mehfooz karne tak asar nahi)</button>
       </div>
     </div>

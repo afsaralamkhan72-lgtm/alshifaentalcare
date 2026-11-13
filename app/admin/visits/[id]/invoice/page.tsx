@@ -17,7 +17,7 @@ export default async function VisitInvoicePage({ params }: { params: Promise<{ i
   const supabase = await createClient()
   const { data: v } = await supabase.from('clinical_visits').select('id, patient_id, visit_date, doctor, patients(full_name, mr_number, phone)').eq('id', id).maybeSingle()
   if (!v) notFound()
-  const [invRes, payRes, balRes] = await Promise.all([
+  const [invRes, payRes, balRes, rxRes] = await Promise.all([
     supabase
       .from('invoices')
       .select('id, invoice_number, total, paid_amount, invoice_items(name, tooth, qty, unit_price)')
@@ -26,7 +26,10 @@ export default async function VisitInvoicePage({ params }: { params: Promise<{ i
       .order('created_at'),
     supabase.from('payments').select('id, amount, method, invoice_id').eq('patient_id', v.patient_id).eq('paid_on', v.visit_date),
     supabase.from('patient_balances').select('*').eq('patient_id', v.patient_id).maybeSingle(),
+    supabase.from('prescriptions').select('id, items').eq('clinical_visit_id', id).order('created_at', { ascending: false }).limit(1),
   ])
+  const rxRow = ((rxRes.data ?? []) as { id: string; items: unknown[] | null }[])[0]
+  const rxId = rxRow && (rxRow.items ?? []).length ? rxRow.id : null
   const invs = (invRes.data ?? []) as unknown as Inv[]
   const p = v.patients as unknown as { full_name: string; mr_number: string | null; phone: string } | null
   const total = invs.reduce((s, i) => s + Number(i.total), 0)
@@ -41,6 +44,11 @@ export default async function VisitInvoicePage({ params }: { params: Promise<{ i
           ← Patient
         </Link>
         <div className="flex flex-wrap items-center justify-end gap-2">
+          {rxId && (
+            <Link data-testid="both-link" href={'/admin/prescriptions/' + rxId + '/print?w=both'} className="rounded-full border border-clinic-teal px-4 py-2 text-sm font-semibold text-clinic-teal">
+              Invoice + Prescription aik sath
+            </Link>
+          )}
           <DocShare
             fileName={'Invoice-' + (p?.mr_number ?? 'mareez') + '-' + v.visit_date + '.pdf'}
             patientId={v.patient_id}

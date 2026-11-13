@@ -17,7 +17,8 @@ async function getData() {
 
   const { data } = await supabase
     .from('prescriptions')
-    .select('id, department, items, prescribed_date, patients(id, full_name, mr_number)')
+    .select('id, department, items, prescribed_date, patients!inner(id, full_name, mr_number)')
+    .is('patients.deleted_at', null)
     .order('created_at', { ascending: false })
     .limit(60)
 

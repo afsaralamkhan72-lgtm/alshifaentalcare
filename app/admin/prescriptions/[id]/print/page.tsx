@@ -8,20 +8,21 @@ import { type RxItem } from '@/components/PrescriptionSheet'
 import { getPrintCfg } from '@/lib/printSettings'
 import { aftercareFor } from '@/lib/printTemplates'
 import { renderTemplate } from '@/lib/messageTemplates'
+import { billForRx } from '@/lib/visitDocs'
 
-export default async function PrescriptionPrintPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ t?: string }> }) {
+export default async function PrescriptionPrintPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ t?: string; tpl?: string; w?: string }> }) {
   await requirePerm('prescriptions.view')
   const { id } = await params
-  const { t: forTreatment } = await searchParams
+  const { t: forTreatment, tpl: askTpl, w: askWhat } = await searchParams
   const supabase = await createClient()
   const { data: rx } = await supabase
     .from('prescriptions')
-    .select('id, department, items, notes_en, notes_ur, prescribed_date, patient_id, treatment_id, patients(full_name, mr_number, age, gender, phone, portal_code)')
+    .select('id, department, items, notes_en, notes_ur, prescribed_date, patient_id, treatment_id, clinical_visit_id, patients(full_name, mr_number, age, gender, phone, portal_code, address)')
     .eq('id', id)
     .maybeSingle()
   if (!rx) notFound()
 
-  const p = rx.patients as unknown as { full_name: string; mr_number: string | null; age: number | null; gender: string | null; phone: string; portal_code: string | null } | null
+  const p = rx.patients as unknown as { full_name: string; mr_number: string | null; age: number | null; gender: string | null; phone: string; portal_code: string | null; address: string | null } | null
   let treatmentName: string | null = null
   if (rx.treatment_id) {
     const { data: t } = await supabase.from('patient_treatments').select('name').eq('id', rx.treatment_id).maybeSingle()
@@ -38,6 +39,7 @@ export default async function PrescriptionPrintPage({ params, searchParams }: { 
     }
   }
   const printCfg = await getPrintCfg()
+  const { bill, href: billHref } = await billForRx(supabase, { patient_id: rx.patient_id, clinical_visit_id: rx.clinical_visit_id ?? null, prescribed_date: rx.prescribed_date })
   const { data: ci } = await supabase.from('site_settings').select('value').eq('key', 'clinic_info').maybeSingle()
   const logoUrl = ((ci?.value ?? {}) as { logo_url?: string }).logo_url ?? null
   const dept = (rx.department as string | null) ?? 'dental'
@@ -71,14 +73,16 @@ export default async function PrescriptionPrintPage({ params, searchParams }: { 
       <RxPrint
         rx={{ items: (rx.items ?? []) as RxItem[], notes_en: rx.notes_en, notes_ur: rx.notes_ur, prescribed_date: rx.prescribed_date, treatmentName, patient: p }}
         dept={dept}
-        patientId={rx.patient_id}
         rxId={rx.id}
         logo={printCfg.logo}
         logoUrl={logoUrl}
-        defaultTpl={dept === 'homeopathic' ? printCfg.defaults.rx_homeo : printCfg.defaults.rx_dental}
+        defaultTpl={askTpl === 'duo' ? 'duo' : dept === 'homeopathic' ? printCfg.defaults.rx_homeo : printCfg.defaults.rx_dental}
+        bill={bill}
+        billHref={billHref}
+        initialWhat={askWhat === 'both' ? 'both' : 'rx'}
+        patientInfo={{ name: p?.full_name ?? '', mr: p?.mr_number ?? null, age: p?.age ?? null, gender: p?.gender ?? null, address: p?.address ?? null, phone: p?.phone ?? null }}
         aftercare={aftercare}
         phone={p?.phone ?? null}
-        patientName={p?.full_name ?? ''}
         layout={printCfg.layout}
       />
     </div>

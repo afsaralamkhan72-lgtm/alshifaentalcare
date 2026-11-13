@@ -7,15 +7,17 @@ import { getReadyRewards } from '@/lib/rewards'
 import InvoiceSheets from '@/components/print/InvoiceSheets'
 import { getPrintCfg } from '@/lib/printSettings'
 import InvoicePanel, { type PayRow } from '@/components/admin/InvoicePanel'
+import { rxForInvoice } from '@/lib/visitDocs'
 
-export default async function InvoicePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function InvoicePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tpl?: string; w?: string }> }) {
+  const { tpl: askTpl, w: askWhat } = await searchParams
   await requireAnyPerm('billing.view')
   const { id } = await params
   const supabase = await createClient()
 
   const { data: inv } = await supabase
     .from('invoices')
-    .select('*, patients(id, full_name, phone, mr_number, age, department)')
+    .select('*, patients(id, full_name, phone, mr_number, age, department, gender, address)')
     .eq('id', id)
     .maybeSingle()
   if (!inv) notFound()
@@ -45,9 +47,14 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
 
   const printCfg = await getPrintCfg()
   const rewards = inv.status === 'active' ? await getReadyRewards(supabase, inv.patient_id) : []
-  const patient = inv.patients as { id: string; full_name: string; phone: string; mr_number: string | null; age: number | null; department: string } | null
+  const patient = inv.patients as { id: string; full_name: string; phone: string; mr_number: string | null; age: number | null; department: string; gender: string | null; address: string | null } | null
   const info = (clinicRes.data?.value ?? {}) as { logo_url?: string }
   const void_ = inv.status === 'void'
+  const { rx, rxId } = await rxForInvoice(
+    supabase,
+    { patient_id: inv.patient_id, clinical_visit_id: inv.clinical_visit_id ?? null, invoice_date: inv.invoice_date },
+    patient ? { full_name: patient.full_name, mr_number: patient.mr_number, age: patient.age, gender: patient.gender } : null
+  )
 
   return (
     <div>
@@ -60,7 +67,12 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
       <InvoiceSheets
         logo={printCfg.logo}
         logoUrl={info.logo_url ?? null}
-        defaultTpl={printCfg.defaults.bill}
+        defaultTpl={askTpl === 'duo' ? 'duo' : printCfg.defaults.bill}
+        rx={rx}
+        rxId={rxId}
+        rxHref={rxId ? '/admin/prescriptions/' + rxId + '/print' : null}
+        initialWhat={askWhat === 'both' ? 'both' : 'bill'}
+        patient={patient ? { name: patient.full_name, mr: patient.mr_number, age: patient.age, gender: patient.gender, address: patient.address, phone: patient.phone } : null}
         layout={printCfg.layout}
         d={{
           id: inv.id,

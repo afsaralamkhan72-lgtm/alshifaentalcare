@@ -10,7 +10,24 @@ async function makePdf(targetId: string): Promise<Blob> {
   const el = document.getElementById(targetId)
   if (!el) throw new Error('Kaghaz nahi mila')
   const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas-pro'), import('jspdf')])
-  const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true, windowWidth: Math.max(el.scrollWidth, 794) })
+  // "Aik safhe mein" wale kaghaz screen par chhote (zoom) dikhte hain; PDF ke liye asli size par tasveer li jati hai
+  const fitPaper = el.hasAttribute('data-fit-paper')
+  const canvas = await html2canvas(el, {
+    scale: 2,
+    backgroundColor: '#ffffff',
+    useCORS: true,
+    windowWidth: Math.max(el.scrollWidth, 794),
+    onclone: (doc) => {
+      doc.querySelectorAll<HTMLElement>('[data-fit-paper], [data-fit-inner]').forEach((x) => {
+        x.style.zoom = '1'
+        x.style.boxShadow = 'none'
+      })
+      doc.querySelectorAll<HTMLElement>('[data-fit-wrap]').forEach((x) => {
+        x.style.overflow = 'visible'
+        x.style.width = 'max-content'
+      })
+    },
+  })
   const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' })
   const pw = pdf.internal.pageSize.getWidth()
   const ph = pdf.internal.pageSize.getHeight()
@@ -18,6 +35,12 @@ async function makePdf(targetId: string): Promise<Blob> {
   const w = pw - m * 2
   const pxPerMm = canvas.width / w
   const pageH = Math.floor((ph - m * 2) * pxPerMm)
+  // Thora sa lamba ho to poora kaghaz chhota kar ke aik hi safhe par (parhne laiq had tak)
+  if (fitPaper && canvas.height > pageH && canvas.height <= pageH / 0.6) {
+    const k = pageH / canvas.height
+    pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', m + (w - w * k) / 2, m, w * k, (canvas.height / pxPerMm) * k)
+    return pdf.output('blob')
+  }
   let y = 0
   let first = true
   while (y < canvas.height) {

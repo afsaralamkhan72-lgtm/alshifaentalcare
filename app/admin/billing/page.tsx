@@ -24,12 +24,16 @@ async function getTransactions(from: string, to: string) {
   const supabase = await createClient()
   const { data } = await supabase
     .from('transactions')
-    .select('id, type, category, amount, payment_method, description, transaction_date, rate, discount_amount, treatment_name, treating_doctor')
+    .select('id, type, category, amount, payment_method, description, transaction_date, rate, discount_amount, treatment_name, treating_doctor, patients(deleted_at)')
     .gte('transaction_date', from)
     .lte('transaction_date', to)
     .order('transaction_date', { ascending: false })
     .limit(500)
-  return data ?? []
+  const all = (data ?? []) as unknown as (Record<string, unknown> & { amount: number; patients: { deleted_at: string | null } | null })[]
+  // Recycle Bin wale mareez aur Rs. 0 ki lines list mein nahi dikhti (totals database se aate hain)
+  const binRows = all.filter((t) => t.patients?.deleted_at)
+  const rows = all.filter((t) => !t.patients?.deleted_at && Number(t.amount) !== 0)
+  return { rows, fetched: all.length, binCount: binRows.length, binIncome: binRows.filter((t) => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0) }
 }
 
 const METHODS = ['cash', 'bank', 'easypaisa', 'jazzcash'] as const
@@ -44,7 +48,8 @@ export default async function BillingPage({
   const from = params.from || firstOfMonth()
   const to = params.to || todayStr()
 
-  const transactions = await getTransactions(from, to)
+  const txRes = await getTransactions(from, to)
+  const transactions = txRes.rows as unknown as { id: string; type: string; category: string; amount: number; payment_method: string; description: string | null; transaction_date: string; rate: number | null; discount_amount: number | null; treatment_name: string | null; treating_doctor: string | null }[]
   const supabaseCat = await createClient()
   const { data: catRows } = await supabaseCat
     .from('expense_categories')
@@ -56,7 +61,7 @@ export default async function BillingPage({
   // Phase 9: kul raqam database se (list sirf pehli 500 dikhati hai, total hamesha poora)
   const supabaseTot = await createClient()
   const { data: rep } = await supabaseTot.rpc('report_summary', { p_from: from, p_to: to })
-  const tooMany = transactions.length >= 500
+  const tooMany = txRes.fetched >= 500
   const income = rep
     ? Number((rep as { income: number }).income)
     : transactions.filter((t) => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0)
@@ -133,6 +138,11 @@ export default async function BillingPage({
         ))}
       </div>
 
+      {txRes.binCount > 0 && (
+        <p data-testid="bin-note" className="mt-4 rounded-xl border border-clinic-teal/15 bg-clinic-mint/30 px-4 py-2 text-xs text-clinic-ink/70">
+          Recycle Bin wale mareezon ki {txRes.binCount} entries (Rs. {txRes.binIncome.toLocaleString()}) list mein chhupi hain, lekin upar ke totals mein shamil hain. Recycle Bin se hamesha ke liye hatane par totals se bhi nikal jayengi.
+        </p>
+      )}
       {tooMany && (
         <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-800">
           Neeche list mein sirf sab se nayi 500 entries hain. Upar ke totals poori muddat ke hain. Poori list ke liye tareekh chhoti karein.

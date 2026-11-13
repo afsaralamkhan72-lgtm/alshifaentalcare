@@ -21,10 +21,10 @@ export interface RxSheetData {
 }
 
 /** Prescription ka saaf safha (print / PDF / patient portal, teeno jagah wahi) */
-export default function PrescriptionSheet({ rx, bare = false }: { rx: RxSheetData; bare?: boolean }) {
+export default function PrescriptionSheet({ rx, bare = false, sheetId = 'print-sheet', extra = null, qr = null }: { rx: RxSheetData; bare?: boolean; sheetId?: string | null; extra?: React.ReactNode; qr?: React.ReactNode }) {
   const p = rx.patient
   return (
-    <div id={bare ? undefined : 'print-sheet'} className={bare ? 'text-clinic-ink' : 'rounded-2xl border border-clinic-teal/10 bg-white p-5 text-clinic-ink sm:p-8'}>
+    <div id={bare ? undefined : sheetId ?? undefined} className={bare ? 'text-clinic-ink' : 'rounded-2xl border border-clinic-teal/10 bg-white p-5 text-clinic-ink sm:p-8'}>
       {!bare && <header className="flex flex-wrap items-start justify-between gap-3 border-b-2 border-clinic-teal pb-4">
         <div>
           <p className="font-display text-2xl font-semibold text-clinic-teal">{CLINIC.name}</p>
@@ -109,8 +109,13 @@ export default function PrescriptionSheet({ rx, bare = false }: { rx: RxSheetDat
         </div>
       )}
 
+      {extra}
+
       <footer className="mt-12 flex flex-wrap items-end justify-between gap-4 text-xs text-clinic-ink/60">
-        <p>{CLINIC.timings.full}</p>
+        <div>
+          {!bare && qr}
+          <p>{CLINIC.timings.full}</p>
+        </div>
         <div className="text-center">
           <div className="w-48 border-t border-clinic-ink/40" />
           <p className="mt-1">Signature</p>

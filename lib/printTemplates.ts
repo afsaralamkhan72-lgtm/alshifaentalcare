@@ -8,10 +8,12 @@ export const BILL_TEMPLATES: PrintTpl[] = [
   { id: 'green', label: 'Hara (Patient Bill / Invoice)', dept: 'both' },
   { id: 'classic', label: 'Purana (Classic)', dept: 'both' },
   { id: 'blue', label: 'Naya (Neela)', dept: 'both' },
+  { id: 'duo', label: 'Do doctor wala (sada)', dept: 'both' },
 ]
 export const RX_TEMPLATES: PrintTpl[] = [
   { id: 'soft', label: 'Software wala (Neela-Safed)', dept: 'both' },
   { id: 'classic', label: 'Purana (Classic)', dept: 'both' },
+  { id: 'duo', label: 'Do doctor wala (sada)', dept: 'both' },
   { id: 'pad_red', label: 'Pad (Laal-Kala)', dept: 'dental' },
   { id: 'pad_bw', label: 'Pad (Kala-Safed, hidayat ke saath)', dept: 'dental' },
   { id: 'pad_green', label: 'Pad (Hara, Homeopathic)', dept: 'homeopathic' },
@@ -35,3 +37,6 @@ export function aftercareFor(dept: string | null | undefined) {
   const d: Dept = dept === 'homeopathic' ? 'homeopathic' : 'dental'
   return AFTERCARE.filter((a) => a.dept === d)
 }
+
+/** Kaghaz par kya chhape: sirf prescription, sirf invoice, ya dono aik sath */
+export type PrintWhat = 'rx' | 'bill' | 'both'
