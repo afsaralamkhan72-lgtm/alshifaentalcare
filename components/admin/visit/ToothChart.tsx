@@ -62,6 +62,7 @@ export default function ToothChart({
   canEdit,
   pickOnly = false,
   renderExtra,
+  hidePick = false,
   noPlan,
   onWork,
   hideDentalMarks = false,
@@ -77,6 +78,8 @@ export default function ToothChart({
   pickOnly?: boolean
   /** Is daant ke liye masla / kaam likhne ka hissa (visit mein) */
   renderExtra?: (tooth: string) => React.ReactNode
+  /** Bridge chunte waqt: "kis daant ka note" wale button nahi dikhte, seedha qismein */
+  hidePick?: boolean
   noPlan?: boolean
   /** Visit mein: daant ke kaam/masle yahan nahi chunne (neeche card mein chunte hain). Sirf masoorhe ke nishan baqi */
   hideDentalMarks?: boolean
@@ -318,7 +321,7 @@ export default function ToothChart({
             </div>
           </div>
           {!(narrow && sheetMin) && (<>
-          {selected.length > 1 && (
+          {selected.length > 1 && !hidePick && (
             <div className="flex flex-wrap items-center gap-1.5 text-xs">
               <span className="text-clinic-ink/60">Surface/note kis daant ka:</span>
               {selected.map((t) => (

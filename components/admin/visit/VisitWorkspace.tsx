@@ -106,6 +106,8 @@ interface TRow {
   stg?: string[]
   /** Doctor ne keh diya: ye milte julte naam wala nahi, bilkul naya kaam hai */
   isNew?: boolean
+  /** Denture ki qism ka asal naam (hisse ke baghair): Price List mein isi naam se save hoti hai */
+  base?: string
 }
 type Applies = 'tooth' | 'mouth' | 'jaw' | 'once'
 const APPLIES_LABEL: Record<Applies, string> = { tooth: 'Har daant ki', mouth: 'Poora muh', jaw: 'Jabda', once: 'Aik dafa' }
@@ -351,6 +353,10 @@ export default function VisitWorkspace(p: Props) {
   /** Do ya zyada ilaaj hon to doctor khud batata hai kis ke kitne mile */
   const [split, setSplit] = useState<Record<string, string>>({})
   const [dReg, setDReg] = useState('')
+  /** Denture / Bridge wala sada dabba: kaunsa khula hai */
+  const [gb, setGb] = useState<'' | 'denture' | 'bridge'>('')
+  /** "+ Nayi qism": naam, qeemat, aur milte julte naam ka sawal */
+  const [nw, setNw] = useState<{ open: boolean; name: string; price: string; ask: string[] }>({ open: false, name: '', price: '', ask: [] })
   const [pickQ, setPickQ] = useState('')
   const [pickGrp, setPickGrp] = useState('')
   const [rctAuto, setRctAuto] = useState(false)
@@ -568,19 +574,19 @@ export default function VisitWorkspace(p: Props) {
     })
   }
   /** Kai daanton ka ek hi kaam (Bridge, Partial Denture): ek hi qatar, ek hi qeemat, har daant ka alag card nahi */
-  function addGroupWork(name: string, pickedTeeth: string[], mode: 'each' | 'whole' = 'each') {
+  function addGroupWork(name: string, pickedTeeth: string[], mode: 'each' | 'whole' = 'each', customUnit?: number) {
     const nm = name.trim()
     if (!nm || pickedTeeth.length < 2) return
     const teeth = pickedTeeth.slice().sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
     const c = p.catalog.find((x) => eq(x.name, nm))
     const mats: Record<string, string> = {}
     if (c) for (const m of p.materials[c.id] ?? []) mats[m.inventory_id] = String(m.default_qty)
-    const g = c ? Number(c.price) || 0 : 0
-    const price = c ? String(mode === 'each' ? g * teeth.length : g) : ''
+    const g = c ? Number(c.price) || 0 : customUnit && customUnit > 0 ? customUnit : 0
+    const price = g > 0 ? String(mode === 'each' ? g * teeth.length : g) : ''
     const note = g > 0 ? (mode === 'each' ? `${g} x ${teeth.length} daant` : 'Poore kaam ki ek qeemat') : ''
     setRows((rs) => [
       ...rs.flatMap((r) => (r.applies !== 'tooth' || r.group ? [r] : (() => { const tt = r.teeth.filter((x) => !teeth.includes(x)); return tt.length ? [{ ...r, teeth: tt, price: autoPrice(r, tt) }] : [] })())),
-      { key: newKey(), name: c?.name ?? nm, catalog_id: c?.id ?? null, teeth, price, planned: workPlanned, notes: note, mats, applies: 'tooth', unit: null, manual: true, jaw: '', group: true, gmode: mode, gunit: g },
+      { key: newKey(), name: c?.name ?? nm, catalog_id: c?.id ?? null, teeth, price, planned: workPlanned, notes: note, mats, applies: 'tooth', unit: null, manual: true, jaw: '', group: true, gmode: mode, gunit: g, isNew: !c },
     ])
   }
   function setGroupMode(key: string, mode: 'each' | 'whole') {
@@ -846,13 +852,14 @@ export default function VisitWorkspace(p: Props) {
           const { data: up } = await createClient().from('treatment_catalog').update({ price: unit }).eq('id', r.catalog_id).eq('price', 0).select('id')
           if (up && up.length) saved.push(`${cat.name} Rs. ${unit}`)
         } else {
-          const k = nm.toLowerCase()
-          if (seen.has(k) || p.catalog.some((x) => eq(x.name, nm))) continue
+          const sv = (r.base ?? nm).trim()
+          const k = sv.toLowerCase()
+          if (!sv || seen.has(k) || p.catalog.some((x) => eq(x.name, sv))) continue
           seen.add(k)
-          const { data: dup } = await createClient().from('treatment_catalog').select('id').ilike('name', nm.replace(/[%_]/g, ' ')).limit(1)
+          const { data: dup } = await createClient().from('treatment_catalog').select('id').ilike('name', sv.replace(/[%_]/g, ' ')).limit(1)
           if (dup && dup.length) continue
-          const { error: insErr } = await createClient().from('treatment_catalog').insert({ name: nm, price: unit, department: homeo ? 'homeopathic' : 'dental', category: /denture/i.test(nm) ? 'Denture' : 'Other', applies_to: r.applies })
-          if (!insErr) saved.push(`${nm} Rs. ${unit} (naya kaam)`)
+          const { error: insErr } = await createClient().from('treatment_catalog').insert({ name: sv, price: unit, department: homeo ? 'homeopathic' : 'dental', category: /denture/i.test(sv) ? 'Denture' : r.group && /bridge/i.test(sv) ? 'Crown & Bridge' : 'Other', applies_to: r.applies })
+          if (!insErr) saved.push(`${sv} Rs. ${unit} (naya kaam)`)
         }
       }
       if (saved.length) warn0 = 'Price List mein save hui: ' + saved.join(', ') + '. '
@@ -1224,7 +1231,7 @@ export default function VisitWorkspace(p: Props) {
           {/* 6. DENTAL CHART */}
           {!homeo && (
             <Section title="Dental Chart">
-              <ToothChart age={p.patient.age} selected={sel} onSelect={pickTeeth} marks={marks} onMarks={setMarks} old={p.chartRecords} canEdit={canEdit} noPlan hideDentalMarks renderExtra={() => entryPanel} onWork={onChartWork} bridges={rows.filter((r) => r.group && /bridge/i.test(r.name)).map((r) => r.teeth)} />
+              <ToothChart age={p.patient.age} selected={sel} onSelect={pickTeeth} marks={marks} onMarks={setMarks} old={p.chartRecords} canEdit={canEdit} noPlan hideDentalMarks renderExtra={() => (gb === 'bridge' ? bridgePanel : entryPanel)} hidePick={gb === 'bridge'} onWork={onChartWork} bridges={rows.filter((r) => r.group && /bridge/i.test(r.name)).map((r) => r.teeth)} />
             </Section>
           )}
 
@@ -1534,11 +1541,6 @@ export default function VisitWorkspace(p: Props) {
                   {entTx === n ? '✓ ' : ''}{/root canal/i.test(n) ? 'Root Canal (daant ke hisab se)' : n}
                 </button>
               ))}
-              {([['GRP:bridge', 'Bridge']] as const).map(([k, l]) => (
-                <button key={k} type="button" data-testid={'grp-' + k.slice(4)} aria-pressed={entTx === k} onClick={() => { setEntTx(entTx === k ? '' : k); setEntType('') }} className={`min-h-10 rounded-full px-3.5 py-1.5 text-sm font-semibold ${entTx === k ? 'bg-violet-700 text-white' : 'border-2 border-violet-300 bg-white text-violet-900'}`}>
-                  {entTx === k ? '✓ ' : ''}{l}
-                </button>
-              ))}
             </div>
             {!isGrp && (
               <div className="grid gap-1.5" data-testid="tx-picker">
@@ -1609,48 +1611,152 @@ export default function VisitWorkspace(p: Props) {
           </div>
         </div>
   ) : null
-  const DENT_REGIONS: { k: string; jaw: 'Upar' | 'Neeche'; full: boolean }[] = [
-    { k: 'Upper', jaw: 'Upar', full: true },
-    { k: 'Lower', jaw: 'Neeche', full: true },
-    { k: 'Partial Upper Right', jaw: 'Upar', full: false },
-    { k: 'Partial Upper Left', jaw: 'Upar', full: false },
-    { k: 'Partial Lower Right', jaw: 'Neeche', full: false },
-    { k: 'Partial Lower Left', jaw: 'Neeche', full: false },
-  ]
-  const dentTypesAll = uniqNames(dentalCat.filter((c) => /denture/i.test(c.name) && !/repair|relin|adjust|\(both\)/i.test(c.name) && !c.name.includes(' - ')).map((c) => c.name))
-  const dentReg = DENT_REGIONS.find((x) => x.k === dReg)
-  const dentTypes = dentReg ? dentTypesAll.filter((n) => (dentReg.full ? !/partial/i.test(n) : !/complete/i.test(n))) : []
-  function addDenture(type: string) {
-    if (!dentReg) return
-    const clean = type.replace(/\s*\(upper or lower\)/i, '').trim()
-    const name = clean + ' - ' + dentReg.k
+  // ---------- Denture / Bridge: sada rasta ----------
+  // Denture: [Denture] -> Upper / Lower -> qism -> bill ki line. Bridge: [Bridge] -> chart par daant -> qism -> aik line (fi daant x ginti).
+  const dentTypesAll = uniqNames(dentalCat.filter((c) => /denture/i.test(c.name) && !/repair|relin|adjust|\(both\)|upper\s*(\+|and|&)\s*lower/i.test(c.name) && !c.name.includes(' - ')).map((c) => c.name))
+  const dentShow = (n: string) => n.replace(/\s*\(upper or lower\)/i, '').trim()
+  const DENT_JAW: Record<string, 'Upar' | 'Neeche'> = { Upper: 'Upar', Lower: 'Neeche' }
+  const cleanNew = (v: string, word: 'Denture' | 'Bridge') => {
+    const t = v.replace(/\s+-\s+/g, ' ').replace(/\s+/g, ' ').trim()
+    if (!t) return ''
+    return new RegExp(word, 'i').test(t) ? t : t + ' ' + word
+  }
+  function closeGb() {
+    setGb('')
+    setDReg('')
+    setNw({ open: false, name: '', price: '', ask: [] })
+  }
+  /** type = Price List ka naam (ya naya naam); newPrice sirf nayi qism ke liye */
+  function addDenture(type: string, newPrice?: number) {
+    const jaw = DENT_JAW[dReg]
+    if (!jaw) return
+    const clean = dentShow(type)
+    const name = clean + ' - ' + dReg
     const exact = p.catalog.find((x) => eq(x.name, name))
     const base = p.catalog.find((x) => eq(x.name, type))
-    const cat = exact ?? (base && Number(base.price) > 0 ? base : undefined)
-    setRows((rs) => (rs.some((r) => eq(r.name, name)) ? rs : [...rs, { key: newKey(), name, catalog_id: cat?.id ?? null, teeth: [], price: cat && Number(cat.price) > 0 ? String(cat.price) : '', planned: workPlanned, notes: '', mats: {}, applies: 'jaw', unit: null, manual: true, jaw: dentReg.jaw, group: false }]))
-    setDReg('')
+    const cat = exact && Number(exact.price) > 0 ? exact : base ?? exact
+    const price = cat && Number(cat.price) > 0 ? String(cat.price) : newPrice && newPrice > 0 ? String(newPrice) : ''
+    setRows((rs) => (rs.some((r) => eq(r.name, name)) ? rs : [...rs, { key: newKey(), name, catalog_id: cat?.id ?? null, teeth: [], price, planned: workPlanned, notes: '', mats: {}, applies: 'jaw', unit: null, manual: true, jaw, group: false, isNew: !cat, base: cat ? undefined : clean }]))
+    closeGb()
   }
-  const blk_cd = !homeo && canEdit && dentTypesAll.length > 0 ? (
-    <div className="grid gap-2 rounded-2xl border-2 border-violet-300 bg-white p-3" data-testid="complete-denture-row">
-      <p className="text-sm font-semibold text-clinic-ink">Denture lagani hai? Daant chunne ki zarurat nahi. Pehle hissa chunein:</p>
-      <div className="flex flex-wrap items-center gap-1.5 text-xs">
-        {DENT_REGIONS.map((r) => (
-          <button key={r.k} type="button" data-testid="dent-region" aria-pressed={dReg === r.k} onClick={() => setDReg(dReg === r.k ? '' : r.k)} className={'min-h-10 rounded-full border px-3 py-1.5 font-semibold ' + (dReg === r.k ? 'border-violet-600 bg-violet-600 text-white' : 'border-violet-300 bg-white text-violet-900')}>
-            {r.k}
+  function addBridge(type: string, newUnit?: number) {
+    if (selTeeth.length < 2) return
+    addGroupWork(type, selTeeth, 'each', newUnit)
+    pickTeeth([])
+    closeGb()
+  }
+  /** "+ Nayi qism" ka button: pehle dekho list mein wahi ya milta julta naam to nahi */
+  function submitNew(force = false) {
+    const word = gb === 'bridge' ? 'Bridge' : 'Denture'
+    const list = gb === 'bridge' ? bridgeNames : dentTypesAll
+    const name = cleanNew(nw.name, word)
+    if (!name) return
+    const same = list.find((n) => eq(dentShow(n), name) || eq(n, name))
+    if (same) return gb === 'bridge' ? addBridge(same) : addDenture(same)
+    if (!force) {
+      const sims = similarNames(name, list)
+      if (sims.length) return setNw({ ...nw, ask: sims })
+    }
+    const pr = Number(nw.price) || 0
+    if (gb === 'bridge') addBridge(name, pr)
+    else addDenture(name, pr)
+  }
+  const gbBtn = (on: boolean) => 'min-h-11 rounded-full border-2 px-5 py-2 text-sm font-semibold ' + (on ? 'border-violet-600 bg-violet-600 text-white' : 'border-violet-300 bg-white text-violet-900')
+  const typeBtn = 'min-h-10 rounded-full border border-clinic-teal/40 bg-clinic-mint/40 px-3 py-1.5 text-xs font-semibold text-clinic-teal disabled:opacity-40'
+  const planToggle = (
+    <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Aaj ya plan">
+      <button type="button" data-testid="gb-today" aria-pressed={!workPlanned} onClick={() => setWorkPlanned(false)} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${!workPlanned ? 'bg-emerald-600 text-white' : 'border border-clinic-ink/20 bg-white text-clinic-ink/60'}`}>Aaj karna hai</button>
+      <button type="button" data-testid="gb-plan" aria-pressed={workPlanned} onClick={() => setWorkPlanned(true)} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${workPlanned ? 'bg-amber-500 text-white' : 'border border-clinic-ink/20 bg-white text-clinic-ink/60'}`}>Sirf plan</button>
+    </div>
+  )
+  const newTypeBox = (unitLabel: string, blocked: boolean) => (
+    <div className="grid gap-2 rounded-xl border border-dashed border-teal-300 bg-teal-50/60 p-2.5" data-testid="gb-new-box">
+      <div className="flex flex-wrap items-center gap-2">
+        <input data-testid="gb-new-name" value={nw.name} onChange={(e) => setNw({ ...nw, name: e.target.value, ask: [] })} placeholder="Nayi qism ka naam" aria-label="Nayi qism ka naam" maxLength={60} className="min-w-0 flex-1 basis-40 rounded-lg border border-clinic-teal/25 bg-white px-3 py-2 text-sm" />
+        {p.perms.bill && <input data-testid="gb-new-price" type="number" min={0} value={nw.price} onChange={(e) => setNw({ ...nw, price: e.target.value })} placeholder={unitLabel} aria-label={unitLabel} className="w-36 rounded-lg border border-clinic-teal/25 bg-white px-3 py-2 text-sm" />}
+        <button type="button" data-testid="gb-new-add" disabled={!nw.name.trim() || blocked} onClick={() => submitNew(false)} className="min-h-10 rounded-full bg-clinic-teal px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">Bill mein daalein</button>
+      </div>
+      {nw.ask.length > 0 && (
+        <div className="grid gap-1.5 rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900" data-testid="gb-sim">
+          <p>List mein ye pehle se hai. Kya aap ka matlab yehi hai?</p>
+          <div className="flex flex-wrap gap-1.5">
+            {nw.ask.map((n) => (
+              <button key={n} type="button" data-testid="gb-sim-yes" onClick={() => (gb === 'bridge' ? addBridge(n) : addDenture(n))} className="min-h-9 rounded-full bg-clinic-teal px-3 py-1 font-semibold text-white">Haan: {dentShow(n)}</button>
+            ))}
+            <button type="button" data-testid="gb-sim-no" onClick={() => submitNew(true)} className="min-h-9 rounded-full border border-amber-400 bg-white px-3 py-1 font-semibold text-amber-900">Nahi, ye nayi qism hai</button>
+          </div>
+        </div>
+      )}
+      {nw.name.trim() && <p className="text-[11px] font-semibold text-clinic-ink/70" data-testid="gb-new-final">Naam banega: {cleanNew(nw.name, gb === 'bridge' ? 'Bridge' : 'Denture')}</p>}
+      <p className="text-[11px] text-clinic-ink/60">{p.perms.owner ? 'Visit khatam hone par ye qism qeemat ke sath Price List mein khud save ho jayegi.' : 'Bill mein aa jayegi. Price List mein save sirf owner ke login se hoti hai.'}</p>
+    </div>
+  )
+  const newBtn = (
+    <button type="button" data-testid="gb-new" aria-pressed={nw.open} onClick={() => setNw({ ...nw, open: !nw.open, ask: [] })} className="min-h-10 rounded-full border border-dashed border-teal-400 bg-teal-50 px-3 py-1.5 text-xs font-semibold text-teal-800">+ Nayi qism</button>
+  )
+  /** Chart ke andar (daant chunne par): bridge ki qismein */
+  const bridgePanel = canEdit ? (
+    <div className="grid gap-2 rounded-2xl border-2 border-violet-300 bg-white p-3" data-testid="bridge-panel">
+      <p className="text-sm font-semibold text-clinic-ink" data-testid="gb-count">
+        {selTeeth.length} daant chune{selTeeth.length ? ': ' + selTeeth.join(', ') : ''}
+      </p>
+      {selTeeth.length < 2 ? (
+        <p className="text-xs text-clinic-ink/70">Bridge ke liye kam az kam 2 daant dabayein.</p>
+      ) : (
+        <p className="text-xs text-clinic-ink/70">Ab bridge ki qism chunein. Qeemat = fi daant qeemat × {selTeeth.length}.</p>
+      )}
+      <div className="flex flex-wrap items-center gap-1.5">
+        {bridgeNames.map((n) => (
+          <button key={n} type="button" data-testid="gb-type" disabled={selTeeth.length < 2} onClick={() => addBridge(n)} className={typeBtn}>
+            {n}
+            {p.perms.bill && catPrice(n) > 0 && selTeeth.length >= 2 ? ` · Rs. ${numFmt(catPrice(n) * selTeeth.length)}` : ''}
           </button>
         ))}
+        {newBtn}
       </div>
-      {dentReg && (
-        <div className="grid gap-1.5" data-testid="dent-types">
-          <p className="text-xs text-clinic-ink/70">Ab {dentReg.k} ki qism chunein:</p>
-          <div className="flex flex-wrap items-center gap-1.5 text-xs">
-            {dentTypes.map((n) => (
-              <button key={n} type="button" data-testid="dent-type" onClick={() => addDenture(n)} className="min-h-10 rounded-full border border-clinic-teal/40 bg-clinic-mint/40 px-3 py-1.5 font-semibold text-clinic-teal">
-                + {n.replace(/\s*\(upper or lower\)/i, '')}
+      {nw.open && newTypeBox('Fi daant qeemat Rs.', selTeeth.length < 2)}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        {planToggle}
+        <button type="button" data-testid="gb-cancel" onClick={() => { pickTeeth([]); closeGb() }} className="text-xs text-clinic-ink/60 underline">Bridge nahi lagana</button>
+      </div>
+    </div>
+  ) : null
+  const blk_cd = !homeo && canEdit ? (
+    <div className="grid gap-2.5 rounded-2xl border-2 border-violet-300 bg-white p-3" data-testid="gb-box">
+      <p className="text-sm font-semibold text-clinic-ink">Denture ya Bridge lagana hai?</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" data-testid="gb-denture" aria-pressed={gb === 'denture'} onClick={() => (gb === 'denture' ? closeGb() : (closeGb(), setGb('denture')))} className={gbBtn(gb === 'denture')}>Denture</button>
+        <button type="button" data-testid="gb-bridge" aria-pressed={gb === 'bridge'} onClick={() => (gb === 'bridge' ? closeGb() : (closeGb(), setGb('bridge')))} className={gbBtn(gb === 'bridge')}>Bridge</button>
+      </div>
+      {gb === 'denture' && (
+        <div className="grid gap-2" data-testid="gb-denture-steps">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-clinic-ink/70">Upar ki ya neeche ki?</span>
+            {(['Upper', 'Lower'] as const).map((j) => (
+              <button key={j} type="button" data-testid="gb-jaw" aria-pressed={dReg === j} onClick={() => { setDReg(j); setNw({ open: false, name: '', price: '', ask: [] }) }} className={'min-h-10 rounded-full border px-4 py-1.5 text-sm font-semibold ' + (dReg === j ? 'border-violet-600 bg-violet-600 text-white' : 'border-violet-300 bg-white text-violet-900')}>
+                {j}
               </button>
             ))}
           </div>
+          {DENT_JAW[dReg] && (
+            <div className="grid gap-2" data-testid="gb-types">
+              <p className="text-xs text-clinic-ink/70">{dReg} denture ki qism chunein:</p>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {dentTypesAll.map((n) => (
+                  <button key={n} type="button" data-testid="gb-type" onClick={() => addDenture(n)} className={typeBtn}>{dentShow(n)}</button>
+                ))}
+                {newBtn}
+              </div>
+              {nw.open && newTypeBox('Qeemat Rs.', false)}
+              {planToggle}
+            </div>
+          )}
         </div>
+      )}
+      {gb === 'bridge' && (
+        <p className="rounded-xl bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-900" data-testid="gb-hint">
+          ↓ Neeche chart par wo daant dabayein jin par bridge lagega. {selTeeth.length > 0 ? `${selTeeth.length} daant chune; ab chart ke sath wale dabbe mein qism chunein.` : ''}
+        </p>
       )}
     </div>
   ) : null
@@ -1680,8 +1786,7 @@ export default function VisitWorkspace(p: Props) {
         })}
         {rows.filter((r) => r.applies === 'jaw' && /denture/i.test(r.name)).map((r) => (
           <div key={r.key} data-testid="denture-card" className="grid content-start gap-2 rounded-2xl border-2 border-violet-300 bg-white p-3 sm:col-span-2">
-            <p className="font-display text-base font-semibold text-clinic-ink">{r.name}</p>
-            {rowCard(r)}
+            {miniRow(r)}
           </div>
         ))}
         {cardTeeth.map((t) => {
@@ -2271,7 +2376,7 @@ export default function VisitWorkspace(p: Props) {
                     ))}
                   </optgroup>
                 </select>
-                {liveAll.length === 0 && <p className="mt-1 text-[11px] text-clinic-ink/60">Is mareez ka abhi koi chalu ya plan wala treatment nahi, is liye sirf checkup. Kisi kaam ke liye bulana ho to pehle &quot;Daant aur kaam&quot; mein us kaam ko us kaam ko &quot;Plan (aage ke liye)&quot; ke taur par joreinquot;Sirf plan (baad mein)&quot; chunein.</p>}
+                {liveAll.length === 0 && <p className="mt-1 text-[11px] text-clinic-ink/60" data-testid="next-hint">Abhi koi chalu ya plan wala kaam nahi, is liye sirf checkup. Kisi kaam ke liye bulana ho to Qadam 2 mein us kaam ko &quot;Sirf plan&quot; ke sath daalein.</p>}
               </div>
             </fieldset>
             {!homeo || true ? (

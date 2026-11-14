@@ -168,3 +168,16 @@ Homeopathic dawaiyon ki list (aap ki taraf se). Asli Supabase/login/phone/WhatsA
 - Naya SQL: koi nahi (settings purani jagah site_settings / print_layout mein).
 - Tests (sirf local test DB): duo1 81/81, duo3 18/18 (lamba / aik safha), PDF laptop + 390px dekha, qr1 6/6, del1 24/24, tp1 42/42, tp3 9/9, tp5 39/39, unit 33/33. Asli Supabase / phone / asli printer par NOT VERIFIED.
 - Had: bill ke page se "aik sath" mein sirf wahi aik invoice aata hai; prescription ke page se us visit ke sab invoice mil kar aate hain. Bill ke purane templates ka apna QR (hisaab wala) nahi chhera.
+
+## 14 Nov — Denture / Bridge ka sada rasta
+
+- Purana dabba (6 hisse aur har hisse par saari qismein) hata diya.
+- Ab: "Denture ya Bridge lagana hai?" sirf 2 button.
+  - Denture: Upper / Lower, phir qismein (Price List se), qism dabayi to bill ki line. Daant chunne ki zarurat nahi.
+  - Bridge: chart par daant dabayein, phir qism; EK line, qeemat = fi daant qeemat x daanton ki ginti.
+  - "+ Nayi qism": naam aur qeemat; visit khatam hone par Price List mein khud save (sirf owner ke login se). Milta julta naam ho to pehle poochta hai. Naam mein "Denture" / "Bridge" na ho to khud jor deta hai.
+- Daant wale purane panel se "Bridge" ka button hata diya (ab aik hi rasta).
+- Qadam 4 ki ghalat likhai ("joreinquot;") theek.
+- Naya SQL: koi nahi.
+- Tests (sirf local test DB): gb1 42/42, tp1 42/42, tp2 38/38, tp3 9/9, tp4 18/18, tp5 39/39, fu1 58/58, fu2 13/13, fu3 7/7, fu4 10/10, sc1 45/45, duo1 81/81, del1 24/24, qr1 6/6, unit 33/33. Asli Supabase / phone par NOT VERIFIED.
+- Abhi baqi (PNG diya ja chuka, banana baqi): qadam 2 ke 5 bare button aur chart sirf zarurat par, qadam 1 sada, qadam 4 ki tarteeb, lab ki yaad-dahani.
