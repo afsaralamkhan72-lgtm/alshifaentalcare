@@ -195,3 +195,13 @@ Homeopathic dawaiyon ki list (aap ki taraf se). Asli Supabase/login/phone/WhatsA
 - Homeopathic visit ka rasta waisa hi.
 - Naya SQL: koi nahi.
 - Tests (sirf local test DB): st2 43/43, gb1 42/42, tp1 42/42, tp2 38/38, tp3 9/9, tp4 18/18, tp5 39/39, fu1 58/58, fu2 13/13, fu3 7/7, fu4 10/10, sc1 45/45, duo1 81/81, del1 24/24, qr1 6/6, homeo visit (n9) mukammal, unit 33/33, security (sec1/sec2) pehle jaisa. Asli Supabase / phone par NOT VERIFIED.
+
+
+## 14 NOV C (Aaj ki visit, khulasa, search, partial denture daant)
+- Profile par **"Aaj ki visit"** dabba: us din ke sab kaam ek jadwal mein (Bill / Mila / Baqaya / Kul), ek combined Invoice, ek WhatsApp (har kaam ka detail + baqaya). 14 din tak dikhta hai, aur sirf jab 2 ya zyada kaam hon (ya khulasa likha ho).
+- **"Aaj kya kya hua?"** khulasa box (Kaam wale qadam mein): visit ki purani `notes` jagah mein save hota hai, **SQL nahi chahiye**. Dabbe, WhatsApp aur visit print mein aata hai.
+- Naya WhatsApp template `day_summary` (Settings ke templates mein badla ja sakta hai).
+- Kaam ki **search**: "root canal / nerve / rct", "nikalna", "bharai", "safai" jaise doosre naam (lib/aliases.ts). Qeemat ya naam nahi badalte.
+- **Aik daant par kai kaam** (RCT + Post): har kaam par dabayein, "Is daant par: ..." mein dikhte hain, hata bhi sakte hain.
+- **Partial / Cast / Flexible denture**: qism ke baad "kaunse daant?" (chart ya side popup nahi). Qeemat poori ek hi. "Daant nahi batane" ka button bhi hai. Complete denture mein daant nahi poochte.
+- SQL: **koi nahi** is batch mein.

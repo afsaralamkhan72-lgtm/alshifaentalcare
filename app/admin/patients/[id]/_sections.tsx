@@ -6,7 +6,8 @@ import type { Plan as PayPlan, PlanItem } from '@/components/admin/PaymentPlan'
 import TreatmentCards, { type Stage, type LabLite } from '@/components/admin/TreatmentCards'
 import { money, fmtDate, numFmt, todayKarachi } from '@/lib/karachi'
 import { messageLink } from '@/lib/messages'
-import { mapTemplates } from '@/lib/messageTemplates'
+import { mapTemplates, type Tpl } from '@/lib/messageTemplates'
+import DayVisitCard, { type DayVisit } from '@/components/admin/DayVisitCard'
 
 type Sb = Awaited<ReturnType<typeof createClient>>
 const num = (v: unknown) => Number(v ?? 0)
@@ -233,6 +234,77 @@ export async function HistorySection({ patient, history, canClinical, canMoney, 
 }
 
 
+/** Akhri (14 din ke andar) visit wale din ke sab kaam ek jagah: bill, mila, baqaya, khulasa, WhatsApp */
+async function loadDayVisit(supabase: Sb, patient: { id: string; full_name: string; phone: string | null; gender?: string | null }, tpl: Tpl): Promise<DayVisit | null> {
+  const { data: vs } = await supabase
+    .from('clinical_visits')
+    .select('id, visit_date, notes, next_date, next_time, next_treatment_id, created_at')
+    .eq('patient_id', patient.id)
+    .eq('status', 'finished')
+    .order('visit_date', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(12)
+  const visits = (vs ?? []) as { id: string; visit_date: string; notes: string | null; next_date: string | null; next_time: string | null; next_treatment_id: string | null }[]
+  if (!visits.length) return null
+  const date = visits[0].visit_date
+  const today = todayKarachi()
+  if ((new Date(today).getTime() - new Date(date).getTime()) / 86400000 > 14) return null
+  const day = visits.filter((v) => v.visit_date === date)
+  const ids = day.map((v) => v.id)
+  const { data: iv } = await supabase
+    .from('invoices')
+    .select('id, clinical_visit_id, patient_treatment_id, total, balance, invoice_items(name, tooth)')
+    .in('clinical_visit_id', ids)
+    .neq('status', 'void')
+    .order('created_at')
+  const invs = (iv ?? []) as unknown as { id: string; clinical_visit_id: string; patient_treatment_id: string | null; total: number; balance: number; invoice_items: { name: string; tooth: string | null }[] }[]
+  const notes = day.map((v) => (v.notes ?? '').trim()).filter(Boolean)
+  if (invs.length < 2 && !(invs.length === 1 && notes.length)) return null
+  const tids = [...new Set([...invs.map((i) => i.patient_treatment_id), ...day.map((v) => v.next_treatment_id)].filter(Boolean))] as string[]
+  const [tRes, pRes, bRes] = await Promise.all([
+    tids.length ? supabase.from('patient_treatments').select('id, name, teeth').in('id', tids) : Promise.resolve({ data: [] }),
+    supabase.from('payments').select('invoice_id, amount').eq('patient_id', patient.id).eq('paid_on', date).in('invoice_id', invs.map((i) => i.id)),
+    supabase.from('patient_balances').select('balance').eq('patient_id', patient.id).maybeSingle(),
+  ])
+  const tname = new Map(((tRes.data ?? []) as { id: string; name: string; teeth: string[] | null }[]).map((t) => [t.id, t.name + (t.teeth?.length ? ' (' + t.teeth.join(', ') + ')' : '')]))
+  const paidBy = new Map<string, number>()
+  for (const x of (pRes.data ?? []) as { invoice_id: string; amount: number }[]) paidBy.set(x.invoice_id, (paidBy.get(x.invoice_id) ?? 0) + num(x.amount))
+  const rows = invs.map((i) => ({
+    id: i.id,
+    label: (i.patient_treatment_id && tname.get(i.patient_treatment_id)) || (i.invoice_items ?? []).map((it) => it.name + (it.tooth ? ' (' + it.tooth + ')' : '')).join(', ') || 'Kaam',
+    total: num(i.total),
+    paidToday: paidBy.get(i.id) ?? 0,
+    balance: Math.max(0, num(i.balance)),
+  }))
+  const total = rows.reduce((s, r) => s + r.total, 0)
+  const paidToday = rows.reduce((s, r) => s + r.paidToday, 0)
+  const balance = rows.reduce((s, r) => s + r.balance, 0)
+  const patientBalance = bRes.data ? num((bRes.data as Record<string, unknown>).balance) : null
+  const mainVisit = [...day].sort((a, b) => invs.filter((i) => i.clinical_visit_id === b.id).length - invs.filter((i) => i.clinical_visit_id === a.id).length)[0]
+  const nxt = day.find((v) => v.next_date) ?? null
+  const summary = notes.join('\n')
+  const due = rows.filter((r) => r.balance > 0)
+  const waHref = patient.phone
+    ? messageLink(
+        'day_summary',
+        { full_name: patient.full_name, phone: patient.phone, gender: patient.gender ?? null },
+        {
+          summary,
+          work_lines: rows.map((r) => '• ' + r.label + ' — Rs. ' + numFmt(r.total)).join('\n'),
+          day_total: numFmt(total),
+          today_paid: numFmt(paidToday),
+          balance: numFmt(Math.max(0, patientBalance ?? balance)),
+          due_block: due.length ? 'ہر کام کا بقایا:\n' + due.map((r) => '• ' + r.label + ' — Rs. ' + numFmt(r.balance)).join('\n') : '',
+          next_date: nxt?.next_date ? fmtDate(nxt.next_date) : '',
+          next_time: nxt?.next_date ? nxt.next_time ?? '' : '',
+          next_work: nxt?.next_treatment_id ? tname.get(nxt.next_treatment_id) ?? '' : '',
+        },
+        tpl,
+      )
+    : null
+  return { dateLabel: fmtDate(date), isToday: date === today, visitId: mainVisit.id, count: rows.length, rows, total, paidToday, balance, patientBalance, summary, waHref, nextDate: nxt?.next_date ?? null }
+}
+
 /** Profile par: har ilaaj ka chhota card (click se us ilaaj ka apna page) + muaine ka card */
 export async function TreatmentMiniCards({ patient, canMoney, canClinical, canRx }: { patient: { id: string; full_name: string; phone: string | null; gender?: string | null }; canMoney: boolean; canClinical: boolean; canRx: boolean }) {
   const patientId = patient.id
@@ -248,12 +320,14 @@ export async function TreatmentMiniCards({ patient, canMoney, canClinical, canRx
   const visitCount = cvRes.count ?? 0
   if (list.length === 0 && planned.length === 0 && visitCount === 0) return null
   const tpl = mapTemplates(tplRes.data as { key: string; body: string }[] | null)
+  const dayVisit = canMoney && canClinical ? await loadDayVisit(supabase, patient, tpl) : null
   const chip: Record<string, string> = { planned: 'sirf plan', active: 'chal rahi', completed: 'mukammal', cancelled: 'cancel' }
   const tone: Record<string, string> = { planned: 'bg-amber-100 text-amber-800', active: 'bg-sky-100 text-sky-800', completed: 'bg-emerald-100 text-emerald-800', cancelled: 'bg-gray-100 text-gray-600' }
   return (
     <section className="rounded-2xl border border-clinic-teal/10 bg-white p-4 sm:p-5" data-testid="mini-cards">
       <h2 className="font-display text-lg font-semibold text-clinic-ink">Ilaaj</h2>
       <p className="mb-3 text-xs text-clinic-ink/55">Kisi ilaaj par dabayein: us ki visits, qadam, paise, invoice, prescription aur lab ek jagah.</p>
+      {dayVisit && <DayVisitCard d={dayVisit} />}
       <div className="grid gap-2 sm:grid-cols-2">
         {[...list, ...planned].map((t) => (
           <div key={t.id} data-testid="mini-card-box" className="grid gap-2 rounded-xl border border-clinic-teal/15 px-3 py-2">

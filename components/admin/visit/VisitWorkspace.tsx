@@ -15,6 +15,7 @@ import { useTemplates } from '@/lib/useTemplates'
 import { messageLink } from '@/lib/messages'
 import { stagesFor, LAB_WORK_RE } from '@/lib/treatmentStages'
 import { similarNames } from '@/lib/similar'
+import { matchesWork } from '@/lib/aliases'
 import PaymentDialog from '@/components/admin/PaymentDialog'
 import VisitRewards from '@/components/admin/VisitRewards'
 
@@ -110,6 +111,15 @@ interface TRow {
   base?: string
 }
 type Applies = 'tooth' | 'mouth' | 'jaw' | 'once'
+/** Denture ke daant doctor ki zubaan mein: "Lower Right 5, 6, 7 | Lower Left 1, 2" */
+const dentTeethText = (teeth: string[]) => {
+  const names: Record<string, string> = { '1': 'Upper Right', '2': 'Upper Left', '3': 'Lower Left', '4': 'Lower Right' }
+  return ['1', '2', '4', '3']
+    .map((q) => ({ q, n: teeth.filter((t) => t[0] === q).map((t) => t[1]) }))
+    .filter((g) => g.n.length)
+    .map((g) => names[g.q] + ' ' + g.n.join(', '))
+    .join(' | ')
+}
 const APPLIES_LABEL: Record<Applies, string> = { tooth: 'Har daant ki', mouth: 'Poora muh', jaw: 'Jabda', once: 'Aik dafa' }
 const autoPrice = (r: { applies: Applies; unit: number | null; manual: boolean; price: string }, teeth: string[]) =>
   r.applies === 'tooth' && r.unit != null && !r.manual ? String(r.unit * Math.max(1, teeth.length)) : r.price
@@ -327,6 +337,7 @@ export default function VisitWorkspace(p: Props) {
   const [cItems, setCItems] = useState<string[]>(v?.complaint?.items ?? [])
   const [cOther, setCOther] = useState(v?.complaint?.other ?? '')
   const [cDur, setCDur] = useState(v?.complaint?.duration ?? '')
+  const [dayNote, setDayNote] = useState(v?.notes ?? '')
   const [cSev, setCSev] = useState(v?.complaint?.severity ?? '')
   const [cLoc, setCLoc] = useState(v?.complaint?.location ?? '')
   const [findings, setFindings] = useState<Record<string, string>>(v?.findings ?? {})
@@ -353,6 +364,9 @@ export default function VisitWorkspace(p: Props) {
   /** Do ya zyada ilaaj hon to doctor khud batata hai kis ke kitne mile */
   const [split, setSplit] = useState<Record<string, string>>({})
   const [dReg, setDReg] = useState('')
+  // Partial / Cast / Flexible denture: qism chunne ke baad kaunse daant
+  const [dPick, setDPick] = useState<{ type: string; price?: number } | null>(null)
+  const [dTeeth, setDTeeth] = useState<string[]>([])
   /** Denture / Bridge wala sada dabba: kaunsa khula hai */
   /** Qadam 1 (dental): pehle sirf chand takleef, baqi "Aur" mein; tafseel band rehti hai jab tak zarurat na ho */
   const [ccAll, setCcAll] = useState(false)
@@ -484,6 +498,7 @@ export default function VisitWorkspace(p: Props) {
     complaint: { items: cItems, other: cOther, duration: cDur, severity: cSev, location: cLoc },
     findings,
     diagnoses: diags.filter((d) => d.text.trim()),
+    notes: dayNote,
     next_date: nextDate || '',
     next_time: nextDate ? nextTime : '',
     next_treatment_id: nextDate && !nextT.startsWith('cat:') && !nextT.startsWith('row:') ? nextT : '',
@@ -540,6 +555,8 @@ export default function VisitWorkspace(p: Props) {
   // ---- Chart ke panel se: is daant ka masla (diagnosis) aur kaam (treatment) ----
   const [workPlanned, setWorkPlanned] = useState(false)
   const [entTx, setEntTx] = useState('')
+  // Aik daant par kai kaam (RCT + Post): pehla entTx mein, baqi yahan
+  const [entMore, setEntMore] = useState<string[]>([])
   const [entDx, setEntDx] = useState('')
   const [entType, setEntType] = useState('')
   const [entMode, setEntMode] = useState<'each' | 'whole'>('each')
@@ -806,7 +823,7 @@ export default function VisitWorkspace(p: Props) {
       ...rows.map((r) => ({
         name: r.name.trim(),
         catalog_id: r.catalog_id,
-        teeth: r.applies === 'tooth' ? r.teeth : [],
+        teeth: r.applies === 'tooth' || (r.applies === 'jaw' && /denture/i.test(r.name)) ? r.teeth : [],
         price: p.perms.bill ? Number(r.price) || 0 : 0,
         planned: r.planned,
         notes: [r.applies === 'jaw' && r.jaw ? `Jabda: ${r.jaw}` : '', r.notes].filter(Boolean).join(' — '),
@@ -1455,12 +1472,31 @@ export default function VisitWorkspace(p: Props) {
     { k: 'Extraction', re: /extract|impact|surgical/i },
   ]
   const pickList = singleNames.filter((n) => {
-    if (pickQ.trim() && !n.toLowerCase().includes(pickQ.trim().toLowerCase())) return false
+    if (pickQ.trim() && !matchesWork(n, pickQ)) return false
     if (!pickGrp) return true
     if (pickGrp === 'Baqi') return !PICK_GROUPS.some((g) => g.re.test(n))
     return PICK_GROUPS.find((g) => g.k === pickGrp)?.re.test(n) ?? true
   })
   const isGrp = entTx === 'GRP:bridge' || entTx === 'GRP:denture'
+  const pickedWorks = isGrp ? [] : [entTx, ...entMore].filter((w) => w.trim())
+  function toggleWork(n: string, quick: boolean) {
+    const isR = /root canal/i.test(n)
+    if (n === entTx) {
+      setEntTx(entMore[0] ?? '')
+      setEntMore(entMore.slice(1))
+      return
+    }
+    if (entMore.includes(n)) return setEntMore(entMore.filter((x) => x !== n))
+    if (!entTx || isGrp) {
+      setEntMore([])
+      setEntTx(n)
+      setEntType('')
+      setRctAuto(quick && isR)
+      return
+    }
+    setEntMore([...entMore, n])
+    if (quick && isR) setRctAuto(true)
+  }
   const isComplete = entTx === 'GRP:denture' && entDKind === 'complete'
   const grpNames = entTx === 'GRP:bridge' ? bridgeNames : entDKind === 'complete' ? completeNames : partialNames
   const catPrice = (n: string) => Number(p.catalog.find((x) => eq(x.name, n))?.price) || 0
@@ -1469,6 +1505,7 @@ export default function VisitWorkspace(p: Props) {
     setPickGrp('')
     setRctAuto(false)
     setEntTx('')
+    setEntMore([])
     setEntDx('')
     setEntType('')
     setEntMode('each')
@@ -1488,9 +1525,10 @@ export default function VisitWorkspace(p: Props) {
       resetEntry()
       return
     }
-    if (!entTx.trim() && !entDx.trim()) return
+    const works = [entTx, ...entMore].filter((w) => w.trim())
+    if (!works.length && !entDx.trim()) return
     for (const t of selTeeth) {
-      if (entTx.trim()) addTxTooth(rctAuto && /root canal/i.test(entTx) ? rctFor(t) ?? entTx : entTx, t, workPlanned)
+      for (const w of works) addTxTooth(rctAuto && /root canal/i.test(w) && quickNames.includes(w) ? rctFor(t) ?? w : w, t, workPlanned)
       if (entDx.trim()) addDxTooth(entDx, t)
     }
     resetEntry()
@@ -1503,7 +1541,7 @@ export default function VisitWorkspace(p: Props) {
     if (u <= 0) return 0
     return entMode === 'each' ? u * selTeeth.length : u
   })()
-  const singlePreview = !isGrp && entTx ? catPrice(entTx) * selTeeth.length : null
+  const singlePreview = !isGrp && entTx ? [entTx, ...entMore].reduce((s, w) => s + catPrice(w), 0) * selTeeth.length : null
   const groupTeethSet = new Set(rows.filter((r) => r.group).flatMap((r) => r.teeth))
   const ccOf = (t: string) => (findings['cc_' + t] ?? '').split(',').map((x) => x.trim()).filter(Boolean)
   const cardTeeth = [...new Set([...diags.flatMap((d) => d.teeth ?? []), ...rows.filter((r) => r.applies === 'tooth' && !r.group).flatMap((r) => r.teeth), ...Object.keys(findings).filter((k) => k.startsWith('cc_') && ccOf(k.slice(3)).length).map((k) => k.slice(3))])].filter((t) => !groupTeethSet.has(t)).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
@@ -1555,11 +1593,11 @@ export default function VisitWorkspace(p: Props) {
             <input id="entry-dx" data-testid="entry-dx" list="diag-list" value={entDx} onChange={(e) => setEntDx(e.target.value)} placeholder="Masla (zaroori nahi)" className="rounded-lg border border-clinic-teal/25 bg-white px-3 py-2 text-sm" />
           </div>
           <div className="grid gap-1.5">
-            <p className="text-xs font-bold text-clinic-ink">Kaam (Treatment)</p>
+            <p className="text-xs font-bold text-clinic-ink">Kaam (Treatment) <span className="font-normal text-clinic-ink/55">· aik se zyada bhi chun sakte hain</span></p>
             <div className="flex flex-wrap gap-1.5" role="group" aria-label="Kaam">
               {quickNames.map((n) => (
-                <button key={n} type="button" data-testid="quick-tx" aria-pressed={entTx === n} onClick={() => { const isR = /root canal/i.test(n); setRctAuto(isR && entTx !== n); setEntTx(entTx === n ? '' : n); setEntType('') }} className={`min-h-10 rounded-full px-3.5 py-1.5 text-sm font-semibold ${entTx === n ? 'bg-clinic-teal text-white' : 'border border-clinic-teal/40 bg-white text-clinic-teal'}`}>
-                  {entTx === n ? '✓ ' : ''}{/root canal/i.test(n) ? 'Root Canal (daant ke hisab se)' : n}
+                <button key={n} type="button" data-testid="quick-tx" aria-pressed={entTx === n || entMore.includes(n)} onClick={() => toggleWork(n, true)} className={`min-h-10 rounded-full px-3.5 py-1.5 text-sm font-semibold ${entTx === n ? 'bg-clinic-teal text-white' : 'border border-clinic-teal/40 bg-white text-clinic-teal'}`}>
+                  {entTx === n || entMore.includes(n) ? '✓ ' : ''}{/root canal/i.test(n) ? 'Root Canal (daant ke hisab se)' : n}
                 </button>
               ))}
             </div>
@@ -1576,12 +1614,22 @@ export default function VisitWorkspace(p: Props) {
                 {(pickQ.trim() || pickGrp) && (
                   <div className="flex max-h-40 flex-wrap gap-1.5 overflow-y-auto" data-testid="pick-results">
                     {pickList.slice(0, 30).map((n) => (
-                      <button key={n} type="button" data-testid="pick-item" aria-pressed={entTx === n} onClick={() => { setRctAuto(false); setEntTx(entTx === n ? '' : n) }} className={'min-h-9 rounded-full px-3 py-1 text-xs font-semibold ' + (entTx === n ? 'bg-clinic-teal text-white' : 'border border-clinic-teal/40 bg-white text-clinic-teal')}>
-                        {entTx === n ? '✓ ' : ''}
+                      <button key={n} type="button" data-testid="pick-item" aria-pressed={entTx === n || entMore.includes(n)} onClick={() => toggleWork(n, false)} className={'min-h-9 rounded-full px-3 py-1 text-xs font-semibold ' + (entTx === n ? 'bg-clinic-teal text-white' : 'border border-clinic-teal/40 bg-white text-clinic-teal')}>
+                        {entTx === n || entMore.includes(n) ? '✓ ' : ''}
                         {n}
                       </button>
                     ))}
-                    {pickList.length === 0 && <span className="text-xs text-clinic-ink/60">Is naam ka kaam list mein nahi. Neeche "+ Treatment" se naya likh sakte hain, wo list mein save ho jayega.</span>}
+                    {pickList.length === 0 && <span className="text-xs text-clinic-ink/60">Is naam ka kaam list mein nahi. Neeche "+ Treatment" se naya likh sakte hain, wo list mein save ho jayega. Aik daant par kai kaam chun sakte hain (jaise RCT aur Post): har kaam par dabayein.</span>}
+                  </div>
+                )}
+                {pickedWorks.length > 1 && (
+                  <div className="flex flex-wrap items-center gap-1.5 rounded-lg bg-clinic-mint/40 px-2 py-1.5 text-xs" data-testid="picked-works">
+                    <span className="font-semibold text-clinic-ink/70">Is daant par:</span>
+                    {pickedWorks.map((w) => (
+                      <button key={w} type="button" data-testid="picked-work" onClick={() => toggleWork(w, false)} aria-label={w + ' hatao'} className="min-h-8 rounded-full bg-clinic-teal px-3 py-1 font-semibold text-white">
+                        {w} ✕
+                      </button>
+                    ))}
                   </div>
                 )}
                 <select aria-label="Koi aur kaam" data-testid="entry-tx-select" value={quickNames.includes(entTx) ? '' : entTx} onChange={(e) => { setRctAuto(false); setEntTx(e.target.value) }} className="rounded-lg border border-clinic-teal/25 bg-white px-3 py-2 text-sm">
@@ -1652,10 +1700,12 @@ export default function VisitWorkspace(p: Props) {
   function closeGb() {
     setGb('')
     setDReg('')
+    setDPick(null)
+    setDTeeth([])
     setNw({ open: false, name: '', price: '', ask: [] })
   }
   /** type = Price List ka naam (ya naya naam); newPrice sirf nayi qism ke liye */
-  function addDenture(type: string, newPrice?: number) {
+  function addDenture(type: string, newPrice?: number, teeth: string[] = []) {
     const jaw = DENT_JAW[dReg]
     if (!jaw) return
     const clean = dentShow(type)
@@ -1664,8 +1714,15 @@ export default function VisitWorkspace(p: Props) {
     const base = p.catalog.find((x) => eq(x.name, type))
     const cat = exact && Number(exact.price) > 0 ? exact : base ?? exact
     const price = cat && Number(cat.price) > 0 ? String(cat.price) : newPrice && newPrice > 0 ? String(newPrice) : ''
-    setRows((rs) => (rs.some((r) => eq(r.name, name)) ? rs : [...rs, { key: newKey(), name, catalog_id: cat?.id ?? null, teeth: [], price, planned: workPlanned, notes: '', mats: {}, applies: 'jaw', unit: null, manual: true, jaw, group: false, isNew: !cat, base: cat ? undefined : clean }]))
+    setRows((rs) => (rs.some((r) => eq(r.name, name)) ? rs : [...rs, { key: newKey(), name, catalog_id: cat?.id ?? null, teeth, price, planned: workPlanned, notes: '', mats: {}, applies: 'jaw', unit: null, manual: true, jaw, group: false, isNew: !cat, base: cat ? undefined : clean }]))
     closeGb()
+  }
+  /** Complete denture: seedha line. Partial / Cast / Flexible: pehle kaunse daant (qeemat phir bhi poori) */
+  function startDenture(type: string, newPrice?: number) {
+    if (/complete|full/i.test(type)) return addDenture(type, newPrice)
+    setDPick({ type, price: newPrice })
+    setDTeeth([])
+    setNw({ open: false, name: '', price: '', ask: [] })
   }
   function addBridge(type: string, newUnit?: number) {
     if (selTeeth.length < 2) return
@@ -1680,14 +1737,14 @@ export default function VisitWorkspace(p: Props) {
     const name = cleanNew(nw.name, word)
     if (!name) return
     const same = list.find((n) => eq(dentShow(n), name) || eq(n, name))
-    if (same) return gb === 'bridge' ? addBridge(same) : addDenture(same)
+    if (same) return gb === 'bridge' ? addBridge(same) : startDenture(same)
     if (!force) {
       const sims = similarNames(name, list)
       if (sims.length) return setNw({ ...nw, ask: sims })
     }
     const pr = Number(nw.price) || 0
     if (gb === 'bridge') addBridge(name, pr)
-    else addDenture(name, pr)
+    else startDenture(name, pr)
   }
   const gbBtn = (on: boolean) => 'min-h-11 rounded-full border-2 px-5 py-2 text-sm font-semibold ' + (on ? 'border-violet-600 bg-violet-600 text-white' : 'border-violet-300 bg-white text-violet-900')
   const typeBtn = 'min-h-10 rounded-full border border-clinic-teal/40 bg-clinic-mint/40 px-3 py-1.5 text-xs font-semibold text-clinic-teal disabled:opacity-40'
@@ -1784,7 +1841,7 @@ export default function VisitWorkspace(p: Props) {
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-clinic-ink/70">Upar ki ya neeche ki?</span>
             {(['Upper', 'Lower'] as const).map((j) => (
-              <button key={j} type="button" data-testid="gb-jaw" aria-pressed={dReg === j} onClick={() => { setDReg(j); setNw({ open: false, name: '', price: '', ask: [] }) }} className={'min-h-10 rounded-full border px-4 py-1.5 text-sm font-semibold ' + (dReg === j ? 'border-violet-600 bg-violet-600 text-white' : 'border-violet-300 bg-white text-violet-900')}>
+              <button key={j} type="button" data-testid="gb-jaw" aria-pressed={dReg === j} onClick={() => { setDReg(j); setDPick(null); setDTeeth([]); setNw({ open: false, name: '', price: '', ask: [] }) }} className={'min-h-10 rounded-full border px-4 py-1.5 text-sm font-semibold ' + (dReg === j ? 'border-violet-600 bg-violet-600 text-white' : 'border-violet-300 bg-white text-violet-900')}>
                 {j}
               </button>
             ))}
@@ -1794,12 +1851,46 @@ export default function VisitWorkspace(p: Props) {
               <p className="text-xs text-clinic-ink/70">{dReg} denture ki qism chunein:</p>
               <div className="flex flex-wrap items-center gap-1.5">
                 {dentTypesAll.map((n) => (
-                  <button key={n} type="button" data-testid="gb-type" onClick={() => addDenture(n)} className={typeBtn}>{dentShow(n)}</button>
+                  <button key={n} type="button" data-testid="gb-type" onClick={() => startDenture(n)} className={typeBtn}>{dentShow(n)}</button>
                 ))}
                 {newBtn}
               </div>
               {nw.open && newTypeBox('Qeemat Rs.', false)}
               {planToggle}
+              {dPick && (
+                <div className="grid gap-2 rounded-xl border-2 border-violet-300 bg-violet-50/60 p-2.5" data-testid="gb-dteeth">
+                  <p className="text-sm font-semibold text-clinic-ink">
+                    {dentShow(dPick.type)} - {dReg}: kaunse daant?
+                    <span className="block text-xs font-normal text-clinic-ink/65">Qeemat poori ek hi lagegi, daant ginne se nahi badlegi.</span>
+                  </p>
+                  <div className="grid gap-2 sm:grid-cols-[1fr_auto_1fr] sm:items-start" data-testid="gb-dteeth-row">
+                    {(dReg === 'Upper' ? [['18', '17', '16', '15', '14', '13', '12', '11'], ['21', '22', '23', '24', '25', '26', '27', '28']] : [['48', '47', '46', '45', '44', '43', '42', '41'], ['31', '32', '33', '34', '35', '36', '37', '38']]).flatMap((half, hi) => [
+                      hi === 1 ? <div key="mid" aria-hidden className="hidden h-full min-h-10 w-0.5 self-stretch bg-violet-300 sm:block" /> : null,
+                      <div key={hi} className="grid gap-1">
+                        <p className="text-[11px] font-semibold text-clinic-ink/60">{hi === 0 ? 'Right (seedha)' : 'Left (ulta)'}</p>
+                        <div className="grid grid-cols-8 gap-1">
+                          {half.map((t) => (
+                            <button key={t} type="button" data-testid="gb-dtooth" aria-label={'Denture daant ' + t} aria-pressed={dTeeth.includes(t)} onClick={() => setDTeeth((x) => (x.includes(t) ? x.filter((y) => y !== t) : [...x, t]))} className={'min-h-11 rounded-lg border text-base font-semibold ' + (dTeeth.includes(t) ? 'border-violet-700 bg-violet-700 text-white' : 'border-violet-300 bg-white text-violet-900')}>
+                              {t[1]}
+                            </button>
+                          ))}
+                        </div>
+                      </div>,
+                    ])}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button type="button" data-testid="gb-dteeth-add" disabled={dTeeth.length === 0} onClick={() => addDenture(dPick.type, dPick.price, [...dTeeth].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })))} className="min-h-11 rounded-full bg-violet-700 px-5 py-2 text-sm font-semibold text-white disabled:opacity-40">
+                      Denture lagayein{dTeeth.length ? ` (${dTeeth.length} daant)` : ''}
+                    </button>
+                    <button type="button" data-testid="gb-dteeth-skip" onClick={() => addDenture(dPick.type, dPick.price)} className="min-h-10 text-xs font-semibold text-violet-900 underline">
+                      Daant nahi batane
+                    </button>
+                    <button type="button" data-testid="gb-dteeth-back" onClick={() => { setDPick(null); setDTeeth([]) }} className="min-h-10 text-xs text-clinic-ink/60 underline">
+                      Wapas
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1809,6 +1900,23 @@ export default function VisitWorkspace(p: Props) {
           ↓ Neeche chart par wo daant dabayein jin par bridge lagega. {selTeeth.length > 0 ? `${selTeeth.length} daant chune; ab chart ke sath wale dabbe mein qism chunein.` : ''}
         </p>
       )}
+    </div>
+  ) : null
+
+  const blk_note = canEdit ? (
+    <div className="grid gap-1.5 rounded-2xl border border-clinic-teal/25 bg-white p-3 sm:p-4" data-testid="day-note-box">
+      <label htmlFor="day-note" className="font-display text-base font-semibold text-clinic-ink">
+        Aaj kya kya hua? <span className="text-xs font-normal text-clinic-ink/55">(zaroori nahi)</span>
+      </label>
+      <textarea
+        id="day-note"
+        data-testid="day-note"
+        rows={4}
+        value={dayNote}
+        onChange={(e) => setDayNote(e.target.value)}
+        placeholder="Poori visit ek saath likhein ya keyboard ke mic se bol kar likhwayein. Ye marez ke WhatsApp msg mein bhi jayega."
+        className="w-full rounded-lg border border-clinic-teal/25 px-3 py-2 text-sm outline-none focus:border-clinic-teal"
+      />
     </div>
   ) : null
 
@@ -1837,6 +1945,7 @@ export default function VisitWorkspace(p: Props) {
         })}
         {rows.filter((r) => r.applies === 'jaw' && /denture/i.test(r.name)).map((r) => (
           <div key={r.key} data-testid="denture-card" className="grid content-start gap-2 rounded-2xl border-2 border-violet-300 bg-white p-3 sm:col-span-2">
+            {r.teeth.length > 0 && <p className="text-xs text-clinic-ink/70" data-testid="denture-teeth">Daant: {dentTeethText(r.teeth)}</p>}
             {miniRow(r)}
           </div>
         ))}
@@ -2573,6 +2682,7 @@ export default function VisitWorkspace(p: Props) {
             {blk_ongoing}
             {blk_live}
             {blk_cd}
+            {blk_note}
             {!homeo && (!canEdit || gb === 'tooth' || gb === 'bridge') && blk_chart}
             {catDatalist}
             {diagDatalist}
