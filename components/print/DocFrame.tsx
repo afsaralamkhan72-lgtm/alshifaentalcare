@@ -2,31 +2,33 @@ import { getPrintCfg } from '@/lib/printSettings'
 import { fmtDate } from '@/lib/karachi'
 import { CLINIC } from '@/clinic.config'
 import { accentOf } from '@/lib/printLayout'
+import { inkOnWhite } from '@/lib/contrast'
 import SoftHeader from '@/components/print/SoftHeader'
 import { DuoFoot, DuoHead } from '@/components/print/Duo'
+import DocStylePicker from '@/components/print/DocStylePicker'
 
 /**
  * Invoice jaise sab kaghaz ka upar ka hissa: prescription wala hi header (logo, clinic ka naam,
  * doctoron ke naam, pata, phone, timing). Sab kuch Settings > Print layout se badalta hai.
  */
-export async function DocHead({ title, refs, date }: { title: string; refs?: string | null; date?: string | null }) {
+export async function DocHead({ title, refs, date, tpl }: { title: string; refs?: string | null; date?: string | null; tpl?: string }) {
   const cfg = await getPrintCfg()
   const { layout, logo } = cfg
   const acc = accentOf(layout)
-  const duo = cfg.defaults.bill === 'duo'
+  const duo = (tpl === 'duo' || tpl === 'soft' ? tpl : cfg.defaults.bill) === 'duo'
   return (
     <div data-testid="doc-head" data-doc-style={duo ? 'duo' : 'soft'}>
       {duo ? (
         <div style={{ fontSize: `${13.5 * layout.scale}px`, lineHeight: 1.45, padding: '4px 10px' }}>
-          <DuoHead layout={layout} />
+          <DuoHead layout={layout} logo={logo} logoUrl={null} />
         </div>
       ) : (
         <SoftHeader logo={logo} logoUrl={null} layout={layout} />
       )}
       <div
-        style={{ borderBottom: `2px solid ${acc}`, marginTop: duo ? '0.4em' : 0, padding: '8px 10px 6px', display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8, alignItems: 'baseline' }}
+        style={{ borderBottom: `2px solid ${inkOnWhite(acc)}`, marginTop: duo ? '0.4em' : 0, padding: '8px 10px 6px', display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8, alignItems: 'baseline' }}
       >
-        <p data-testid="doc-title" style={{ fontWeight: 700, fontSize: '1.05em', color: acc }}>{title}</p>
+        <p data-testid="doc-title" style={{ fontWeight: 700, fontSize: '1.05em', color: inkOnWhite(acc) }}>{title}</p>
         <p style={{ fontSize: '0.85em' }}>
           {refs ? <>Ref: <b>{refs}</b></> : null}
           {refs && date ? ' · ' : ''}
@@ -38,9 +40,9 @@ export async function DocHead({ title, refs, date }: { title: string; refs?: str
 }
 
 /** Neeche ka hissa: do doctor wale template mein dono doctors ke naam aur mohar; baqi mein mohar aur shukriya */
-export async function DocFoot({ verify = null }: { verify?: { table: 'invoices' | 'prescriptions'; id: string } | null }) {
+export async function DocFoot({ verify = null, tpl }: { verify?: { table: 'invoices' | 'prescriptions'; id: string } | null; tpl?: string }) {
   const { layout, defaults } = await getPrintCfg()
-  if (defaults.bill === 'duo') {
+  if ((tpl === 'duo' || tpl === 'soft' ? tpl : defaults.bill) === 'duo') {
     return (
       <div data-testid="doc-foot" style={{ fontSize: `${13.5 * layout.scale}px`, padding: '0 10px' }}>
         <DuoFoot layout={layout} verify={verify} />
@@ -56,4 +58,11 @@ export async function DocFoot({ verify = null }: { verify?: { table: 'invoices' 
       )}
     </div>
   )
+}
+
+/** Kaghaz ke upar: style chunne ka option (sirf is baar ke liye) */
+export async function DocStyleBar({ tpl }: { tpl?: string }) {
+  const { defaults } = await getPrintCfg()
+  const cur = (tpl === 'duo' || tpl === 'soft' ? tpl : defaults.bill) === 'duo' ? 'duo' : 'soft'
+  return <DocStylePicker current={cur} />
 }

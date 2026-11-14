@@ -5,14 +5,15 @@ import { getPermissions, getStaffProfile, isOwnerRole } from '@/lib/auth'
 import { CLINIC } from '@/clinic.config'
 import { fmtDate, money } from '@/lib/karachi'
 import SheetPrintButton from '@/components/admin/SheetPrintButton'
-import { DocHead, DocFoot } from '@/components/print/DocFrame'
+import { DocHead, DocFoot, DocStyleBar } from '@/components/print/DocFrame'
 
 /** Aik payment ki receipt (print / PDF). Database ki asli entry se banti hai. */
-export default async function ReceiptPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ReceiptPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tpl?: string }> }) {
   const staff = await getStaffProfile()
   const perms = await getPermissions()
   if (!isOwnerRole(staff.role) && !perms.includes('billing.view') && !perms.includes('billing.collect')) redirect('/admin/dashboard?denied=1')
   const { id } = await params
+  const { tpl } = await searchParams
   const supabase = await createClient()
   const { data: pay } = await supabase
     .from('payments')
@@ -41,8 +42,9 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
         </Link>
         <SheetPrintButton />
       </div>
+      <DocStyleBar tpl={tpl} />
       <div id="print-sheet" className="overflow-hidden rounded-2xl border border-clinic-teal/10 bg-white text-sm text-clinic-ink">
-        <DocHead title={isRefund ? 'REFUND RECEIPT' : 'PAYMENT RECEIPT'} date={null} />
+        <DocHead tpl={tpl} title={isRefund ? 'REFUND RECEIPT' : 'PAYMENT RECEIPT'} date={null} />
         <div className="p-6">
         <div className="mt-3 grid grid-cols-2 gap-1">
           <span className="text-clinic-ink/50">Receipt</span>
@@ -81,7 +83,7 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
           </div>
         )}
         {pay.note && <p className="mt-3 text-xs text-clinic-ink/60">Note: {pay.note}</p>}
-        <DocFoot />
+        <DocFoot tpl={tpl} />
         </div>
       </div>
     </div>

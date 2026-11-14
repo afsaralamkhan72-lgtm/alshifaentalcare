@@ -1,0 +1,41 @@
+const L=require('./lib2.js');let pass=0,fail=0;const ok=(n,c,x)=>{c?pass++:fail++;console.log((c?'PASS ':'FAIL ')+n+(x?' | '+x:''))};
+const B='http://localhost:3055';const S='/tmp/prst/shots/hd-';
+(async()=>{const r=await L.open(1280);const p=r.p;const errs=[];p.on('pageerror',e=>errs.push(e.message.slice(0,150)));
+const tag=Date.now().toString().slice(-5);const T=(id)=>p.getByTestId(id);
+L.q("delete from site_settings where key in ('print_defaults','print_layout')");
+const pid=await L.newPatient(p,'Hd Mareez '+tag,'03'+String(Date.now()).slice(-9));
+await p.goto(B+'/admin/patients/'+pid,{waitUntil:'networkidle'});await p.waitForTimeout(1500);
+const st=p.getByRole('button',{name:/Naya visit shuru/});if(await st.count()){await st.click();await p.waitForTimeout(800)}
+await p.getByRole('button',{name:'Agla →'}).click();await p.waitForTimeout(900);
+await L.mouth(p);await p.getByRole('button',{name:/^\+ (Treatment|Aur kaam)$/}).click();await p.waitForTimeout(400);
+await p.getByPlaceholder(/Treatment \(list se/).fill('Hd Kaam '+tag);await p.getByPlaceholder('Qeemat Rs.').fill('4000');
+const ag=p.getByRole('button',{name:'Aaj ho gayi'});if(await ag.count())await ag.first().click();await p.waitForTimeout(400);
+const next=async()=>{await p.getByRole('button',{name:'Agla →'}).click();await p.waitForTimeout(800)};
+await next();await next();
+if(await T('split-all').count())await T('split-all').click();
+await p.getByRole('button',{name:/Visit khatam karein/}).click();await p.waitForTimeout(5000);
+const tid=L.q(`select id from patient_treatments where patient_id='${pid}' limit 1`);
+const vid=L.q(`select id from clinical_visits where patient_id='${pid}' limit 1`);
+const payid=L.q(`select p.id from payments p join invoices i on i.id=p.invoice_id where i.patient_id='${pid}' limit 1`);
+const pages={'ilaaj invoice':`/admin/patients/${pid}/treatment/${tid}/invoice`,'visit invoice':`/admin/visits/${vid}/invoice`,'raseed':`/admin/payments/${payid}/receipt`,'estimate':`/admin/patients/${pid}/estimate`};
+
+
+const PNG='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mNk+M9Qz0AEYBxVSF+FABJADveWkH6oAAAAAElFTkSuQmCC';
+L.q("delete from site_settings where key in ('print_defaults','print_layout','print_logo')");
+require('child_process').execSync("runuser -u postgres -- /usr/lib/postgresql/16/bin/psql -h /tmp/pgt -p 5544 -U postgres -d a3 -q -f /tmp/prst/duo.sql");
+await p.goto(B+pages['visit invoice'],{waitUntil:'networkidle'});await p.waitForTimeout(600);
+ok('logo nahi lagaya to duo mein logo nahi',await T('duo-logo').count()===0);
+L.q("insert into site_settings(key,value) select 'print_logo', jsonb_build_object('data','"+PNG+"','size',60,'badge',false)");
+await p.goto(B+pages['visit invoice'],{waitUntil:'networkidle'});await p.waitForTimeout(800);
+ok('logo lagaya to duo header mein',await T('duo-logo').count()===1&&await T('duo-logo').locator('img').count()===1);
+const hb=await T('doc-head').boundingBox();const lb=await T('duo-logo').boundingBox();ok('logo header ke andar',lb.x>=hb.x&&lb.x+lb.width<=hb.x+hb.width+1);
+ok('clinic ka naam abhi bhi',/Shifa/i.test(await T('duo-clinic').innerText()));
+await p.screenshot({path:S+'duo-logo.png'});
+await p.setViewportSize({width:390,height:800});await p.goto(B+pages['visit invoice'],{waitUntil:'networkidle'});await p.waitForTimeout(700);
+ok('390: side scroll nahi',await p.evaluate(()=>document.documentElement.scrollWidth<=391),String(await p.evaluate(()=>document.documentElement.scrollWidth)));
+await p.screenshot({path:S+'duo-logo-390.png'});
+await p.setViewportSize({width:1280,height:900});
+const rid=L.q("select id from prescriptions limit 1");
+L.q("delete from site_settings where key in ('print_defaults','print_layout','print_logo')");
+ok('JS errors nahi',errs.length===0,errs.join(';'));
+console.log('TOTAL '+(pass+fail)+' | FAIL '+fail);process.exit(0)})().catch(e=>{console.log('CRASH',e.message.slice(0,400));process.exit(1)});

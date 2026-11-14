@@ -7,7 +7,7 @@ import { fmtDate, money, numFmt } from '@/lib/karachi'
 import { toothTitle } from '@/lib/teeth'
 import SheetPrintButton from '@/components/admin/SheetPrintButton'
 import DocShare from '@/components/print/DocShare'
-import { DocHead, DocFoot } from '@/components/print/DocFrame'
+import { DocHead, DocFoot, DocStyleBar } from '@/components/print/DocFrame'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,9 +17,10 @@ const STATUS: Record<string, string> = { planned: 'Sirf plan', active: 'Chal rah
 const num = (v: unknown) => Number(v) || 0
 
 /** Ek ilaaj ka poora tafseeli invoice: qadam, visits, bill, har payment, baqaya (clinic ke invoice wale template mein) */
-export default async function TreatmentInvoicePage({ params }: { params: Promise<{ id: string; treatmentId: string }> }) {
+export default async function TreatmentInvoicePage({ params, searchParams }: { params: Promise<{ id: string; treatmentId: string }>; searchParams: Promise<{ tpl?: string }> }) {
   await requirePerm('billing.view')
   const { id, treatmentId } = await params
+  const { tpl } = await searchParams
   const supabase = await createClient()
   const [pRes, tRes] = await Promise.all([
     supabase.from('patients').select('id, full_name, mr_number, phone, deleted_at').eq('id', id).maybeSingle(),
@@ -67,8 +68,9 @@ export default async function TreatmentInvoicePage({ params }: { params: Promise
           <SheetPrintButton />
         </div>
       </div>
+      <DocStyleBar tpl={tpl} />
       <div id="print-sheet" className="overflow-hidden rounded-2xl border border-clinic-teal/10 bg-white text-clinic-ink">
-        <DocHead title="Invoice (ilaaj ka)" refs={invs.map((i) => i.invoice_number).join(', ')} date={null} />
+        <DocHead tpl={tpl} title="Invoice (ilaaj ka)" refs={invs.map((i) => i.invoice_number).join(', ')} date={null} />
         <div className="p-5 sm:p-8">
         <p className="mt-4 text-sm">
           <span className="text-clinic-ink/50">Patient: </span>
@@ -225,7 +227,7 @@ export default async function TreatmentInvoicePage({ params }: { params: Promise
             <span className={balance > 0 ? 'text-red-600' : ''}>{money(Math.max(0, balance))}</span>
           </p>
         </div>
-        <DocFoot />
+        <DocFoot tpl={tpl} />
         </div>
       </div>
     </div>

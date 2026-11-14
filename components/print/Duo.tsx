@@ -7,6 +7,8 @@ import { rupeesInWords } from '@/lib/words'
 import { accentOf, type DuoDoctor, type PrintLayout } from '@/lib/printLayout'
 import type { RxSheetData } from '@/components/PrescriptionSheet'
 import VerifyQr from '@/components/print/VerifyQr'
+import LogoMark from '@/components/print/LogoMark'
+import type { PrintLogo } from '@/lib/printTemplates'
 
 export interface BillLine { name: string; tooth: string | null; qty: number; unit_price: number; line_total: number }
 export interface BillPart {
@@ -227,15 +229,19 @@ export function duoDoctors(layout: PrintLayout): { left: DuoDoctor; right: DuoDo
 }
 
 /** Do doctor wala upar ka hissa: clinic ka naam, dono taraf doctor, beech mein pata aur timing */
-export function DuoHead({ layout }: { layout: PrintLayout }) {
+export function DuoHead({ layout, logo = null, logoUrl = null }: { layout: PrintLayout; logo?: PrintLogo | null; logoUrl?: string | null }) {
   const acc = accentOf(layout)
   const { left, right } = duoDoctors(layout)
   const address = layout.duo.address.trim() || CLINIC.address.full
   const timings = layout.duo.timings.trim() || CLINIC.timings.full
   const anySub = Boolean(left.sub_phone.trim() || right.sub_phone.trim())
+  const showLogo = Boolean(logo && (logo.data || logoUrl) && !layout.letterhead.data)
   return (
     <>
-        <p data-testid="duo-clinic" style={{ textAlign: 'center', fontSize: '2.2em', fontWeight: 800, color: acc, lineHeight: 1.15, textDecoration: 'underline', textUnderlineOffset: '0.18em' }}>{CLINIC.name}</p>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.7em' }}>
+          {showLogo && logo && <span data-testid="duo-logo" style={{ display: 'inline-flex' }}><LogoMark logo={logo} fallbackUrl={logoUrl} scale={0.9} /></span>}
+          <p data-testid="duo-clinic" style={{ textAlign: 'center', fontSize: '2.2em', fontWeight: 800, color: acc, lineHeight: 1.15, textDecoration: 'underline', textUnderlineOffset: '0.18em' }}>{CLINIC.name}</p>
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.15fr 1fr', gap: '0.8em', marginTop: '0.7em', alignItems: 'start' }}>
           <DoctorBlock d={left} align="left" />
           <div data-testid="duo-center" style={{ textAlign: 'center', fontSize: '0.85em', overflowWrap: 'anywhere' }}>
@@ -278,7 +284,7 @@ export function DuoFoot({ layout, verify }: { layout: PrintLayout; verify: { tab
  * beech mein pata aur timing; phir mareez, phir prescription aur / ya bill; neeche dono doctors ke naam.
  */
 export default function DuoSheet({
-  id, layout, patient, date, rx, bill, verify, cancelled = false,
+  id, layout, patient, date, rx, bill, verify, cancelled = false, logo = null, logoUrl = null,
 }: {
   cancelled?: boolean
   id: string
@@ -288,6 +294,8 @@ export default function DuoSheet({
   rx: RxSheetData | null
   bill: BillPart | null
   verify: { table: 'invoices' | 'prescriptions'; id: string } | null
+  logo?: PrintLogo | null
+  logoUrl?: string | null
 }) {
   const acc = accentOf(layout)
   const both = Boolean(rx && bill)
@@ -298,7 +306,7 @@ export default function DuoSheet({
   return (
     <FitOnePage id={id} watch={[rx, bill, layout]}>
       <div data-testid="duo-sheet" style={{ fontSize: `${13.5 * layout.scale}px`, lineHeight: 1.45, padding: '4px 10px' }}>
-        <DuoHead layout={layout} />
+        <DuoHead layout={layout} logo={logo} logoUrl={logoUrl} />
         <div style={{ borderTop: `2px solid ${acc}`, marginTop: '0.7em', paddingTop: '0.5em', display: 'flex', justifyContent: 'space-between', gap: '1em' }}>
           <p>{bill && bill.numbers.length > 0 ? <>Ref: <b>{bill.numbers.join(', ')}</b></> : null}</p>
           {cancelled && <p data-testid="duo-cancelled" style={{ color: '#b91c1c', fontWeight: 800, border: '2px solid #b91c1c', padding: '0 0.6em', borderRadius: 4 }}>CANCELLED</p>}

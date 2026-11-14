@@ -214,3 +214,12 @@ Homeopathic dawaiyon ki list (aap ki taraf se). Asli Supabase/login/phone/WhatsA
 - File jo ab use nahi hoti: components/admin/DayVisitCard.tsx (repo mein ho to delete kar sakte hain, nuqsan nahi).
 - SQL: **koi nahi**.
 - Tests: b1 (24), dv1, tp1, tp2, tp5, hd1 pass; baqi regression pass.
+
+## 14 NOV E (header rang + style chunna + qualification line)
+- Header par text ka rang ab background ke hisaab se khud chunta hai (gehre rang par safed, halke par gehra). Tagline ka sunehri rang hata diya (green par nazar nahi aata tha).
+- "Dental Surgeon & Homeopathic Physician" wali line rangeen header (invoice aur prescription) se hata di. Doctor ka naam rehta hai. Duo style apna degree khana use karta hai, wahan koi farq nahi.
+- Invoice, visit invoice, raseed, estimate aur summary par upar "Style" ka option: Rangeen header / Duo. Sirf is baar ke liye, Settings nahi badalti.
+- Naye files: lib/contrast.ts, components/print/DocStylePicker.tsx. SQL: koi nahi. Test: hd2 (9), hd1, duo1, duo3, qr1, tp3, tp4, tp5 pass.
+
+## 14 NOV F (Duo template mein logo)
+- Do doctors wala (Duo) header mein ab Al Shifa ka logo clinic ke naam ke saath aata hai (Settings ka logo). Logo na ho ya letterhead paper laga ho to nahi aata. Invoice aur prescription dono par. SQL: koi nahi. Test: hd3 (6), duo1, duo3, hd1, hd2, tp5, qr1 pass.

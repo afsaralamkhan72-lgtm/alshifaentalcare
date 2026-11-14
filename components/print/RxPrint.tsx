@@ -73,7 +73,7 @@ function Pad({
           <div style={{ display: 'flex', justifyContent: 'center' }}>{(logo.data || logoUrl) && <LogoMark logo={logo} fallbackUrl={logoUrl} />}</div>
           <p style={{ fontSize: 26, fontWeight: 700, color: t.main, lineHeight: 1.2, marginTop: 4 }}>{CLINIC.name}</p>
           <p style={{ fontSize: 12, color: t.dark }}>{CLINIC.tagline}</p>
-          <p style={{ fontSize: 13, marginTop: 6, color: t.dark }}><b>{CLINIC.doctor.name}</b> · {CLINIC.doctor.qualification}{CLINIC.doctor.registration ? ` · Reg. ${CLINIC.doctor.registration}` : ''}</p>
+          <p style={{ fontSize: 13, marginTop: 6, color: t.dark }}><b>{CLINIC.doctor.name}</b>{CLINIC.doctor.registration ? ` · Reg. ${CLINIC.doctor.registration}` : ''}</p>
         </div>
       ) : (
       <>
@@ -87,7 +87,6 @@ function Pad({
         </div>
         <div style={{ textAlign: 'right', fontSize: 12 }}>
           <p style={{ fontWeight: 700, fontSize: 14 }}>{CLINIC.doctor.name}</p>
-          <p style={{ opacity: 0.9 }}>{CLINIC.doctor.qualification}</p>
           {CLINIC.doctor.registration && <p style={{ opacity: 0.9 }}>Reg. No: {CLINIC.doctor.registration}</p>}
         </div>
       </div>
@@ -278,7 +277,7 @@ export default function RxPrint({
 
       {(() => {
         const sheet = tpl === 'duo' ? (
-          <DuoSheet id="print-sheet" layout={layout} patient={patientInfo} date={rx.prescribed_date} rx={rx} bill={both ? bill : null} verify={{ table: 'prescriptions', id: rxId }} />
+          <DuoSheet id="print-sheet" logo={logo} logoUrl={logoUrl} layout={layout} patient={patientInfo} date={rx.prescribed_date} rx={rx} bill={both ? bill : null} verify={{ table: 'prescriptions', id: rxId }} />
         ) : tpl === 'soft' ? (
           <LetterheadFrame layout={layout} id={wrap ? 'print-sheet-in' : 'print-sheet'}>
             <div style={{ background: '#fff', color: 'rgb(var(--c-ink))', fontSize: `${14 * layout.scale}px`, borderRadius: layout.letterhead.data ? 0 : 14, border: layout.letterhead.data ? 'none' : '1px solid rgb(var(--c-mint))', overflow: 'hidden', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>

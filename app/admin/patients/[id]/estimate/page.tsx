@@ -6,14 +6,15 @@ import { CLINIC } from '@/clinic.config'
 import { fmtDate, money, todayKarachi } from '@/lib/karachi'
 import { toothTitle as toothLabel } from '@/lib/teeth'
 import SheetPrintButton from '@/components/admin/SheetPrintButton'
-import { DocHead, DocFoot } from '@/components/print/DocFrame'
+import { DocHead, DocFoot, DocStyleBar } from '@/components/print/DocFrame'
 
 /** Treatment plan ka andaza (estimate): jo treatments "plan" hain unki qeemat, patient ke dastakhat ke sath, print / PDF ke liye */
-export default async function EstimatePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function EstimatePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tpl?: string }> }) {
   const staff = await getStaffProfile()
   const perms = await getPermissions()
   if (!isOwnerRole(staff.role) && !perms.includes('billing.view')) redirect('/admin/dashboard?denied=1')
   const { id } = await params
+  const { tpl } = await searchParams
   const supabase = await createClient()
   const { data: patient } = await supabase.from('patients').select('id, mr_number, full_name, phone, age').eq('id', id).maybeSingle()
   if (!patient) notFound()
@@ -34,8 +35,9 @@ export default async function EstimatePage({ params }: { params: Promise<{ id: s
         </Link>
         <SheetPrintButton />
       </div>
+      <DocStyleBar tpl={tpl} />
       <div id="print-sheet" className="overflow-hidden rounded-2xl border border-clinic-teal/10 bg-white text-clinic-ink">
-        <DocHead title="Treatment Estimate" date={todayKarachi()} />
+        <DocHead tpl={tpl} title="Treatment Estimate" date={todayKarachi()} />
         <div className="p-6 sm:p-8">
         <p className="mt-4 text-sm">
           <span className="font-semibold capitalize">{patient.full_name}</span> · {patient.mr_number} · {patient.phone}
@@ -73,7 +75,7 @@ export default async function EstimatePage({ params }: { params: Promise<{ id: s
           <div className="border-t border-clinic-ink/40 pt-1">Patient / Guardian ke dastakhat</div>
           <div className="border-t border-clinic-ink/40 pt-1">Doctor ke dastakhat</div>
         </div>
-        <DocFoot />
+        <DocFoot tpl={tpl} />
         </div>
       </div>
     </div>

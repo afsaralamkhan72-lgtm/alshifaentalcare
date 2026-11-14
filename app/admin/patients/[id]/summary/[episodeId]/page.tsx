@@ -1,4 +1,4 @@
-import { DocHead } from '@/components/print/DocFrame'
+import { DocHead, DocStyleBar } from '@/components/print/DocFrame'
 import ShareQr from '@/components/print/ShareQr'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
@@ -11,11 +11,14 @@ import { fmtDate } from '@/lib/karachi'
 
 export default async function TreatmentSummaryPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string; episodeId: string }>
+  searchParams: Promise<{ tpl?: string }>
 }) {
   await requireOwner()
   const { id, episodeId } = await params
+  const { tpl } = await searchParams
   const supabase = await createClient()
 
   const [episodeRes, patientRes, clinicRes] = await Promise.all([
@@ -47,11 +50,12 @@ export default async function TreatmentSummaryPage({
         <HistoryPrintButton />
       </div>
 
+      <DocStyleBar tpl={tpl} />
       <div
         id="history-sheet"
         className="mx-auto mt-4 max-w-2xl overflow-hidden rounded-2xl border border-clinic-teal/20 bg-white"
       >
-        <DocHead title="Treatment Completion Record" date={null} />
+        <DocHead tpl={tpl} title="Treatment Completion Record" date={null} />
         <div className="px-4 py-6 sm:px-8">
           <p className="font-display text-lg font-semibold text-clinic-ink">
             Treatment Completion Record

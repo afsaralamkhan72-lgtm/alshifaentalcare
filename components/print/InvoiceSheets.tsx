@@ -1,5 +1,6 @@
 'use client'
 
+import { onColor } from '@/lib/contrast'
 import { useState } from 'react'
 import ClinicLogo from '@/components/ClinicLogo'
 import LogoMark from '@/components/print/LogoMark'
@@ -231,7 +232,7 @@ function Soft({ d, logo, logoUrl, layout, extra, sid }: { d: InvData; logo: Prin
   const acc = accentOf(layout)
   const lh = Boolean(layout.letterhead.data)
   const sh = layout.show
-  const th: React.CSSProperties = { background: acc, color: '#fff', padding: '8px 10px', fontSize: '0.85em', textAlign: 'left' }
+  const th: React.CSSProperties = { background: acc, color: onColor(acc).fg, padding: '8px 10px', fontSize: '0.85em', textAlign: 'left' }
   const td: React.CSSProperties = { padding: '8px 10px', borderBottom: '1px solid rgb(var(--c-mint))', verticalAlign: 'top', overflowWrap: 'anywhere' }
   const row = (k: string, v: string, bold?: boolean, color?: string) => (
     <p style={{ display: 'flex', justifyContent: 'space-between', gap: 16, padding: '4px 12px', fontWeight: bold ? 700 : 400, color }}><span>{k}</span><span>{v}</span></p>
@@ -280,7 +281,7 @@ function Soft({ d, logo, logoUrl, layout, extra, sid }: { d: InvData; logo: Prin
               {d.discountAmount > 0 && row(`Discount (${d.discountPercent}%)`, `− ${money(d.discountAmount)}`)}
               {row('Kul raqam', money(d.total), true)}
               {row('Mila', money(d.paid), false, '#047857')}
-              <div style={{ background: acc, color: '#fff', borderRadius: 8, margin: '4px 6px 2px' }}>{row('Baqaya', money(d.balance), true)}</div>
+              <div style={{ background: acc, color: onColor(acc).fg, borderRadius: 8, margin: '4px 6px 2px' }}>{row('Baqaya', money(d.balance), true)}</div>
               {d.balance > 0 && d.dueDate && <p style={{ textAlign: 'right', fontSize: '0.8em', padding: '2px 12px' }}>Aakhri tareekh: {fmtDate(d.dueDate)}</p>}
             </div>
           </div>
@@ -333,7 +334,6 @@ function Green({ d, logo, logoUrl, layout, extra, sid }: { d: InvData; logo: Pri
                 <p style={{ fontSize: '2em', fontWeight: 800, color: GREEN_D, lineHeight: 1.1 }}>{CLINIC.name}</p>
                 {sh.tagline && <p style={{ display: 'inline-block', marginTop: 6, border: `1px solid ${G}`, borderRadius: 99, padding: '2px 14px', fontWeight: 600, color: GREEN_D, background: '#fff' }}>{layout.texts.tagline.trim() || CLINIC.slogan}</p>}
                 {sh.doctor && <p style={{ marginTop: 6, fontWeight: 700 }}>{CLINIC.doctor.name}</p>}
-                {sh.doctor && <p style={{ fontSize: '0.85em' }}>{CLINIC.doctor.qualification}</p>}
               </div>
             </div>
             <div style={{ marginTop: 10, borderTop: `3px solid ${G}`, padding: '6px 0', fontSize: '0.85em', display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '4px 18px' }}>
@@ -450,6 +450,8 @@ export default function InvoiceSheets({
   const sheet =
     tpl === 'duo' ? (
       <DuoSheet
+        logo={logo}
+        logoUrl={logoUrl}
         id="invoice-sheet"
         layout={layout}
         patient={patient ?? { name: d.patientName, mr: d.mr, age: d.age ?? null, gender: null, address: null, phone: d.phone }}
