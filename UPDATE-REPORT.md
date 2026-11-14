@@ -205,3 +205,12 @@ Homeopathic dawaiyon ki list (aap ki taraf se). Asli Supabase/login/phone/WhatsA
 - **Aik daant par kai kaam** (RCT + Post): har kaam par dabayein, "Is daant par: ..." mein dikhte hain, hata bhi sakte hain.
 - **Partial / Cast / Flexible denture**: qism ke baad "kaunse daant?" (chart ya side popup nahi). Qeemat poori ek hi. "Daant nahi batane" ka button bhi hai. Complete denture mein daant nahi poochte.
 - SQL: **koi nahi** is batch mein.
+
+
+## 14 NOV D (Invoice header + Visit card)
+- **A. Sab invoice-type pages par prescription jaisa header/footer** (logo, doctors, address, phone): treatment invoice, visit invoice, payment receipt, estimate, summary. Settings (Print) se badalta hai. Naye files: components/print/DocFrame.tsx; Duo.tsx mein DuoHead/DuoFoot alag kiye.
+- **B. Visit card**: profile par har visit ka ek card (kholo/band). Andar har kaam ka chhota card: Bill / Mila / Baqaya, visit chips, "+ Visit N" (maujooda follow-up page), Invoice, WhatsApp, "Khulasa dekhein", "Ilaaj mukammal karein" (baqaya ho to poochta hai) aur "Dobara kholein". Neeche sab kaam ka Invoice, Prescription, Invoice+Prescription, WhatsApp. Sab mukammal ho to card band aur neeche. Plan wale kaam "Aage ka plan" mein. Purana alag "Aaj ki visit" dabba aur duplicate cards hata diye.
+- 2nd visit ka paisa sirf us kaam se kat-ta hai (follow-up page ki tarah), combined WhatsApp mein naya hisaab aata hai.
+- File jo ab use nahi hoti: components/admin/DayVisitCard.tsx (repo mein ho to delete kar sakte hain, nuqsan nahi).
+- SQL: **koi nahi**.
+- Tests: b1 (24), dv1, tp1, tp2, tp5, hd1 pass; baqi regression pass.

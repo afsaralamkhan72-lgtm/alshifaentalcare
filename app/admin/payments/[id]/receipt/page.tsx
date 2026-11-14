@@ -5,6 +5,7 @@ import { getPermissions, getStaffProfile, isOwnerRole } from '@/lib/auth'
 import { CLINIC } from '@/clinic.config'
 import { fmtDate, money } from '@/lib/karachi'
 import SheetPrintButton from '@/components/admin/SheetPrintButton'
+import { DocHead, DocFoot } from '@/components/print/DocFrame'
 
 /** Aik payment ki receipt (print / PDF). Database ki asli entry se banti hai. */
 export default async function ReceiptPage({ params }: { params: Promise<{ id: string }> }) {
@@ -40,14 +41,9 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
         </Link>
         <SheetPrintButton />
       </div>
-      <div id="print-sheet" className="rounded-2xl border border-clinic-teal/10 bg-white p-6 text-sm text-clinic-ink">
-        <div className="border-b-2 border-clinic-teal pb-3 text-center">
-          <p className="font-display text-xl font-semibold text-clinic-teal">{CLINIC.name}</p>
-          <p className="text-xs text-clinic-ink/60">
-            {CLINIC.address.full} · {CLINIC.phone.display}
-          </p>
-          <p className="mt-2 font-semibold">{isRefund ? 'REFUND RECEIPT' : 'PAYMENT RECEIPT'}</p>
-        </div>
+      <div id="print-sheet" className="overflow-hidden rounded-2xl border border-clinic-teal/10 bg-white text-sm text-clinic-ink">
+        <DocHead title={isRefund ? 'REFUND RECEIPT' : 'PAYMENT RECEIPT'} date={null} />
+        <div className="p-6">
         <div className="mt-3 grid grid-cols-2 gap-1">
           <span className="text-clinic-ink/50">Receipt</span>
           <span className="text-right">{receiptNo}</span>
@@ -85,7 +81,8 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
           </div>
         )}
         {pay.note && <p className="mt-3 text-xs text-clinic-ink/60">Note: {pay.note}</p>}
-        <p className="mt-6 text-center text-xs text-clinic-ink/50">Shukriya · {CLINIC.timings.full}</p>
+        <DocFoot />
+        </div>
       </div>
     </div>
   )

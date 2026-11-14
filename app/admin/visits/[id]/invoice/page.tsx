@@ -6,6 +6,7 @@ import { CLINIC } from '@/clinic.config'
 import { fmtDate, money } from '@/lib/karachi'
 import SheetPrintButton from '@/components/admin/SheetPrintButton'
 import DocShare from '@/components/print/DocShare'
+import { DocHead, DocFoot } from '@/components/print/DocFrame'
 import { numFmt } from '@/lib/karachi'
 
 type Inv = { id: string; invoice_number: string; total: number; paid_amount: number; invoice_items: { name: string; tooth: string | null; qty: number; unit_price: number }[] }
@@ -58,20 +59,9 @@ export default async function VisitInvoicePage({ params }: { params: Promise<{ i
           <SheetPrintButton />
         </div>
       </div>
-      <div id="print-sheet" className="rounded-2xl border border-clinic-teal/10 bg-white p-8 text-clinic-ink">
-        <header className="flex items-start justify-between border-b-2 border-clinic-teal pb-4">
-          <div>
-            <p className="font-display text-2xl font-semibold text-clinic-teal">{CLINIC.name}</p>
-            <p className="mt-1 text-xs text-clinic-ink/60">
-              {CLINIC.address.full} · {CLINIC.phone.display}
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="font-semibold">Invoice</p>
-            <p className="text-xs text-clinic-ink/70">{fmtDate(v.visit_date)}</p>
-            {invs.length > 0 && <p className="text-xs text-clinic-ink/70">{invs.map((i) => i.invoice_number).join(', ')}</p>}
-          </div>
-        </header>
+      <div id="print-sheet" className="overflow-hidden rounded-2xl border border-clinic-teal/10 bg-white text-clinic-ink">
+        <DocHead title="Invoice" refs={invs.map((i) => i.invoice_number).join(', ')} date={v.visit_date} />
+        <div className="p-6 sm:p-8">
         <p className="mt-4 text-sm">
           <span className="text-clinic-ink/50">Patient: </span>
           <span className="font-semibold capitalize">{p?.full_name}</span> · {p?.mr_number ?? ''} · {p?.phone}
@@ -126,6 +116,8 @@ export default async function VisitInvoicePage({ params }: { params: Promise<{ i
             </p>
           )}
           {paidOnBills !== todayPaid && <p className="text-[11px] text-clinic-ink/40">Is bill par ab tak mile: {money(paidOnBills)}</p>}
+        </div>
+        <DocFoot />
         </div>
       </div>
     </div>

@@ -6,6 +6,7 @@ import { CLINIC } from '@/clinic.config'
 import { fmtDate, money, todayKarachi } from '@/lib/karachi'
 import { toothTitle as toothLabel } from '@/lib/teeth'
 import SheetPrintButton from '@/components/admin/SheetPrintButton'
+import { DocHead, DocFoot } from '@/components/print/DocFrame'
 
 /** Treatment plan ka andaza (estimate): jo treatments "plan" hain unki qeemat, patient ke dastakhat ke sath, print / PDF ke liye */
 export default async function EstimatePage({ params }: { params: Promise<{ id: string }> }) {
@@ -33,19 +34,9 @@ export default async function EstimatePage({ params }: { params: Promise<{ id: s
         </Link>
         <SheetPrintButton />
       </div>
-      <div id="print-sheet" className="rounded-2xl border border-clinic-teal/10 bg-white p-8 text-clinic-ink">
-        <header className="flex items-start justify-between border-b-2 border-clinic-teal pb-4">
-          <div>
-            <p className="font-display text-2xl font-semibold text-clinic-teal">{CLINIC.name}</p>
-            <p className="text-xs text-clinic-ink/60">
-              {CLINIC.address.full} · {CLINIC.phone.display}
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="font-display text-lg font-semibold">Treatment Estimate</p>
-            <p className="text-xs text-clinic-ink/60">{fmtDate(todayKarachi())}</p>
-          </div>
-        </header>
+      <div id="print-sheet" className="overflow-hidden rounded-2xl border border-clinic-teal/10 bg-white text-clinic-ink">
+        <DocHead title="Treatment Estimate" date={todayKarachi()} />
+        <div className="p-6 sm:p-8">
         <p className="mt-4 text-sm">
           <span className="font-semibold capitalize">{patient.full_name}</span> · {patient.mr_number} · {patient.phone}
         </p>
@@ -81,6 +72,8 @@ export default async function EstimatePage({ params }: { params: Promise<{ id: s
         <div className="mt-14 grid grid-cols-2 gap-10 text-xs text-clinic-ink/70">
           <div className="border-t border-clinic-ink/40 pt-1">Patient / Guardian ke dastakhat</div>
           <div className="border-t border-clinic-ink/40 pt-1">Doctor ke dastakhat</div>
+        </div>
+        <DocFoot />
         </div>
       </div>
     </div>

@@ -7,6 +7,7 @@ import { fmtDate, money, numFmt } from '@/lib/karachi'
 import { toothTitle } from '@/lib/teeth'
 import SheetPrintButton from '@/components/admin/SheetPrintButton'
 import DocShare from '@/components/print/DocShare'
+import { DocHead, DocFoot } from '@/components/print/DocFrame'
 
 export const dynamic = 'force-dynamic'
 
@@ -66,19 +67,9 @@ export default async function TreatmentInvoicePage({ params }: { params: Promise
           <SheetPrintButton />
         </div>
       </div>
-      <div id="print-sheet" className="rounded-2xl border border-clinic-teal/10 bg-white p-5 text-clinic-ink sm:p-8">
-        <header className="flex flex-wrap items-start justify-between gap-3 border-b-2 border-clinic-teal pb-4">
-          <div>
-            <p className="font-display text-2xl font-semibold text-clinic-teal">{CLINIC.name}</p>
-            <p className="mt-1 text-xs text-clinic-ink/60">
-              {CLINIC.address.full} · {CLINIC.phone.display}
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="font-semibold">Invoice (ilaaj ka)</p>
-            {invs.length > 0 && <p className="text-xs text-clinic-ink/70">{invs.map((i) => i.invoice_number).join(', ')}</p>}
-          </div>
-        </header>
+      <div id="print-sheet" className="overflow-hidden rounded-2xl border border-clinic-teal/10 bg-white text-clinic-ink">
+        <DocHead title="Invoice (ilaaj ka)" refs={invs.map((i) => i.invoice_number).join(', ')} date={null} />
+        <div className="p-5 sm:p-8">
         <p className="mt-4 text-sm">
           <span className="text-clinic-ink/50">Patient: </span>
           <span className="font-semibold capitalize">{p.full_name}</span> · {p.mr_number ?? ''} · {p.phone}
@@ -233,6 +224,8 @@ export default async function TreatmentInvoicePage({ params }: { params: Promise
             <span>Baqaya</span>
             <span className={balance > 0 ? 'text-red-600' : ''}>{money(Math.max(0, balance))}</span>
           </p>
+        </div>
+        <DocFoot />
         </div>
       </div>
     </div>

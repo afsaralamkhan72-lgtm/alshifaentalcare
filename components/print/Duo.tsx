@@ -226,6 +226,53 @@ export function duoDoctors(layout: PrintLayout): { left: DuoDoctor; right: DuoDo
   return { left, right: layout.duo.right }
 }
 
+/** Do doctor wala upar ka hissa: clinic ka naam, dono taraf doctor, beech mein pata aur timing */
+export function DuoHead({ layout }: { layout: PrintLayout }) {
+  const acc = accentOf(layout)
+  const { left, right } = duoDoctors(layout)
+  const address = layout.duo.address.trim() || CLINIC.address.full
+  const timings = layout.duo.timings.trim() || CLINIC.timings.full
+  const anySub = Boolean(left.sub_phone.trim() || right.sub_phone.trim())
+  return (
+    <>
+        <p data-testid="duo-clinic" style={{ textAlign: 'center', fontSize: '2.2em', fontWeight: 800, color: acc, lineHeight: 1.15, textDecoration: 'underline', textUnderlineOffset: '0.18em' }}>{CLINIC.name}</p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.15fr 1fr', gap: '0.8em', marginTop: '0.7em', alignItems: 'start' }}>
+          <DoctorBlock d={left} align="left" />
+          <div data-testid="duo-center" style={{ textAlign: 'center', fontSize: '0.85em', overflowWrap: 'anywhere' }}>
+            <p>{address}</p>
+            <p style={{ marginTop: '0.2em' }}>{timings}</p>
+            {!anySub && <p style={{ marginTop: '0.2em' }}>{CLINIC.phone.display}</p>}
+          </div>
+          <DoctorBlock d={right} align="right" />
+        </div>
+    </>
+  )
+}
+
+/** Neeche dono doctors ke naam, mohar aur (agar ho) tasdeeq wala QR */
+export function DuoFoot({ layout, verify }: { layout: PrintLayout; verify: { table: 'invoices' | 'prescriptions'; id: string } | null }) {
+  const { left, right } = duoDoctors(layout)
+  return (
+    <div style={{ marginTop: '2.2em', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '1em', breakInside: 'avoid' }}>
+          <div data-testid="duo-foot-left" style={{ minWidth: '11em' }}>
+            {left.name.trim() && <p style={{ borderTop: line, paddingTop: '0.25em', fontWeight: 700 }}>{left.name}</p>}
+            {left.degree.trim() && <p style={{ fontSize: '0.8em' }}>{left.degree}</p>}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.8em' }}>
+            {layout.show.stamp && layout.stamp && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={layout.stamp} alt="Mohar" style={{ height: '5em', width: 'auto' }} />
+            )}
+            {verify && <VerifyQr table={verify.table} id={verify.id} size={64} />}
+          </div>
+          <div data-testid="duo-foot-right" style={{ minWidth: '11em', textAlign: 'right' }}>
+            {right.name.trim() && <p style={{ borderTop: line, paddingTop: '0.25em', fontWeight: 700 }}>{right.name}</p>}
+            {right.degree.trim() && <p style={{ fontSize: '0.8em' }}>{right.degree}</p>}
+          </div>
+        </div>
+  )
+}
+
 /**
  * "Do doctor wala" sada kaghaz: upar clinic ka naam, dono taraf doctor (neeche chhota naam aur number),
  * beech mein pata aur timing; phir mareez, phir prescription aur / ya bill; neeche dono doctors ke naam.
@@ -243,10 +290,6 @@ export default function DuoSheet({
   verify: { table: 'invoices' | 'prescriptions'; id: string } | null
 }) {
   const acc = accentOf(layout)
-  const { left, right } = duoDoctors(layout)
-  const address = layout.duo.address.trim() || CLINIC.address.full
-  const timings = layout.duo.timings.trim() || CLINIC.timings.full
-  const anySub = Boolean(left.sub_phone.trim() || right.sub_phone.trim())
   const both = Boolean(rx && bill)
   const info: [string, string][] = []
   if (patient.age != null || patient.gender) info.push(['Age / Sex', [patient.age != null ? String(patient.age) : '', patient.gender ?? ''].filter(Boolean).join(' / ')])
@@ -255,16 +298,7 @@ export default function DuoSheet({
   return (
     <FitOnePage id={id} watch={[rx, bill, layout]}>
       <div data-testid="duo-sheet" style={{ fontSize: `${13.5 * layout.scale}px`, lineHeight: 1.45, padding: '4px 10px' }}>
-        <p data-testid="duo-clinic" style={{ textAlign: 'center', fontSize: '2.2em', fontWeight: 800, color: acc, lineHeight: 1.15, textDecoration: 'underline', textUnderlineOffset: '0.18em' }}>{CLINIC.name}</p>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.15fr 1fr', gap: '0.8em', marginTop: '0.7em', alignItems: 'start' }}>
-          <DoctorBlock d={left} align="left" />
-          <div data-testid="duo-center" style={{ textAlign: 'center', fontSize: '0.85em', overflowWrap: 'anywhere' }}>
-            <p>{address}</p>
-            <p style={{ marginTop: '0.2em' }}>{timings}</p>
-            {!anySub && <p style={{ marginTop: '0.2em' }}>{CLINIC.phone.display}</p>}
-          </div>
-          <DoctorBlock d={right} align="right" />
-        </div>
+        <DuoHead layout={layout} />
         <div style={{ borderTop: `2px solid ${acc}`, marginTop: '0.7em', paddingTop: '0.5em', display: 'flex', justifyContent: 'space-between', gap: '1em' }}>
           <p>{bill && bill.numbers.length > 0 ? <>Ref: <b>{bill.numbers.join(', ')}</b></> : null}</p>
           {cancelled && <p data-testid="duo-cancelled" style={{ color: '#b91c1c', fontWeight: 800, border: '2px solid #b91c1c', padding: '0 0.6em', borderRadius: 4 }}>CANCELLED</p>}
@@ -280,23 +314,7 @@ export default function DuoSheet({
           {rx && bill && <div style={{ borderTop: '1px dashed rgba(0,0,0,0.45)' }} />}
           {bill && <BillBody bill={bill} title={both ? 'Invoice' : undefined} />}
         </div>
-        <div style={{ marginTop: '2.2em', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '1em', breakInside: 'avoid' }}>
-          <div data-testid="duo-foot-left" style={{ minWidth: '11em' }}>
-            {left.name.trim() && <p style={{ borderTop: line, paddingTop: '0.25em', fontWeight: 700 }}>{left.name}</p>}
-            {left.degree.trim() && <p style={{ fontSize: '0.8em' }}>{left.degree}</p>}
-          </div>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.8em' }}>
-            {layout.show.stamp && layout.stamp && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={layout.stamp} alt="Mohar" style={{ height: '5em', width: 'auto' }} />
-            )}
-            {verify && <VerifyQr table={verify.table} id={verify.id} size={64} />}
-          </div>
-          <div data-testid="duo-foot-right" style={{ minWidth: '11em', textAlign: 'right' }}>
-            {right.name.trim() && <p style={{ borderTop: line, paddingTop: '0.25em', fontWeight: 700 }}>{right.name}</p>}
-            {right.degree.trim() && <p style={{ fontSize: '0.8em' }}>{right.degree}</p>}
-          </div>
-        </div>
+        <DuoFoot layout={layout} verify={verify} />
       </div>
     </FitOnePage>
   )

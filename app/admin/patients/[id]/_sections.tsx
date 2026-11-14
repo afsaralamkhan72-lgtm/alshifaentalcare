@@ -7,7 +7,7 @@ import TreatmentCards, { type Stage, type LabLite } from '@/components/admin/Tre
 import { money, fmtDate, numFmt, todayKarachi } from '@/lib/karachi'
 import { messageLink } from '@/lib/messages'
 import { mapTemplates, type Tpl } from '@/lib/messageTemplates'
-import DayVisitCard, { type DayVisit } from '@/components/admin/DayVisitCard'
+import VisitGroupCard, { type VisitGroup } from '@/components/admin/VisitGroupCard'
 
 type Sb = Awaited<ReturnType<typeof createClient>>
 const num = (v: unknown) => Number(v ?? 0)
@@ -235,74 +235,132 @@ export async function HistorySection({ patient, history, canClinical, canMoney, 
 
 
 /** Akhri (14 din ke andar) visit wale din ke sab kaam ek jagah: bill, mila, baqaya, khulasa, WhatsApp */
-async function loadDayVisit(supabase: Sb, patient: { id: string; full_name: string; phone: string | null; gender?: string | null }, tpl: Tpl): Promise<DayVisit | null> {
-  const { data: vs } = await supabase
-    .from('clinical_visits')
-    .select('id, visit_date, notes, next_date, next_time, next_treatment_id, created_at')
+async function loadVisitGroups(
+  supabase: Sb,
+  patient: { id: string; full_name: string; phone: string | null; gender?: string | null },
+  treatments: TItem[],
+  docs: Map<string, TreatmentDocs>,
+  tpl: Tpl,
+  canMoney: boolean,
+  canRx: boolean
+): Promise<VisitGroup[]> {
+  const live = treatments.filter((t) => t.visits.length > 0 && t.status !== 'planned')
+  if (!live.length) return []
+  const { data: vn } = await supabase
+    .from('visit_notes')
+    .select('treatment_id, clinical_visit_id, visit_no, visit_date')
     .eq('patient_id', patient.id)
-    .eq('status', 'finished')
-    .order('visit_date', { ascending: false })
-    .order('created_at', { ascending: false })
-    .limit(12)
-  const visits = (vs ?? []) as { id: string; visit_date: string; notes: string | null; next_date: string | null; next_time: string | null; next_treatment_id: string | null }[]
-  if (!visits.length) return null
-  const date = visits[0].visit_date
-  const today = todayKarachi()
-  if ((new Date(today).getTime() - new Date(date).getTime()) / 86400000 > 14) return null
-  const day = visits.filter((v) => v.visit_date === date)
-  const ids = day.map((v) => v.id)
-  const { data: iv } = await supabase
-    .from('invoices')
-    .select('id, clinical_visit_id, patient_treatment_id, total, balance, invoice_items(name, tooth)')
-    .in('clinical_visit_id', ids)
-    .neq('status', 'void')
-    .order('created_at')
-  const invs = (iv ?? []) as unknown as { id: string; clinical_visit_id: string; patient_treatment_id: string | null; total: number; balance: number; invoice_items: { name: string; tooth: string | null }[] }[]
-  const notes = day.map((v) => (v.notes ?? '').trim()).filter(Boolean)
-  if (invs.length < 2 && !(invs.length === 1 && notes.length)) return null
-  const tids = [...new Set([...invs.map((i) => i.patient_treatment_id), ...day.map((v) => v.next_treatment_id)].filter(Boolean))] as string[]
-  const [tRes, pRes, bRes] = await Promise.all([
-    tids.length ? supabase.from('patient_treatments').select('id, name, teeth').in('id', tids) : Promise.resolve({ data: [] }),
-    supabase.from('payments').select('invoice_id, amount').eq('patient_id', patient.id).eq('paid_on', date).in('invoice_id', invs.map((i) => i.id)),
-    supabase.from('patient_balances').select('balance').eq('patient_id', patient.id).maybeSingle(),
+    .is('voided_at', null)
+    .not('treatment_id', 'is', null)
+  const notes = (vn ?? []) as { treatment_id: string; clinical_visit_id: string | null; visit_no: number | null; visit_date: string }[]
+  const opening = new Map<string, string | null>()
+  for (const t of live) {
+    const mine = notes
+      .filter((n) => n.treatment_id === t.id)
+      .sort((x, y) => (x.visit_no ?? 0) - (y.visit_no ?? 0) || x.visit_date.localeCompare(y.visit_date))
+    opening.set(t.id, mine.find((n) => n.clinical_visit_id)?.clinical_visit_id ?? null)
+  }
+  const cvIds = [...new Set([...opening.values()].filter(Boolean))] as string[]
+  const [cvRes, rxRes] = await Promise.all([
+    cvIds.length ? supabase.from('clinical_visits').select('id, visit_date, notes, next_date, next_time, next_treatment_id').in('id', cvIds) : Promise.resolve({ data: [] }),
+    canRx && cvIds.length ? supabase.from('prescriptions').select('id, clinical_visit_id, items, created_at').in('clinical_visit_id', cvIds).order('created_at', { ascending: false }) : Promise.resolve({ data: [] }),
   ])
-  const tname = new Map(((tRes.data ?? []) as { id: string; name: string; teeth: string[] | null }[]).map((t) => [t.id, t.name + (t.teeth?.length ? ' (' + t.teeth.join(', ') + ')' : '')]))
-  const paidBy = new Map<string, number>()
-  for (const x of (pRes.data ?? []) as { invoice_id: string; amount: number }[]) paidBy.set(x.invoice_id, (paidBy.get(x.invoice_id) ?? 0) + num(x.amount))
-  const rows = invs.map((i) => ({
-    id: i.id,
-    label: (i.patient_treatment_id && tname.get(i.patient_treatment_id)) || (i.invoice_items ?? []).map((it) => it.name + (it.tooth ? ' (' + it.tooth + ')' : '')).join(', ') || 'Kaam',
-    total: num(i.total),
-    paidToday: paidBy.get(i.id) ?? 0,
-    balance: Math.max(0, num(i.balance)),
-  }))
-  const total = rows.reduce((s, r) => s + r.total, 0)
-  const paidToday = rows.reduce((s, r) => s + r.paidToday, 0)
-  const balance = rows.reduce((s, r) => s + r.balance, 0)
-  const patientBalance = bRes.data ? num((bRes.data as Record<string, unknown>).balance) : null
-  const mainVisit = [...day].sort((a, b) => invs.filter((i) => i.clinical_visit_id === b.id).length - invs.filter((i) => i.clinical_visit_id === a.id).length)[0]
-  const nxt = day.find((v) => v.next_date) ?? null
-  const summary = notes.join('\n')
-  const due = rows.filter((r) => r.balance > 0)
-  const waHref = patient.phone
-    ? messageLink(
-        'day_summary',
-        { full_name: patient.full_name, phone: patient.phone, gender: patient.gender ?? null },
-        {
-          summary,
-          work_lines: rows.map((r) => '• ' + r.label + ' — Rs. ' + numFmt(r.total)).join('\n'),
-          day_total: numFmt(total),
-          today_paid: numFmt(paidToday),
-          balance: numFmt(Math.max(0, patientBalance ?? balance)),
-          due_block: due.length ? 'ہر کام کا بقایا:\n' + due.map((r) => '• ' + r.label + ' — Rs. ' + numFmt(r.balance)).join('\n') : '',
-          next_date: nxt?.next_date ? fmtDate(nxt.next_date) : '',
-          next_time: nxt?.next_date ? nxt.next_time ?? '' : '',
-          next_work: nxt?.next_treatment_id ? tname.get(nxt.next_treatment_id) ?? '' : '',
-        },
-        tpl,
-      )
-    : null
-  return { dateLabel: fmtDate(date), isToday: date === today, visitId: mainVisit.id, count: rows.length, rows, total, paidToday, balance, patientBalance, summary, waHref, nextDate: nxt?.next_date ?? null }
+  const cvs = new Map(((cvRes.data ?? []) as { id: string; visit_date: string; notes: string | null; next_date: string | null; next_time: string | null; next_treatment_id: string | null }[]).map((c) => [c.id, c]))
+  const rxBy = new Map<string, string>()
+  for (const r of (rxRes.data ?? []) as { id: string; clinical_visit_id: string; items: unknown[] | null }[]) {
+    if (!rxBy.has(r.clinical_visit_id) && (r.items ?? []).length) rxBy.set(r.clinical_visit_id, r.id)
+  }
+  const today = todayKarachi()
+  const label = (t: TItem) => t.name + (t.teeth.length ? ' (' + t.teeth.join(', ') + ')' : '')
+  const buckets = new Map<string, TItem[]>()
+  for (const t of live) {
+    const k = opening.get(t.id) ?? 'old'
+    ;(buckets.get(k) ?? buckets.set(k, []).get(k)!).push(t)
+  }
+  const pinfo = { full_name: patient.full_name, phone: patient.phone ?? '', gender: patient.gender ?? null }
+  const groups: VisitGroup[] = []
+  for (const [k, ts] of buckets) {
+    const cv = k === 'old' ? null : cvs.get(k) ?? null
+    const date = cv?.visit_date ?? [...ts].map((t) => t.started_on).sort()[0]
+    const total = ts.reduce((a, t) => a + t.charged, 0)
+    const paid = ts.reduce((a, t) => a + t.paid, 0)
+    const balance = ts.reduce((a, t) => a + Math.max(0, t.balance), 0)
+    const open = ts.filter((t) => t.status === 'active')
+    const waHref =
+      canMoney && patient.phone
+        ? messageLink(
+            'day_summary',
+            pinfo,
+            {
+              summary: (cv?.notes ?? '').trim(),
+              work_lines: ts.map((t) => '• ' + label(t) + ' — Rs. ' + numFmt(t.charged)).join('\n'),
+              day_total: numFmt(total),
+              today_paid: numFmt(paid),
+              balance: numFmt(balance),
+              due_block: ts.some((t) => t.balance > 0) ? 'ہر کام کا بقایا:\n' + ts.filter((t) => t.balance > 0).map((t) => '• ' + label(t) + ' — Rs. ' + numFmt(t.balance)).join('\n') : '',
+              next_date: cv?.next_date ? fmtDate(cv.next_date) : '',
+              next_time: cv?.next_date ? cv.next_time ?? '' : '',
+              next_work: '',
+            },
+            tpl
+          )
+        : null
+    const allRx = ts.flatMap((t) => (docs.get(t.id)?.rx ?? []).map((r) => ({ ...r, tid: t.id }))).sort((x, y) => y.date.localeCompare(x.date))
+    const rxId = allRx[0]?.id ?? (cv ? rxBy.get(cv.id) ?? null : null)
+    groups.push({
+      key: k,
+      visitId: cv?.id ?? null,
+      title: k === 'old' ? 'Purana record' : date === today ? 'Aaj ki visit' : 'Visit ' + fmtDate(date),
+      dateLabel: fmtDate(date),
+      sortDate: date,
+      summary: (cv?.notes ?? '').trim(),
+      works: ts.map((t) => ({
+        id: t.id,
+        label: label(t),
+        status: t.status,
+        charged: t.charged,
+        paid: t.paid,
+        balance: t.balance,
+        visits: [...t.visits]
+          .sort((x, y) => (x.visit_no ?? 0) - (y.visit_no ?? 0) || x.visit_date.localeCompare(y.visit_date))
+          .map((v, i) => ({ no: v.visit_no ?? i + 1, date: v.visit_date, procedure: v.procedure, notes: v.notes })),
+        rxId: null,
+        waHref:
+          patient.phone && canMoney
+            ? messageLink(
+                'treatment_summary',
+                pinfo,
+                {
+                  work: label(t),
+                  done: (docs.get(t.id)?.doneStages ?? []).join('، '),
+                  visits: String(t.visits.length),
+                  charged: t.charged > 0 ? numFmt(t.charged) : '',
+                  paid: t.charged > 0 ? numFmt(t.paid) : '',
+                  balance: t.charged > 0 ? numFmt(Math.max(0, t.balance)) : '',
+                  next_date: docs.get(t.id)?.next ? fmtDate(docs.get(t.id)!.next!.date) : '',
+                  next_time: docs.get(t.id)?.next?.time ?? '',
+                },
+                tpl
+              )
+            : null,
+      })),
+      total,
+      paid,
+      balance,
+      allDone: open.length === 0,
+      open: false,
+      invoiceHref: cv ? '/admin/visits/' + cv.id + '/invoice' : null,
+      rxHref: rxId ? '/admin/prescriptions/' + rxId + '/print' + (allRx[0] ? '?t=' + allRx[0].tid : '') : null,
+      bothHref: rxId ? '/admin/prescriptions/' + rxId + '/print?w=both' + (allRx[0] ? '&t=' + allRx[0].tid : '') : null,
+      waHref,
+      nextDate: cv?.next_date ?? null,
+    })
+  }
+  groups.sort((a, b) => Number(a.allDone) - Number(b.allDone) || b.sortDate.localeCompare(a.sortDate))
+  const firstOpen = groups.findIndex((g) => !g.allDone)
+  if (firstOpen >= 0) groups[firstOpen].open = true
+  else if (groups.length) groups[0].open = false
+  return groups
 }
 
 /** Profile par: har ilaaj ka chhota card (click se us ilaaj ka apna page) + muaine ka card */
@@ -315,47 +373,48 @@ export async function TreatmentMiniCards({ patient, canMoney, canClinical, canRx
     supabase.from('message_templates').select('key, body'),
     canClinical ? supabase.from('clinical_visits').select('id', { count: 'exact', head: true }).eq('patient_id', patientId).eq('status', 'finished') : Promise.resolve({ count: 0 }),
   ])
-  const list = treatments.filter((t) => t.status !== 'planned' || t.visits.length > 0)
-  const planned = treatments.filter((t) => t.status === 'planned' && t.visits.length === 0)
   const visitCount = cvRes.count ?? 0
-  if (list.length === 0 && planned.length === 0 && visitCount === 0) return null
   const tpl = mapTemplates(tplRes.data as { key: string; body: string }[] | null)
-  const dayVisit = canMoney && canClinical ? await loadDayVisit(supabase, patient, tpl) : null
-  const chip: Record<string, string> = { planned: 'sirf plan', active: 'chal rahi', completed: 'mukammal', cancelled: 'cancel' }
-  const tone: Record<string, string> = { planned: 'bg-amber-100 text-amber-800', active: 'bg-sky-100 text-sky-800', completed: 'bg-emerald-100 text-emerald-800', cancelled: 'bg-gray-100 text-gray-600' }
+  const groups = await loadVisitGroups(supabase, patient, treatments, docs, tpl, canMoney, canRx)
+  const inGroup = new Set(groups.flatMap((g) => g.works.map((w) => w.id)))
+  const planned = treatments.filter((t) => !inGroup.has(t.id) && t.status !== 'cancelled')
+  if (groups.length === 0 && planned.length === 0 && visitCount === 0) return null
   return (
     <section className="rounded-2xl border border-clinic-teal/10 bg-white p-4 sm:p-5" data-testid="mini-cards">
       <h2 className="font-display text-lg font-semibold text-clinic-ink">Ilaaj</h2>
-      <p className="mb-3 text-xs text-clinic-ink/55">Kisi ilaaj par dabayein: us ki visits, qadam, paise, invoice, prescription aur lab ek jagah.</p>
-      {dayVisit && <DayVisitCard d={dayVisit} />}
-      <div className="grid gap-2 sm:grid-cols-2">
-        {[...list, ...planned].map((t) => (
-          <div key={t.id} data-testid="mini-card-box" className="grid gap-2 rounded-xl border border-clinic-teal/15 px-3 py-2">
-            <Link href={'/admin/patients/' + patientId + '/treatment/' + t.id} data-testid="mini-card" className="flex min-h-[48px] flex-col justify-center rounded-lg hover:bg-clinic-mint/30">
-              <span className="flex flex-wrap items-center gap-2">
-                <span className="font-semibold text-clinic-ink">{t.name}</span>
-                {t.teeth.length > 0 && <span className="text-xs text-clinic-ink/60">({t.teeth.join(', ')})</span>}
-                <span className={'rounded-full px-2 py-0.5 text-[11px] ' + (tone[t.status] ?? '')}>{chip[t.status] ?? t.status}</span>
-              </span>
-              <span className="mt-0.5 text-xs text-clinic-ink/60">
-                {t.visits.length} visit{t.visits.length === 1 ? '' : 's'}
-                {canMoney ? (t.balance > 0 ? <span className="font-semibold text-red-600"> · baqaya {money(t.balance)}</span> : t.charged > 0 ? <span className="text-emerald-700"> · hisaab saaf</span> : null) : null}
-                <span className="ml-1 text-clinic-teal"> · kholein →</span>
-              </span>
-            </Link>
-            {t.visits.length > 0 && <TreatmentDocButtons patient={patient} t={t} docs={docs.get(t.id)} canMoney={canMoney} tpl={tpl} />}
+      <p className="mb-3 text-xs text-clinic-ink/55">Har visit ka ek card. Kholein: us ke kaam, paise, agli visit, invoice aur WhatsApp.</p>
+      {groups.map((g) => (
+        <VisitGroupCard key={g.key} g={g} patientId={patientId} canMoney={canMoney} canClinical={canClinical} />
+      ))}
+      {planned.length > 0 && (
+        <div className="mb-3" data-testid="plan-list">
+          <h3 className="mb-1 text-sm font-semibold text-clinic-ink">Aage ka plan</h3>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {planned.map((t) => (
+              <Link key={t.id} href={'/admin/patients/' + patientId + '/treatment/' + t.id} data-testid="mini-card" className="flex min-h-[48px] flex-col justify-center rounded-xl border border-amber-200 bg-amber-50/50 px-3 py-2 hover:bg-amber-50">
+                <span className="font-semibold text-clinic-ink">
+                  {t.name}
+                  {t.teeth.length > 0 && <span className="ml-1 text-xs font-normal text-clinic-ink/60">({t.teeth.join(', ')})</span>}
+                </span>
+                <span className="text-xs text-clinic-ink/60">
+                  {t.status === 'active' ? 'chal rahi' : 'sirf plan'}
+                  {canMoney && t.price > 0 ? ' · Rs. ' + numFmt(t.price) : ''}
+                  <span className="ml-1 text-clinic-teal"> · kholein →</span>
+                </span>
+              </Link>
+            ))}
           </div>
-        ))}
-        {canClinical && visitCount > 0 && (
-          <Link href={'/admin/patients/' + patientId + '/checkups'} data-testid="checkup-card" className="flex min-h-[64px] flex-col justify-center rounded-xl border border-clinic-teal/15 bg-clinic-mint/20 px-3 py-2 hover:border-clinic-teal">
-            <span className="font-semibold text-clinic-ink">Checkup aur muaina</span>
-            <span className="mt-0.5 text-xs text-clinic-ink/60">
-              {visitCount} visit{visitCount === 1 ? '' : 's'}: takleef, tashkhees, dawa
-              <span className="ml-1 text-clinic-teal"> · kholein →</span>
-            </span>
-          </Link>
-        )}
-      </div>
+        </div>
+      )}
+      {canClinical && visitCount > 0 && (
+        <Link href={'/admin/patients/' + patientId + '/checkups'} data-testid="checkup-card" className="flex min-h-[64px] flex-col justify-center rounded-xl border border-clinic-teal/15 bg-clinic-mint/20 px-3 py-2 hover:border-clinic-teal/40">
+          <span className="font-semibold text-clinic-ink">Checkup aur muaina</span>
+          <span className="mt-0.5 text-xs text-clinic-ink/60">
+            {visitCount} visit{visitCount === 1 ? '' : 's'}: takleef, tashkhees, dawa
+            <span className="ml-1 text-clinic-teal"> · kholein →</span>
+          </span>
+        </Link>
+      )}
     </section>
   )
 }
