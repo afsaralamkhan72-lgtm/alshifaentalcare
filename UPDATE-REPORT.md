@@ -181,3 +181,17 @@ Homeopathic dawaiyon ki list (aap ki taraf se). Asli Supabase/login/phone/WhatsA
 - Naya SQL: koi nahi.
 - Tests (sirf local test DB): gb1 42/42, tp1 42/42, tp2 38/38, tp3 9/9, tp4 18/18, tp5 39/39, fu1 58/58, fu2 13/13, fu3 7/7, fu4 10/10, sc1 45/45, duo1 81/81, del1 24/24, qr1 6/6, unit 33/33. Asli Supabase / phone par NOT VERIFIED.
 - Abhi baqi (PNG diya ja chuka, banana baqi): qadam 2 ke 5 bare button aur chart sirf zarurat par, qadam 1 sada, qadam 4 ki tarteeb, lab ki yaad-dahani.
+
+## 14 Nov (B) — Visit ke qadam sada
+
+- Qadam 2 ("Kaam"): "Aaj kaunsa kaam hai?" 5 bare button: Daant ka kaam, Denture, Bridge, Poore munh ka kaam, Checkup. Aik waqt mein aik hissa khulta hai; button par ginti dikhti hai.
+- Chart sirf "Daant ka kaam" aur "Bridge" par khulta hai (A). Purane chart ke nishan mehfooz.
+- Neeche "Aaj ka kaam": jo chuna sab yahan, qeemat badal sakte hain, hatao.
+- Qadam 1: pehle 7 takleef + "Aur"; kab se / kitna dard / kahan aik link ke peeche (zaroori nahi).
+- Visit ke dauran upar sirf patli patti (naam, MR, umar, purana baqaya); profile ka bara card aur "Kul hisaab" chhupe. Visit khatam ya "profile par wapas" par sab wapas.
+- Qadam 4: bill sab se upar, "+ Extra charge" chhota link, "Material kaunsa laga" sab se neeche. "Koi chalu kaam nahi" wali line ab sirf tab jab sach mein koi kaam na ho.
+- Visit khatam: lab jane wale kaam (denture, bridge, crown) ke liye "Lab ki parchi banayein" button; mareez aur kaam pehle se chune hue form khulta hai.
+- Phone par qadam ki patti mein chhote naam (Kaam, Paise) taake kate nahi.
+- Homeopathic visit ka rasta waisa hi.
+- Naya SQL: koi nahi.
+- Tests (sirf local test DB): st2 43/43, gb1 42/42, tp1 42/42, tp2 38/38, tp3 9/9, tp4 18/18, tp5 39/39, fu1 58/58, fu2 13/13, fu3 7/7, fu4 10/10, sc1 45/45, duo1 81/81, del1 24/24, qr1 6/6, homeo visit (n9) mukammal, unit 33/33, security (sec1/sec2) pehle jaisa. Asli Supabase / phone par NOT VERIFIED.

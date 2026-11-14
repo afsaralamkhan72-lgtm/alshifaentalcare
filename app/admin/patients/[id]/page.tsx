@@ -143,7 +143,14 @@ export default async function PatientDetailPage({ params, searchParams }: Props)
       <RewardBanner rewards={readyRewards} />
 
       {/* ================= 1. PATIENT DETAILS ================= */}
-      <section id="s1" className="rounded-2xl border border-clinic-teal/10 bg-white p-4">
+      {/* Visit ke dauran sirf aik chhoti patti: naam, MR, umar, baqaya */}
+      <div className="visit-only flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl border border-clinic-teal/15 bg-white px-4 py-2.5 text-sm" data-testid="visit-strip">
+        <span className="font-display text-base font-semibold capitalize text-clinic-ink">{patient.full_name}</span>
+        {patient.mr_number && <span className="font-mono text-xs font-semibold text-clinic-teal">{patient.mr_number}</span>}
+        {(patient.age != null || patient.gender) && <span className="text-xs text-clinic-ink/60">{[patient.age != null ? patient.age + ' saal' : '', patient.gender ?? ''].filter(Boolean).join(' · ')}</span>}
+        {canMoney && balance && balance.balance > 0 && <span className="text-xs font-semibold text-red-600">Purana baqaya {money(balance.balance)}</span>}
+      </div>
+      <section id="s1" className="profile-extra rounded-2xl border border-clinic-teal/10 bg-white p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-center gap-3">
             <PatientProfilePhoto patientId={patient.id} hasPhoto={Boolean(patient.profile_photo_path)} />
@@ -284,7 +291,7 @@ export default async function PatientDetailPage({ params, searchParams }: Props)
       </section>
 
       {canMoney && balance && (
-        <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-clinic-teal/10 bg-white p-4" data-testid="total-hisab">
+        <section className="profile-extra flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-clinic-teal/10 bg-white p-4" data-testid="total-hisab">
           <div>
             <h2 className="font-display text-lg font-semibold text-clinic-ink">Kul hisaab</h2>
             <p className="mt-1 text-sm">

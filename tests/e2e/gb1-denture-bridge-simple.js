@@ -12,7 +12,7 @@ const start=async(nm)=>{const pid=await L.newPatient(p,nm,'03'+String(Date.now()
 const pid=await start('Gb Mareez '+tag);
 const T=(id)=>p.getByTestId(id);
 ok('purana dabba nahi raha',await T('dent-region').count()===0&&await T('complete-denture-row').count()===0);
-ok('naya dabba: sirf 2 button',await T('gb-box').locator('button').count()===2,(await T('gb-box').locator('button').allInnerTexts()).join(' | '));
+ok('5 bare button (Denture aur Bridge un mein)',(await T('gb-modes').locator('button').allInnerTexts()).filter(x=>/^(Denture|Bridge)/.test(x)).length===2&&await T('gb-modes').locator('button').count()===5,(await T('gb-box').locator('button').allInnerTexts()).join(' | '));
 await p.screenshot({path:S+'1-shuru.png'});
 // ---- Denture
 await T('gb-denture').click();await p.waitForTimeout(300);

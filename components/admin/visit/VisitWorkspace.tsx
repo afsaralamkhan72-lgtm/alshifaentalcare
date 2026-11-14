@@ -13,7 +13,7 @@ import { friendlyError } from '@/lib/errors'
 import { COMPLAINTS, HOMEO_COMPLAINTS, DIAG_SUGGEST } from '@/lib/clinicOptions'
 import { useTemplates } from '@/lib/useTemplates'
 import { messageLink } from '@/lib/messages'
-import { stagesFor } from '@/lib/treatmentStages'
+import { stagesFor, LAB_WORK_RE } from '@/lib/treatmentStages'
 import { similarNames } from '@/lib/similar'
 import PaymentDialog from '@/components/admin/PaymentDialog'
 import VisitRewards from '@/components/admin/VisitRewards'
@@ -354,7 +354,10 @@ export default function VisitWorkspace(p: Props) {
   const [split, setSplit] = useState<Record<string, string>>({})
   const [dReg, setDReg] = useState('')
   /** Denture / Bridge wala sada dabba: kaunsa khula hai */
-  const [gb, setGb] = useState<'' | 'denture' | 'bridge'>('')
+  /** Qadam 1 (dental): pehle sirf chand takleef, baqi "Aur" mein; tafseel band rehti hai jab tak zarurat na ho */
+  const [ccAll, setCcAll] = useState(false)
+  const [ccMore, setCcMore] = useState(false)
+  const [gb, setGb] = useState<'' | 'tooth' | 'denture' | 'bridge' | 'mouth'>('')
   /** "+ Nayi qism": naam, qeemat, aur milte julte naam ka sawal */
   const [nw, setNw] = useState<{ open: boolean; name: string; price: string; ask: string[] }>({ open: false, name: '', price: '', ask: [] })
   const [pickQ, setPickQ] = useState('')
@@ -765,7 +768,7 @@ export default function VisitWorkspace(p: Props) {
     }
     if (rows.some((r) => !r.name.trim())) {
       setStep(2)
-      return setMsg({ ok: false, t: 'Qadam 2 (Daant aur kaam): har treatment ka naam likhein (ya qatar hata dein)' })
+      return setMsg({ ok: false, t: 'Qadam 2 (Kaam): har treatment ka naam likhein (ya qatar hata dein)' })
     }
     setBusy('finish')
     setMsg(null)
@@ -1038,7 +1041,7 @@ export default function VisitWorkspace(p: Props) {
   ].filter(Boolean) as string[]
   const stepIds: number[] = [1, 2, ...(p.perms.rx ? [3] : []), 4]
   const stepPos = Math.max(0, stepIds.indexOf(step))
-  const stepTitle: Record<number, string> = { 1: 'Takleef', 2: homeo ? 'Masla aur ilaj' : 'Daant aur kaam', 3: 'Dawa', 4: 'Paise aur khatam' }
+  const stepTitle: Record<number, string> = { 1: 'Takleef', 2: homeo ? 'Masla aur ilaj' : 'Kaam', 3: 'Dawa', 4: 'Paise aur khatam' }
   const stepCls = (n: number) => (step === n ? 'grid gap-4' : 'hidden')
   const rxOn = wantRx || lines.length > 0
   function goStep(n: number) {
@@ -1046,6 +1049,8 @@ export default function VisitWorkspace(p: Props) {
     void quietSave()
     setTimeout(() => document.querySelector('[data-visit-root] nav[aria-label="Visit ke qadam"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60)
   }
+  // Phone par qadam ke chhote naam, taake patti mein poore aa jayen
+  const stepShort: Record<number, string> = { 2: homeo ? 'Ilaj' : 'Kaam', 4: 'Paise' }
   const Stepper = () => (
     <nav aria-label="Visit ke qadam" className="rounded-2xl border border-clinic-teal/10 bg-white p-3 print:hidden">
       <p className="text-xs font-semibold text-clinic-ink/60">
@@ -1060,7 +1065,8 @@ export default function VisitWorkspace(p: Props) {
               aria-current={n === step ? 'step' : undefined}
               className={`w-full truncate rounded-full px-2 py-1.5 text-[11px] font-semibold sm:text-xs ${n === step ? 'bg-clinic-teal text-white' : i < stepPos ? 'bg-clinic-mint text-clinic-teal' : 'bg-clinic-sand text-clinic-ink/60'}`}
             >
-              {i + 1}. {stepTitle[n]}
+              {i + 1}. <span className="sm:hidden">{stepShort[n] ?? stepTitle[n]}</span>
+              <span className="hidden sm:inline">{stepTitle[n]}</span>
             </button>
           </li>
         ))}
@@ -1157,13 +1163,14 @@ export default function VisitWorkspace(p: Props) {
 
     </>
   )
+  const ccOpen = homeo || ccMore || Boolean(cDur || cSev || cLoc || cOther)
   const blk_cc = (
     <>
           {/* 4. CHIEF COMPLAINT */}
-          <Section title="Takleef (Chief Complaint)" hint="Patient ko kya takleef hai, kab se.">
+          <Section title={homeo ? 'Takleef (Chief Complaint)' : 'Mareez ko kya takleef hai?'} hint={homeo ? 'Patient ko kya takleef hai, kab se.' : 'Sirf takleef chunein. Baqi sab zaroori nahi; seedha Agla bhi daba sakte hain.'}>
             <fieldset disabled={!canEdit} className="grid gap-3">
-              <div className="flex flex-wrap gap-2">
-                {complaintList.map((c) => (
+              <div className="flex flex-wrap gap-2" data-testid="cc-chips">
+                {(homeo || ccAll ? complaintList : complaintList.filter((c, i) => i < 7 || cItems.includes(c))).map((c) => (
                   <button
                     key={c}
                     type="button"
@@ -1174,8 +1181,19 @@ export default function VisitWorkspace(p: Props) {
                     {c}
                   </button>
                 ))}
+                {!homeo && complaintList.length > 7 && (
+                  <button type="button" data-testid="cc-all" aria-expanded={ccAll} onClick={() => setCcAll(!ccAll)} className="rounded-full border border-dashed border-teal-400 bg-teal-50 px-4 py-2 text-sm font-semibold text-teal-800">
+                    {ccAll ? 'Kam dikhayein ▴' : 'Aur ▾'}
+                  </button>
+                )}
               </div>
-              <div className="grid gap-3 sm:grid-cols-3">
+              {!homeo && !ccOpen && (
+                <button type="button" data-testid="cc-more" onClick={() => setCcMore(true)} className="justify-self-start text-xs font-semibold text-clinic-teal underline">
+                  + Kab se, kitna dard, kahan (zaroori nahi)
+                </button>
+              )}
+              {ccOpen && (<>
+              <div className="grid gap-3 sm:grid-cols-3" data-testid="cc-detail">
                 <div>
                   <label className="text-xs font-medium text-clinic-ink/70">Kab se</label>
                   <select value={cDur} onChange={(e) => setCDur(e.target.value)} className={input}>
@@ -1205,6 +1223,7 @@ export default function VisitWorkspace(p: Props) {
                 <label className="text-xs font-medium text-clinic-ink/70">Apne alfaz mein (optional)</label>
                 <input value={cOther} onChange={(e) => setCOther(e.target.value)} className={input} />
               </div>
+              </>)}
             </fieldset>
           </Section>
 
@@ -1250,15 +1269,17 @@ export default function VisitWorkspace(p: Props) {
 
     </>
   )
-  const blk_dx = (
-    <>
-          {/* 8. DIAGNOSIS */}
-          <Section title={homeo ? 'Diagnosis (masla)' : 'Poore munh ka masla (daant ke baghair)'} hint={homeo ? 'Patient ka masla likhein ya list se chunein.' : 'Daant wala masla upar har daant ke card mein hai. Yahan sirf wo masla jo kisi daant ka nahi.'}>
+  const diagDatalist = (
             <datalist id="diag-list">
               {diagList.map((d) => (
                 <option key={d} value={d} />
               ))}
             </datalist>
+  )
+  const blk_dx = (
+    <>
+          {/* 8. DIAGNOSIS */}
+          <Section title={homeo ? 'Diagnosis (masla)' : 'Poore munh ka masla (zaroori nahi)'} hint={homeo ? 'Patient ka masla likhein ya list se chunein.' : 'Daant wala masla upar har daant ke card mein hai. Yahan sirf wo masla jo kisi daant ka nahi.'}>
             <div className="grid gap-3">
               {diags.map((d, i) => ((homeo || (d.teeth ?? []).length === 0) ? (
                 <div key={i} className="grid gap-1.5 rounded-xl border border-clinic-teal/10 p-2.5">
@@ -1331,7 +1352,7 @@ export default function VisitWorkspace(p: Props) {
                       {r.applies === 'tooth' && (
                         <>
                           {!r.group && (!r.catalog_id || r.teeth.length === 0) && <TeethTags all={sel} picked={r.teeth} disabled={!canEdit} onChange={(t) => setRowTeeth(r, t)} />}
-                          {sel.length === 0 && r.teeth.length === 0 && <p className="text-[11px] text-amber-700">Upar chart par daant par tap karke kaam jorein, ya "daant badlein" dabayein.</p>}
+                          {sel.length === 0 && r.teeth.length === 0 && <p className="text-[11px] text-amber-700">Daant ka kaam ho to upar &quot;Daant ka kaam&quot; dabayein, ya &quot;daant badlein&quot; dabayein.</p>}
                           {r.unit != null && !r.manual && r.teeth.length > 1 && (
                             <p className="text-[11px] text-clinic-ink/60">
                               Har daant {money(r.unit)} × {r.teeth.length} daant = {money(r.unit * r.teeth.length)}
@@ -1621,6 +1642,13 @@ export default function VisitWorkspace(p: Props) {
     if (!t) return ''
     return new RegExp(word, 'i').test(t) ? t : t + ' ' + word
   }
+  /** Qadam 2 ke 5 button: aik waqt mein sirf aik hissa khulta hai */
+  function openGb(m: 'tooth' | 'denture' | 'bridge' | 'mouth') {
+    const same = gb === m
+    if (gb === 'tooth' || gb === 'bridge') pickTeeth([])
+    closeGb()
+    if (!same) setGb(m)
+  }
   function closeGb() {
     setGb('')
     setDReg('')
@@ -1721,13 +1749,36 @@ export default function VisitWorkspace(p: Props) {
       </div>
     </div>
   ) : null
+  const mouthDxCount = diags.filter((d) => (d.teeth ?? []).length === 0 && d.text.trim()).length
+  const otherRows = rows.filter((r) => !(r.applies === 'tooth' && r.teeth.length > 0) && !(r.applies === 'jaw' && /denture/i.test(r.name)))
+  const mouthUsed = mouthDxCount + otherRows.filter((r) => !consultCat || r.catalog_id !== consultCat.id).length
+  const consultOn = Boolean(consultCat && rows.some((r) => r.catalog_id === consultCat.id))
+  const toothUsed = rows.filter((r) => r.applies === 'tooth' && !r.group && r.teeth.length > 0).length
+  const modeBtn = (on: boolean) => 'min-h-12 rounded-full border-2 px-4 py-2 text-sm font-semibold sm:px-5 sm:text-base ' + (on ? 'border-violet-600 bg-violet-600 text-white' : 'border-violet-300 bg-white text-violet-900')
+  const dot = (n: number) => (n > 0 ? <span className="ml-1.5 rounded-full bg-emerald-500 px-1.5 text-[11px] font-bold text-white">{n}</span> : null)
   const blk_cd = !homeo && canEdit ? (
-    <div className="grid gap-2.5 rounded-2xl border-2 border-violet-300 bg-white p-3" data-testid="gb-box">
-      <p className="text-sm font-semibold text-clinic-ink">Denture ya Bridge lagana hai?</p>
-      <div className="flex flex-wrap items-center gap-2">
-        <button type="button" data-testid="gb-denture" aria-pressed={gb === 'denture'} onClick={() => (gb === 'denture' ? closeGb() : (closeGb(), setGb('denture')))} className={gbBtn(gb === 'denture')}>Denture</button>
-        <button type="button" data-testid="gb-bridge" aria-pressed={gb === 'bridge'} onClick={() => (gb === 'bridge' ? closeGb() : (closeGb(), setGb('bridge')))} className={gbBtn(gb === 'bridge')}>Bridge</button>
+    <div className="grid gap-2.5 rounded-2xl border-2 border-violet-300 bg-white p-3 sm:p-4" data-testid="gb-box">
+      <p className="font-display text-lg font-semibold text-clinic-ink">Aaj kaunsa kaam hai?</p>
+      <div className="flex flex-wrap items-center gap-2" data-testid="gb-modes">
+        <button type="button" data-testid="gb-tooth" aria-pressed={gb === 'tooth'} onClick={() => openGb('tooth')} className={modeBtn(gb === 'tooth')}>Daant ka kaam{dot(toothUsed)}</button>
+        <button type="button" data-testid="gb-denture" aria-pressed={gb === 'denture'} onClick={() => openGb('denture')} className={modeBtn(gb === 'denture')}>Denture{dot(rows.filter((r) => r.applies === 'jaw' && /denture/i.test(r.name)).length)}</button>
+        <button type="button" data-testid="gb-bridge" aria-pressed={gb === 'bridge'} onClick={() => openGb('bridge')} className={modeBtn(gb === 'bridge')}>Bridge{dot(rows.filter((r) => r.group).length)}</button>
+        <button type="button" data-testid="gb-mouth" aria-pressed={gb === 'mouth'} onClick={() => openGb('mouth')} className={modeBtn(gb === 'mouth')}>Poore munh ka kaam{dot(mouthUsed)}</button>
+        {consultCat && (
+          <button
+            type="button"
+            data-testid="gb-checkup"
+            aria-pressed={consultOn}
+            onClick={() => (consultOn ? setRows(rows.filter((r) => r.catalog_id !== consultCat.id)) : setRows([...rows, { key: newKey(), name: consultCat.name, catalog_id: consultCat.id, teeth: [], price: String(consultCat.price), planned: false, notes: '', mats: {}, applies: 'once', unit: null, manual: false, jaw: '' }]))}
+            className={'min-h-12 rounded-full border-2 px-4 py-2 text-sm font-semibold sm:px-5 sm:text-base ' + (consultOn ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-violet-300 bg-white text-violet-900')}
+          >
+            {consultOn ? '✓ ' : ''}Checkup{p.isFirstVisit && !consultOn ? ' (pehli visit)' : ''}
+          </button>
+        )}
       </div>
+      {gb === '' && <p className="text-xs text-clinic-ink/60" data-testid="gb-idle">Jo kaam karna hai us ka button dabayein. Chuna hua kaam neeche &quot;Aaj ka kaam&quot; mein aata hai.</p>}
+      {gb === 'tooth' && <p className="rounded-xl bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-900" data-testid="gb-tooth-hint">↓ Neeche chart par daant dabayein, phir masla aur kaam chunein.</p>}
+      {gb === 'mouth' && <p className="rounded-xl bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-900" data-testid="gb-mouth-hint">↓ Neeche se scaling, polishing jaise kaam chunein (daant chunne ki zarurat nahi).</p>}
       {gb === 'denture' && (
         <div className="grid gap-2" data-testid="gb-denture-steps">
           <div className="flex flex-wrap items-center gap-2">
@@ -1762,8 +1813,8 @@ export default function VisitWorkspace(p: Props) {
   ) : null
 
   const blk_work = !homeo ? (
-    <Section title="Daant aur kaam" hint="Upar chart par daant chunein, masla aur kaam wahin chunein. Yahan sirf un ke cards aate hain, bill khud.">
-      
+    <Section title="Aaj ka kaam" hint="Jo kaam chuna wo yahan aata hai. Qeemat badal sakte hain; ghalti ho to hatao.">
+      {canEdit && rows.length === 0 && cardTeeth.length === 0 && <p className="text-xs text-clinic-ink/50" data-testid="work-empty">Abhi koi kaam nahi chuna.</p>}
       <div className="grid gap-3 sm:grid-cols-2" data-testid="cards">
         {rows.filter((r) => r.group).map((r) => {
           const dxs = [...new Set(r.teeth.flatMap(dxOfTooth))]
@@ -1990,10 +2041,7 @@ export default function VisitWorkspace(p: Props) {
     </section>
   ) : null
 
-  const blk_tx = (
-    <>
-          {/* 9. TREATMENT */}
-          <Section title={homeo ? 'Aaj ka kaam (Treatment)' : 'Poore muh ka kaam aur baqi kaam'} hint={homeo ? 'Qeemat, samaan aur note yahan likhein.' : 'Daant wale kaam upar har daant ke card mein hain. Yahan scaling, polishing, whitening jaise kaam.'}>
+  const catDatalist = (
             <datalist id="cat-list">
               {p.catalog
                 .filter((c) => (homeo ? c.department !== 'dental' : c.department !== 'homeopathic'))
@@ -2001,8 +2049,14 @@ export default function VisitWorkspace(p: Props) {
                   <option key={c.id} value={c.name} label={c.price_note ? `${c.name} (${c.price_note})` : undefined} />
                 ))}
             </datalist>
+  )
+  const txPick = homeo || gb === 'mouth'
+  const blk_tx = !homeo && !txPick && otherRows.length === 0 && !nextStep ? null : (
+    <>
+          {/* 9. TREATMENT */}
+          <Section title={homeo ? 'Aaj ka kaam (Treatment)' : txPick ? 'Poore munh ka kaam' : 'Baqi kaam'} hint={homeo ? 'Qeemat, samaan aur note yahan likhein.' : txPick ? 'Scaling, polishing, whitening jaise kaam. Jo list mein na ho wo "+ Aur kaam" se likhein.' : undefined}>
             <div className="grid gap-3">
-              {!homeo && canEdit && mouthCat.length > 0 && (
+              {!homeo && txPick && canEdit && mouthCat.length > 0 && (
                 <div className="flex flex-wrap items-center gap-1.5 text-xs">
                   <span className="text-clinic-ink/60">Poore muh ka kaam:</span>
                   {mouthCat.map((c) => {
@@ -2035,13 +2089,13 @@ export default function VisitWorkspace(p: Props) {
                   }}
                 />
               )}
-              {(homeo ? rows : rows.filter((r) => !(r.applies === 'tooth' && r.teeth.length > 0) && !(r.applies === 'jaw' && /denture/i.test(r.name)))).map((r) => rowCard(r))}
-              {canEdit && (
+              {(homeo ? rows : otherRows).map((r) => (homeo || txPick || !r.name.trim() ? rowCard(r) : miniRow(r)))}
+              {canEdit && txPick && (
                 <div className="flex flex-wrap gap-2">
                 <button type="button" onClick={() => setRows([...rows, { key: newKey(), name: '', catalog_id: null, teeth: [], price: '', planned: false, notes: '', mats: {}, applies: 'tooth', unit: null, manual: false, jaw: '' }])} className="justify-self-start rounded-full border border-clinic-teal/30 px-4 py-1.5 text-sm font-semibold text-clinic-teal">
-                  + Treatment
+                  {homeo ? '+ Treatment' : '+ Aur kaam'}
                 </button>
-                {consultCat && !rows.some((r) => r.catalog_id === consultCat.id) && (
+                {homeo && consultCat && !rows.some((r) => r.catalog_id === consultCat.id) && (
                   <button
                     type="button"
                     onClick={() => setRows([...rows, { key: newKey(), name: consultCat.name, catalog_id: consultCat.id, teeth: [], price: String(consultCat.price), planned: false, notes: '', mats: {}, applies: 'once', unit: null, manual: false, jaw: '' }])}
@@ -2052,7 +2106,7 @@ export default function VisitWorkspace(p: Props) {
                 )}
                 </div>
               )}
-              {live.length === 0 && rows.length === 0 && <p className="text-xs text-clinic-ink/50">Abhi koi treatment nahi. Zaroorat ho to &quot;+ Treatment&quot; dabayein.</p>}
+              {homeo && live.length === 0 && rows.length === 0 && <p className="text-xs text-clinic-ink/50">Abhi koi treatment nahi. Zaroorat ho to &quot;+ Treatment&quot; dabayein.</p>}
             </div>
           </Section>
 
@@ -2376,7 +2430,7 @@ export default function VisitWorkspace(p: Props) {
                     ))}
                   </optgroup>
                 </select>
-                {liveAll.length === 0 && <p className="mt-1 text-[11px] text-clinic-ink/60" data-testid="next-hint">Abhi koi chalu ya plan wala kaam nahi, is liye sirf checkup. Kisi kaam ke liye bulana ho to Qadam 2 mein us kaam ko &quot;Sirf plan&quot; ke sath daalein.</p>}
+                {liveAll.length === 0 && !rows.some((r) => !r.planned && r.name.trim()) && <p className="mt-1 text-[11px] text-clinic-ink/60" data-testid="next-hint">Abhi koi chalu ya plan wala kaam nahi, is liye sirf checkup. Kisi kaam ke liye bulana ho to Qadam 2 mein us kaam ko &quot;Sirf plan&quot; ke sath daalein.</p>}
               </div>
             </fieldset>
             {!homeo || true ? (
@@ -2437,6 +2491,20 @@ export default function VisitWorkspace(p: Props) {
               ))}
             </div>
           )}
+          {done && p.perms.lab && (done.links ?? []).some((l) => LAB_WORK_RE.test(l.name)) && (
+            <div className="mt-3 grid gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm" data-testid="lab-remind">
+              <p className="font-semibold text-amber-900">Ye kaam lab jane wale hain. Lab ki parchi bana lein:</p>
+              {(done.links ?? []).filter((l) => LAB_WORK_RE.test(l.name)).map((l) => (
+                <div key={l.id} className="flex flex-wrap items-center justify-between gap-2" data-testid="lab-remind-row">
+                  <span className="min-w-0 font-semibold text-clinic-ink">{l.name}</span>
+                  <a href={`/admin/lab?patient=${p.patient.id}&treatment=${l.id}`} data-testid="lab-remind-link" className="inline-flex min-h-10 items-center rounded-full bg-clinic-teal px-4 py-1.5 text-xs font-semibold text-white">
+                    Lab ki parchi banayein →
+                  </a>
+                </div>
+              ))}
+              <p className="text-[11px] text-amber-900/80">Mareez ka bill ban chuka hai. Lab mein sirf lab ki parchi banti hai; lab ko jo paise dene hain wo &quot;Lab ka hisaab&quot; mein.</p>
+            </div>
+          )}
           {p.hasPlanned && p.perms.money && (
             <a href={`/admin/patients/${p.patient.id}/estimate`} target="_blank" className="mt-3 inline-block text-xs font-semibold text-clinic-teal underline">
               Treatment plan ka estimate (print)
@@ -2477,10 +2545,11 @@ export default function VisitWorkspace(p: Props) {
           <Stepper />
           <div className={stepCls(1)}>
             {blk_head}
+            {!homeo && blk_cc}
             {vs('medical') && blk_med}
             {vs('dental') && !homeo && blk_den}
             {healthCard}
-            {blk_cc}
+            {homeo && blk_cc}
             {vs('exam') && blk_exam}
             {vs('xray') && blk_xray}
             {moreOpts.length > 0 && (
@@ -2504,11 +2573,16 @@ export default function VisitWorkspace(p: Props) {
             {blk_ongoing}
             {blk_live}
             {blk_cd}
-            {!homeo && blk_chart}
+            {!homeo && (!canEdit || gb === 'tooth' || gb === 'bridge') && blk_chart}
+            {catDatalist}
+            {diagDatalist}
+            {!homeo && gb === 'mouth' && blk_tx}
+            {!homeo && (gb === 'mouth' || !canEdit) && blk_dx}
             {blk_work}
+            {!homeo && gb !== 'mouth' && blk_tx}
             {blk_stages}
-            {blk_dx}
-            {blk_tx}
+            {homeo && blk_dx}
+            {homeo && blk_tx}
           </div>
           {p.perms.rx && (
             <div className={stepCls(3)}>
@@ -2534,9 +2608,9 @@ export default function VisitWorkspace(p: Props) {
             </div>
           )}
           <div className={stepCls(4)}>
-            {blk_mat}
             {blk_bill}
             {blk_next}
+            {blk_mat}
           </div>
           {/* QADAM / SAVE / FINISH */}
           <div className="sticky bottom-[calc(3.6rem+env(safe-area-inset-bottom))] z-10 -mx-4 border-t border-clinic-teal/15 bg-white/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:bottom-0">
