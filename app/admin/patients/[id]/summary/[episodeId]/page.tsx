@@ -51,7 +51,7 @@ export default async function TreatmentSummaryPage({
       </div>
 
       <DocStyleBar tpl={tpl} />
-      <DocSheet
+      <DocSheet tpl={tpl}
         id="history-sheet"
         className="mx-auto mt-4 max-w-2xl overflow-hidden rounded-2xl border border-clinic-teal/20 bg-white"
       >

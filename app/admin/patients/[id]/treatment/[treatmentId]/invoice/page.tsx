@@ -69,7 +69,7 @@ export default async function TreatmentInvoicePage({ params, searchParams }: { p
         </div>
       </div>
       <DocStyleBar tpl={tpl} />
-      <DocSheet className="overflow-hidden rounded-2xl border border-clinic-teal/10 bg-white text-clinic-ink">
+      <DocSheet tpl={tpl} className="overflow-hidden rounded-2xl border border-clinic-teal/10 bg-white text-clinic-ink">
         <DocHead tpl={tpl} title="Invoice (ilaaj ka)" refs={invs.map((i) => i.invoice_number).join(', ')} date={null} />
         <div className="p-5 sm:p-8">
         <p className="mt-4 text-sm">

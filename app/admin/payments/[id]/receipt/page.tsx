@@ -43,7 +43,7 @@ export default async function ReceiptPage({ params, searchParams }: { params: Pr
         <SheetPrintButton />
       </div>
       <DocStyleBar tpl={tpl} />
-      <DocSheet className="overflow-hidden rounded-2xl border border-clinic-teal/10 bg-white text-sm text-clinic-ink">
+      <DocSheet tpl={tpl} className="overflow-hidden rounded-2xl border border-clinic-teal/10 bg-white text-sm text-clinic-ink">
         <DocHead tpl={tpl} title={isRefund ? 'REFUND RECEIPT' : 'PAYMENT RECEIPT'} date={null} />
         <div className="p-6">
         <div className="mt-3 grid grid-cols-2 gap-1">

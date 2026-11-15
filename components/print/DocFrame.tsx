@@ -12,20 +12,31 @@ import LetterheadFrame from '@/components/print/LetterheadFrame'
  * Invoice jaise sab kaghaz ka upar ka hissa: prescription wala hi header (logo, clinic ka naam,
  * doctoron ke naam, pata, phone, timing). Sab kuch Settings > Print layout se badalta hai.
  */
+export type DocStyle = 'lh' | 'duo' | 'soft'
+/** Kaunsa style: ?tpl= se (is baar ke liye), warna letterhead laga ho to letterhead, warna Settings ka default */
+function pickStyle(tpl: string | undefined, hasLh: boolean, def: string): DocStyle {
+  if (tpl === 'soft' || tpl === 'duo') return tpl
+  if (tpl === 'lh' && hasLh) return 'lh'
+  if (hasLh) return 'lh'
+  return def === 'duo' ? 'duo' : 'soft'
+}
+
 export async function DocHead({ title, refs, date, tpl }: { title: string; refs?: string | null; date?: string | null; tpl?: string }) {
   const cfg = await getPrintCfg()
   const { layout, logo } = cfg
   const acc = accentOf(layout)
-  const lh = Boolean(layout.letterhead.data)
-  const duo = !lh && (tpl === 'duo' || tpl === 'soft' ? tpl : cfg.defaults.bill) === 'duo'
+  const style = pickStyle(tpl, Boolean(layout.letterhead.data), cfg.defaults.bill)
+  const lh = style === 'lh'
+  const duo = style === 'duo'
+  const bare = { ...layout, letterhead: { ...layout.letterhead, data: null } }
   return (
     <div data-testid="doc-head" data-doc-style={lh ? 'letterhead' : duo ? 'duo' : 'soft'}>
       {lh ? null : duo ? (
         <div style={{ fontSize: `${13.5 * layout.scale}px`, lineHeight: 1.45, padding: '4px 10px' }}>
-          <DuoHead layout={layout} logo={logo} logoUrl={null} />
+          <DuoHead layout={bare} logo={logo} logoUrl={null} />
         </div>
       ) : (
-        <SoftHeader logo={logo} logoUrl={null} layout={layout} />
+        <SoftHeader logo={logo} logoUrl={null} layout={bare} />
       )}
       <div
         style={{ borderBottom: `2px solid ${inkOnWhite(acc)}`, marginTop: duo ? '0.4em' : 0, padding: '8px 10px 6px', display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8, alignItems: 'baseline' }}
@@ -44,7 +55,8 @@ export async function DocHead({ title, refs, date, tpl }: { title: string; refs?
 /** Neeche ka hissa: do doctor wale template mein dono doctors ke naam aur mohar; baqi mein mohar aur shukriya */
 export async function DocFoot({ verify = null, tpl }: { verify?: { table: 'invoices' | 'prescriptions'; id: string } | null; tpl?: string }) {
   const { layout, defaults } = await getPrintCfg()
-  if (layout.letterhead.data) {
+  const style = pickStyle(tpl, Boolean(layout.letterhead.data), defaults.bill)
+  if (style === 'lh') {
     return layout.show.stamp && layout.stamp ? (
       <div data-testid="doc-foot" style={{ marginTop: 24, display: 'flex', justifyContent: 'flex-end' }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -52,7 +64,7 @@ export async function DocFoot({ verify = null, tpl }: { verify?: { table: 'invoi
       </div>
     ) : null
   }
-  if ((tpl === 'duo' || tpl === 'soft' ? tpl : defaults.bill) === 'duo') {
+  if (style === 'duo') {
     return (
       <div data-testid="doc-foot" style={{ fontSize: `${13.5 * layout.scale}px`, padding: '0 10px' }}>
         <DuoFoot layout={layout} verify={verify} />
@@ -72,15 +84,15 @@ export async function DocFoot({ verify = null, tpl }: { verify?: { table: 'invoi
 
 /** Kaghaz ke upar: style chunne ka option (sirf is baar ke liye) */
 export async function DocStyleBar({ tpl }: { tpl?: string }) {
-  const { defaults } = await getPrintCfg()
-  const cur = (tpl === 'duo' || tpl === 'soft' ? tpl : defaults.bill) === 'duo' ? 'duo' : 'soft'
-  return <DocStylePicker current={cur} />
+  const { defaults, layout } = await getPrintCfg()
+  const hasLh = Boolean(layout.letterhead.data)
+  return <DocStylePicker current={pickStyle(tpl, hasLh, defaults.bill)} hasLetterhead={hasLh} />
 }
 
 /** Kaghaz ka dabba: letterhead upload ho to poora A4 us par (header chhup jata hai), warna saada dabba */
-export async function DocSheet({ className, id = 'print-sheet', children }: { className?: string; id?: string; children: React.ReactNode }) {
-  const { layout } = await getPrintCfg()
-  if (layout.letterhead.data) return <LetterheadFrame layout={layout} id={id}>{children}</LetterheadFrame>
+export async function DocSheet({ className, id = 'print-sheet', tpl, children }: { className?: string; id?: string; tpl?: string; children: React.ReactNode }) {
+  const { layout, defaults } = await getPrintCfg()
+  if (pickStyle(tpl, Boolean(layout.letterhead.data), defaults.bill) === 'lh') return <LetterheadFrame layout={layout} id={id}>{children}</LetterheadFrame>
   return (
     <div id={id} className={className}>
       {children}

@@ -231,3 +231,9 @@ Homeopathic dawaiyon ki list (aap ki taraf se). Asli Supabase/login/phone/WhatsA
 - **Homeopathic dawaon ka Import:** Settings > Homeopathic dawaiyan > "Import (file se dawaen)": Excel (.xlsx), CSV/TXT ya paste. Pehle preview (nayi / pehle se maujood / ghalat), phir "jodein". Sirf nayi judti hain (naam+potency), purani kabhi nahi badalti. Namuna file download ka button hai. Naye files: lib/medImport.ts, lib/xlsxLite.ts, components/admin/MedicineImport.tsx.
 - Tests: lg1 (10), hd4 (15), im1 (14), unit medimport (7), b1, hd1-3, tp5 pass. npm test 40/40, tsc, eslint 0 errors.
 - Order: pehle zip paste/push, phir (chahein to) 2 SQL files Supabase SQL Editor mein chalayen (pehle SECURITY-2, phir SECURITY-1). Phir ek galat password se login check karein aur loyalty QR / staff portal ek baar dekhein.
+
+## H (15 Nov): Letterhead ke saath style + patient click
+1. Invoice/receipt/estimate/summary par Style mein Letterhead / Rangeen / Duo (letterhead laga ho tab Letterhead button aata hai). Is baar ke liye badalta hai, Settings nahi badalti.
+2. Patient par click se hamesha profile khulta hai. Adhoora visit ho to "Visit jari rakhein" button aata hai. (Wajah: profile kholte hi khali draft browser mein save ho jata tha, agli baar form khud khul jata tha.)
+Test (local): hd5 11/11, pv1 8/8, pv2, purane hd1-4, b1, tp5, fu1, fu2, dv1, tp1, tp2 PASS, unit 40 PASS.
+Verify nahi: real Supabase, phone/APK, printer.

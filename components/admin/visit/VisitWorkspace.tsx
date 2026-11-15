@@ -297,8 +297,12 @@ export default function VisitWorkspace(p: Props) {
   const visitId = useRef<string | null>(v?.id ?? null)
   const [busy, setBusy] = useState<'' | 'save' | 'finish'>('')
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null)
-  // Visit tab shuru hota hai jab doctor "Naya visit shuru karein" dabaye (ya pehle ka draft maujood ho)
-  const [showForm, setShowForm] = useState(p.visit !== null)
+  // Marez par click se hamesha uska profile khulta hai. Visit ka form tab khulta hai jab doctor khud "Naya visit shuru karein"
+  // (ya adhoora visit ke liye "Visit jari rakhein") dabaye. Adhoora draft maujood ho tab bhi form khud nahi khulta.
+  const [showForm, setShowForm] = useState(false)
+  // Browser mein is marez ka aaj ka adhoora likha hua maujood hai (form khud nahi khulta, sirf "jari rakhein" ka button aata hai)
+  const [localDraft, setLocalDraft] = useState(false)
+  const hasWork = () => rows.length > 0 || lines.length > 0 || extra.length > 0 || rxNotes.trim() !== '' || Object.values(old).some((o) => o && o.tick)
   const [step, setStep] = useState(1)
   const [more, setMore] = useState(false)
   const [wantRx, setWantRx] = useState(false)
@@ -425,9 +429,11 @@ export default function VisitWorkspace(p: Props) {
         }
         const raw = localStorage.getItem(draftKey)
         if (raw) {
-          apply(JSON.parse(raw))
+          const d = JSON.parse(raw)
+          apply(d)
           found = true
-          setShowForm(true)
+          const has = Boolean(d && typeof d === 'object' && ((Array.isArray(d.rows) && d.rows.length > 0) || (Array.isArray(d.lines) && d.lines.length > 0) || (Array.isArray(d.extra) && d.extra.length > 0) || String(d.rxNotes ?? '').trim() !== '' || (d.old && typeof d.old === 'object' && Object.values(d.old as Record<string, { tick?: boolean }>).some((o) => o && o.tick))))
+          if (has) setLocalDraft(true)
         }
       } catch {}
       // Browser mein kuch na ho (naya device / browser saaf) to server par Save ki hui nakal
@@ -443,11 +449,11 @@ export default function VisitWorkspace(p: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftKey])
   useEffect(() => {
-    if (!restored || done) return
+    if (!restored || done || !(showForm || localDraft)) return
     try {
       localStorage.setItem(draftKey, JSON.stringify({ rows, old, lines, rxNotes, extra, sel, paid }))
     } catch {}
-  }, [restored, done, draftKey, rows, old, lines, rxNotes, extra, sel, paid])
+  }, [restored, done, draftKey, rows, old, lines, rxNotes, extra, sel, paid, showForm, localDraft])
 
   /** Daant aik baar chunne par diagnosis / treatment ki qataron mein khud aa jaate hain */
   function pickTeeth(next: string[]) {
@@ -2639,9 +2645,9 @@ export default function VisitWorkspace(p: Props) {
 
       {!showForm && !done && !p.finishedToday && canEdit && (
         <section className="rounded-2xl border border-clinic-teal/15 bg-white p-4 text-center">
-          <p className="text-sm text-clinic-ink/70">Marez ka record neeche dekh sakte hain. Aaj ka visit likhna ho to:</p>
-          <button type="button" onClick={() => setShowForm(true)} className="mt-3 w-full rounded-full bg-clinic-teal px-6 py-3.5 text-base font-semibold text-white sm:w-auto">
-            + Naya visit shuru karein
+          <p className="text-sm text-clinic-ink/70">{p.visit || localDraft || hasWork() ? 'Aaj ka visit adhoora hai (draft mehfooz hai).' : 'Marez ka record neeche dekh sakte hain. Aaj ka visit likhna ho to:'}</p>
+          <button type="button" data-testid={p.visit || localDraft || hasWork() ? 'visit-resume' : 'visit-new'} onClick={() => setShowForm(true)} className="mt-3 w-full rounded-full bg-clinic-teal px-6 py-3.5 text-base font-semibold text-white sm:w-auto">
+            {p.visit || localDraft || hasWork() ? 'Visit jari rakhein' : '+ Naya visit shuru karein'}
           </button>
         </section>
       )}

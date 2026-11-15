@@ -3,11 +3,11 @@
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
 /** Is kaghaz ka style sirf is baar ke liye badalna (Settings nahi badalti) */
-export default function DocStylePicker({ current }: { current: 'soft' | 'duo' }) {
+export default function DocStylePicker({ current, hasLetterhead = false }: { current: 'soft' | 'duo' | 'lh'; hasLetterhead?: boolean }) {
   const router = useRouter()
   const path = usePathname()
   const sp = useSearchParams()
-  const set = (v: 'soft' | 'duo') => {
+  const set = (v: 'soft' | 'duo' | 'lh') => {
     const q = new URLSearchParams(sp.toString())
     q.set('tpl', v)
     router.replace(path + '?' + q.toString())
@@ -16,6 +16,11 @@ export default function DocStylePicker({ current }: { current: 'soft' | 'duo' })
   return (
     <div className="mb-3 flex flex-wrap items-center gap-2 print:hidden" data-testid="doc-style-picker">
       <span className="text-xs text-clinic-ink/60">Style:</span>
+      {hasLetterhead && (
+        <button type="button" data-testid="style-lh" onClick={() => set('lh')} className={b + (current === 'lh' ? 'bg-clinic-teal text-white' : 'border border-clinic-teal text-clinic-teal')}>
+          Letterhead
+        </button>
+      )}
       <button type="button" data-testid="style-soft" onClick={() => set('soft')} className={b + (current === 'soft' ? 'bg-clinic-teal text-white' : 'border border-clinic-teal text-clinic-teal')}>
         Rangeen header
       </button>

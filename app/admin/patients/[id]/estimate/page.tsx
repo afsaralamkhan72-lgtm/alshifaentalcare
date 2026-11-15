@@ -36,7 +36,7 @@ export default async function EstimatePage({ params, searchParams }: { params: P
         <SheetPrintButton />
       </div>
       <DocStyleBar tpl={tpl} />
-      <DocSheet className="overflow-hidden rounded-2xl border border-clinic-teal/10 bg-white text-clinic-ink">
+      <DocSheet tpl={tpl} className="overflow-hidden rounded-2xl border border-clinic-teal/10 bg-white text-clinic-ink">
         <DocHead tpl={tpl} title="Treatment Estimate" date={todayKarachi()} />
         <div className="p-6 sm:p-8">
         <p className="mt-4 text-sm">
