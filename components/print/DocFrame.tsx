@@ -6,6 +6,7 @@ import { inkOnWhite } from '@/lib/contrast'
 import SoftHeader from '@/components/print/SoftHeader'
 import { DuoFoot, DuoHead } from '@/components/print/Duo'
 import DocStylePicker from '@/components/print/DocStylePicker'
+import LetterheadFrame from '@/components/print/LetterheadFrame'
 
 /**
  * Invoice jaise sab kaghaz ka upar ka hissa: prescription wala hi header (logo, clinic ka naam,
@@ -15,10 +16,11 @@ export async function DocHead({ title, refs, date, tpl }: { title: string; refs?
   const cfg = await getPrintCfg()
   const { layout, logo } = cfg
   const acc = accentOf(layout)
-  const duo = (tpl === 'duo' || tpl === 'soft' ? tpl : cfg.defaults.bill) === 'duo'
+  const lh = Boolean(layout.letterhead.data)
+  const duo = !lh && (tpl === 'duo' || tpl === 'soft' ? tpl : cfg.defaults.bill) === 'duo'
   return (
-    <div data-testid="doc-head" data-doc-style={duo ? 'duo' : 'soft'}>
-      {duo ? (
+    <div data-testid="doc-head" data-doc-style={lh ? 'letterhead' : duo ? 'duo' : 'soft'}>
+      {lh ? null : duo ? (
         <div style={{ fontSize: `${13.5 * layout.scale}px`, lineHeight: 1.45, padding: '4px 10px' }}>
           <DuoHead layout={layout} logo={logo} logoUrl={null} />
         </div>
@@ -42,6 +44,14 @@ export async function DocHead({ title, refs, date, tpl }: { title: string; refs?
 /** Neeche ka hissa: do doctor wale template mein dono doctors ke naam aur mohar; baqi mein mohar aur shukriya */
 export async function DocFoot({ verify = null, tpl }: { verify?: { table: 'invoices' | 'prescriptions'; id: string } | null; tpl?: string }) {
   const { layout, defaults } = await getPrintCfg()
+  if (layout.letterhead.data) {
+    return layout.show.stamp && layout.stamp ? (
+      <div data-testid="doc-foot" style={{ marginTop: 24, display: 'flex', justifyContent: 'flex-end' }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={layout.stamp} alt="Mohar" style={{ height: '4.5em', width: 'auto' }} />
+      </div>
+    ) : null
+  }
   if ((tpl === 'duo' || tpl === 'soft' ? tpl : defaults.bill) === 'duo') {
     return (
       <div data-testid="doc-foot" style={{ fontSize: `${13.5 * layout.scale}px`, padding: '0 10px' }}>
@@ -65,4 +75,15 @@ export async function DocStyleBar({ tpl }: { tpl?: string }) {
   const { defaults } = await getPrintCfg()
   const cur = (tpl === 'duo' || tpl === 'soft' ? tpl : defaults.bill) === 'duo' ? 'duo' : 'soft'
   return <DocStylePicker current={cur} />
+}
+
+/** Kaghaz ka dabba: letterhead upload ho to poora A4 us par (header chhup jata hai), warna saada dabba */
+export async function DocSheet({ className, id = 'print-sheet', children }: { className?: string; id?: string; children: React.ReactNode }) {
+  const { layout } = await getPrintCfg()
+  if (layout.letterhead.data) return <LetterheadFrame layout={layout} id={id}>{children}</LetterheadFrame>
+  return (
+    <div id={id} className={className}>
+      {children}
+    </div>
+  )
 }

@@ -1,0 +1,10 @@
+revoke all on function public.loyalty_find_patients(text) from anon, authenticated;
+revoke all on function public.loyalty_rate_ok(text, integer, integer) from anon, authenticated;
+revoke all on function public.loyalty_signup(text, text) from anon, authenticated;
+revoke all on function public.loyalty_device_lookup(text) from anon, authenticated;
+revoke all on function public.loyalty_device_save(text, uuid) from anon, authenticated;
+revoke all on function public.staff_portal_ok(uuid, text) from anon, authenticated;
+revoke all on function public.staff_portal_fail(uuid, text, integer, integer) from anon, authenticated;
+revoke all on function public.staff_acknowledge(uuid, uuid, text) from anon, authenticated;
+revoke all on function public.share_ok(text) from anon, authenticated;
+revoke all on function public.share_fail(text) from anon, authenticated;

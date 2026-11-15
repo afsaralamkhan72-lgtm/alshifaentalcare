@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { money } from '@/lib/karachi'
+import MedicineImport from '@/components/admin/MedicineImport'
 
 export interface Medicine {
   id: string
@@ -113,7 +114,8 @@ export default function MedicineManager({ category, rows }: { category: 'dental'
         <label className="flex items-center gap-1.5 text-xs text-clinic-ink/60">
           <input type="checkbox" checked={showOff} onChange={(e) => setShowOff(e.target.checked)} /> Band wali bhi
         </label>
-        <button onClick={() => open()} className="ml-auto rounded-full bg-clinic-teal px-4 py-2 text-sm font-semibold text-white">
+        {homeo && <MedicineImport existing={rows.map((r) => ({ name: r.name, potency: r.potency }))} />}
+        <button onClick={() => open()} className={(homeo ? '' : 'ml-auto ') + 'rounded-full bg-clinic-teal px-4 py-2 text-sm font-semibold text-white'}>
           + Nayi dawa
         </button>
       </div>

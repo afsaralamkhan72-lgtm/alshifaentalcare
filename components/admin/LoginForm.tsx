@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { loginAction } from '@/app/login/actions'
 
 export default function LoginForm() {
   const router = useRouter()
@@ -16,25 +16,9 @@ export default function LoginForm() {
     setLoading(true)
     setError('')
 
-    const supabase = createClient()
-    const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password })
-
-    if (authError || !data.user) {
-      setError('Email ya password ghalat hai.')
-      setLoading(false)
-      return
-    }
-
-    // Extra check: only users with an active staff_profiles row can enter admin panel
-    const { data: profile } = await supabase
-      .from('staff_profiles')
-      .select('is_active')
-      .eq('id', data.user.id)
-      .single()
-
-    if (!profile || !profile.is_active) {
-      await supabase.auth.signOut()
-      setError('Aap ke account ko staff access nahi mila. Admin se raabta karein.')
+    const res = await loginAction(email, password)
+    if (!res.ok) {
+      setError(res.message)
       setLoading(false)
       return
     }

@@ -223,3 +223,11 @@ Homeopathic dawaiyon ki list (aap ki taraf se). Asli Supabase/login/phone/WhatsA
 
 ## 14 NOV F (Duo template mein logo)
 - Do doctors wala (Duo) header mein ab Al Shifa ka logo clinic ke naam ke saath aata hai (Settings ka logo). Logo na ho ya letterhead paper laga ho to nahi aata. Invoice aur prescription dono par. SQL: koi nahi. Test: hd3 (6), duo1, duo3, hd1, hd2, tp5, qr1 pass.
+
+## 15 NOV G (security + letterhead + dawaon ka import)
+- **Login block:** 5 galat koshish (aik IP + email) par 15 minute band; band hone par bhi wohi aam "Email ya password ghalat hai." (waqt/ginti nahi, sahi password bhi qabool nahi). IP par 20 koshish ki alag hadd. SQL ya service key na ho to login pehle jaisa chalta hai (kabhi band nahi). **SQL: sql-security/SECURITY-2-login-limit.sql** (naya table + 3 functions, purana kuch nahi chheda). Files: app/login/actions.ts, components/admin/LoginForm.tsx.
+- **Security SQL 1:** sql-security/SECURITY-1-lock-public-functions.sql: 10 functions (loyalty_find_patients waghera) se anon/authenticated ka haq hata diya; app inhe service key se chalati hai. Sirf REVOKE, kuch delete nahi.
+- **Letterhead:** treatment invoice, visit invoice, raseed, estimate, summary par letterhead upload ho to poora A4 us par, apna header chhup jata hai (sirf Ref/Date/Patient/bill), mohar rehti hai. Naya: DocSheet (DocFrame.tsx).
+- **Homeopathic dawaon ka Import:** Settings > Homeopathic dawaiyan > "Import (file se dawaen)": Excel (.xlsx), CSV/TXT ya paste. Pehle preview (nayi / pehle se maujood / ghalat), phir "jodein". Sirf nayi judti hain (naam+potency), purani kabhi nahi badalti. Namuna file download ka button hai. Naye files: lib/medImport.ts, lib/xlsxLite.ts, components/admin/MedicineImport.tsx.
+- Tests: lg1 (10), hd4 (15), im1 (14), unit medimport (7), b1, hd1-3, tp5 pass. npm test 40/40, tsc, eslint 0 errors.
+- Order: pehle zip paste/push, phir (chahein to) 2 SQL files Supabase SQL Editor mein chalayen (pehle SECURITY-2, phir SECURITY-1). Phir ek galat password se login check karein aur loyalty QR / staff portal ek baar dekhein.

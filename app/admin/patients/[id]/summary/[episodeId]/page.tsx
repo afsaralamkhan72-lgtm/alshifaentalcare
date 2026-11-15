@@ -1,4 +1,4 @@
-import { DocHead, DocStyleBar } from '@/components/print/DocFrame'
+import { DocHead, DocStyleBar, DocSheet } from '@/components/print/DocFrame'
 import ShareQr from '@/components/print/ShareQr'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
@@ -51,7 +51,7 @@ export default async function TreatmentSummaryPage({
       </div>
 
       <DocStyleBar tpl={tpl} />
-      <div
+      <DocSheet
         id="history-sheet"
         className="mx-auto mt-4 max-w-2xl overflow-hidden rounded-2xl border border-clinic-teal/20 bg-white"
       >
@@ -182,7 +182,7 @@ export default async function TreatmentSummaryPage({
         <div className="mt-6 flex justify-end border-t border-clinic-teal/10 pt-3">
           <ShareQr patientId={id} label="Apni report khud dekhein, QR scan karein" />
         </div>
-      </div>
+      </DocSheet>
     </div>
   )
 }

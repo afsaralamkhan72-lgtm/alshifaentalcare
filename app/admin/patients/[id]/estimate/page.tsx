@@ -6,7 +6,7 @@ import { CLINIC } from '@/clinic.config'
 import { fmtDate, money, todayKarachi } from '@/lib/karachi'
 import { toothTitle as toothLabel } from '@/lib/teeth'
 import SheetPrintButton from '@/components/admin/SheetPrintButton'
-import { DocHead, DocFoot, DocStyleBar } from '@/components/print/DocFrame'
+import { DocHead, DocFoot, DocStyleBar, DocSheet } from '@/components/print/DocFrame'
 
 /** Treatment plan ka andaza (estimate): jo treatments "plan" hain unki qeemat, patient ke dastakhat ke sath, print / PDF ke liye */
 export default async function EstimatePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tpl?: string }> }) {
@@ -36,7 +36,7 @@ export default async function EstimatePage({ params, searchParams }: { params: P
         <SheetPrintButton />
       </div>
       <DocStyleBar tpl={tpl} />
-      <div id="print-sheet" className="overflow-hidden rounded-2xl border border-clinic-teal/10 bg-white text-clinic-ink">
+      <DocSheet className="overflow-hidden rounded-2xl border border-clinic-teal/10 bg-white text-clinic-ink">
         <DocHead tpl={tpl} title="Treatment Estimate" date={todayKarachi()} />
         <div className="p-6 sm:p-8">
         <p className="mt-4 text-sm">
@@ -77,7 +77,7 @@ export default async function EstimatePage({ params, searchParams }: { params: P
         </div>
         <DocFoot tpl={tpl} />
         </div>
-      </div>
+      </DocSheet>
     </div>
   )
 }

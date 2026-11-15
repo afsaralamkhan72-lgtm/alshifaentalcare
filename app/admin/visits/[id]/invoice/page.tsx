@@ -6,7 +6,7 @@ import { CLINIC } from '@/clinic.config'
 import { fmtDate, money } from '@/lib/karachi'
 import SheetPrintButton from '@/components/admin/SheetPrintButton'
 import DocShare from '@/components/print/DocShare'
-import { DocHead, DocFoot, DocStyleBar } from '@/components/print/DocFrame'
+import { DocHead, DocFoot, DocStyleBar, DocSheet } from '@/components/print/DocFrame'
 import { numFmt } from '@/lib/karachi'
 
 type Inv = { id: string; invoice_number: string; total: number; paid_amount: number; invoice_items: { name: string; tooth: string | null; qty: number; unit_price: number }[] }
@@ -61,7 +61,7 @@ export default async function VisitInvoicePage({ params, searchParams }: { param
         </div>
       </div>
       <DocStyleBar tpl={tpl} />
-      <div id="print-sheet" className="overflow-hidden rounded-2xl border border-clinic-teal/10 bg-white text-clinic-ink">
+      <DocSheet className="overflow-hidden rounded-2xl border border-clinic-teal/10 bg-white text-clinic-ink">
         <DocHead tpl={tpl} title="Invoice" refs={invs.map((i) => i.invoice_number).join(', ')} date={v.visit_date} />
         <div className="p-6 sm:p-8">
         <p className="mt-4 text-sm">
@@ -121,7 +121,7 @@ export default async function VisitInvoicePage({ params, searchParams }: { param
         </div>
         <DocFoot tpl={tpl} />
         </div>
-      </div>
+      </DocSheet>
     </div>
   )
 }
